@@ -1,0 +1,96 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build static frontend
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      # Build API container
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
+
+      # Deploy
+      - name: Copy static files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "frontend/dist/*"
+          target: "/srv"
+          strip_components: 2
+
+      - name: Deploy API container
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
+            docker stop api 2>/dev/null || true
+            docker rm api 2>/dev/null || true
+            docker run -d --name api --network app --network-alias api \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              --restart unless-stopped \
+              ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
+
+# SSR mode: uncomment below, comment out static frontend steps above
+#     - name: Build and push Frontend
+#       uses: docker/build-push-action@v5
+#       with:
+#         context: ./frontend
+#         push: true
+#         tags: ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
+#
+#     - name: Deploy frontend container
+#       uses: appleboy/ssh-action@v1
+#       with:
+#         host: ${{ secrets.SERVER_HOST }}
+#         username: ${{ secrets.SERVER_USER }}
+#         key: ${{ secrets.SERVER_SSH_KEY }}
+#         script: |
+#           docker pull ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
+#           docker stop frontend 2>/dev/null || true
+#           docker rm frontend 2>/dev/null || true
+#           docker run -d --name frontend --network app --network-alias frontend \
+#             -e API_URL="http://api:8080" \
+#             --restart unless-stopped \
+#             ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest

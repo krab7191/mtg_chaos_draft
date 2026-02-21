@@ -1,0 +1,14 @@
+tenancy_ocid        = "ocid1.tenancy.oc1..xxx"
+user_ocid           = "ocid1.user.oc1..xxx"
+fingerprint         = "aa:bb:cc:dd:..."
+private_key_path    = "~/.oci/oci_api_key.pem"
+region              = "us-ashburn-1"
+compartment_ocid    = "ocid1.compartment.oc1..xxx"
+availability_domain = "xxxx:US-ASHBURN-AD-1"
+
+app_name       = "myapp"
+ssh_public_key = "ssh-rsa AAAA..."
+
+# Always Free: 4 OCPUs, 24GB total
+instance_ocpus     = 1
+instance_memory_gb = 2
