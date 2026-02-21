@@ -1,5 +1,7 @@
 # App Template
 
+[![Deploy](https://github.com/krab7191/mtg_chaos_draft/actions/workflows/deploy.yml/badge.svg)](https://github.com/krab7191/mtg_chaos_draft/actions/workflows/deploy.yml)
+
 Go + Astro on Oracle Cloud Free Tier. Static-first, SSR optional.
 
 ## Quick Start
