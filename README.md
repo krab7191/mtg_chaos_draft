@@ -1,121 +1,67 @@
-# App Template
+# MTG Chaos Draft
 
 [![Deploy](https://github.com/krab7191/mtg_chaos_draft/actions/workflows/deploy.yml/badge.svg)](https://github.com/krab7191/mtg_chaos_draft/actions/workflows/deploy.yml)
 
-Go + Astro on Oracle Cloud Free Tier. Static-first, SSR optional.
+A personal app for facilitating Magic: The Gathering chaos drafts. Admins manage a sealed product collection; players get a weighted-random pack drawn from it.
 
-## Quick Start
+## Stack
 
-```bash
-# Clone and rename
-git clone <this-repo> my-app && cd my-app
+- **API**: Go + chi, PostgreSQL
+- **Frontend**: Astro (SSR, Node adapter)
+- **Auth**: Google OAuth2 with server-side sessions
+- **Reverse proxy**: Caddy
+- **Infra**: Oracle Cloud Always Free (ARM VM), provisioned with Terraform
 
-# Initialize Go API
-cd api && go mod init my-app && cd ..
+## Features
 
-# Initialize Astro frontend (static mode)
-cd frontend && npm create astro@latest . && cd ..
-
-# Provision infrastructure
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars with your OCI credentials
-terraform init && terraform apply
-```
-
-## Infrastructure (Terraform)
-
-Provisions on Oracle Cloud Always Free tier:
-- 1 ARM VM (1 OCPU, 2GB RAM)
-- VCN with security rules (22, 80, 443)
-- Docker + fail2ban pre-installed
-
-```bash
-cd terraform
-terraform init
-terraform apply
-```
-
-Outputs the server IP for GitHub secrets.
+- Google SSO — admin role granted to `ADMIN_EMAIL`
+- Admin: search sets (via Scryfall), add packs by product type, manage quantities
+- Admin: link MTGStocks IDs to pull live market prices
+- Admin: configure price and scarcity sensitivity for weighted draws
+- Player: select which packs to include, see live odds, draw a random pack
 
 ## GitHub Secrets
 
 | Secret | Description |
 |--------|-------------|
-| `SERVER_HOST` | Server IP (from terraform output) |
+| `SERVER_HOST` | Server IP |
 | `SERVER_USER` | `ubuntu` |
 | `SERVER_SSH_KEY` | Private SSH key |
 | `DATABASE_URL` | `postgres://user:pass@db:5432/myapp` |
-
-## Server Setup (One-Time)
-
-After `terraform apply`:
-
-```bash
-ssh ubuntu@<SERVER_IP>
-
-# Run PostgreSQL
-docker run -d --name db --network app \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=changeme \
-  -e POSTGRES_DB=myapp \
-  -v postgres_data:/var/lib/postgresql/data \
-  --restart unless-stopped \
-  postgres:16-alpine
-
-# Run Caddy
-docker run -d --name caddy --network app \
-  -p 80:80 -p 443:443 \
-  -e DOMAIN=yourapp.duckdns.org \
-  -v /home/ubuntu/Caddyfile:/etc/caddy/Caddyfile \
-  -v caddy_data:/data \
-  -v /srv:/srv:ro \
-  --restart unless-stopped \
-  caddy:2-alpine
-
-# Login to GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
-```
-
-## DuckDNS
-
-Add to crontab (`crontab -e`):
-
-```
-*/5 * * * * curl -s "https://www.duckdns.org/update?domains=YOURDOMAIN&token=YOURTOKEN&ip=" >/dev/null 2>&1
-```
-
-## Deployment Modes
-
-### Static (default)
-- Astro builds to HTML/CSS/JS
-- Caddy serves static files
-- Smallest footprint
-
-### SSR
-- Astro runs as Node server
-- See comments in `Caddyfile` and `.github/workflows/deploy.yml`
-- Uncomment SSR blocks, comment static blocks
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URL` | `https://yourdomain/api/auth/callback` |
+| `ADMIN_EMAIL` | Email address granted admin role |
 
 ## Project Structure
 
 ```
 ├── api/
+│   ├── main.go
+│   ├── db/
+│   ├── handlers/
+│   ├── middleware/
 │   └── Dockerfile
 ├── frontend/
-│   └── Dockerfile        # SSR mode only
+│   ├── src/
+│   └── Dockerfile
+├── docs/
+│   ├── development.md
+│   └── production.md
 ├── terraform/
 │   ├── main.tf
 │   ├── variables.tf
 │   ├── outputs.tf
 │   └── terraform.tfvars.example
-├── .github/workflows/
-│   └── deploy.yml
+├── .github/workflows/deploy.yml
 ├── Caddyfile
-├── .env.example
-├── .gitignore
-└── .pre-commit-config.yaml
+└── .env.example
 ```
+
+## Documentation
+
+- [Development setup](docs/development.md)
+- [Production deployment](docs/production.md)
 
 ## License
 
