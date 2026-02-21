@@ -1,0 +1,255 @@
+---
+// Client-side search component — talks to /api/search (Scryfall-backed)
+---
+
+<div class="search" id="pack-search">
+  <input
+    type="text"
+    id="search-input"
+    class="search__input"
+    placeholder="Search sets (e.g. Foundations, Lord of the Rings, Dominaria...)"
+    autocomplete="off"
+  />
+  <div class="search__results" id="search-results" hidden></div>
+</div>
+
+<style lang="scss">
+  .search {
+    position: relative;
+    margin-bottom: 2rem;
+
+    &__input {
+      width: 100%;
+      padding: 0.7rem 1rem;
+      font-size: 1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-text);
+
+      &:focus { outline: 2px solid var(--color-accent); }
+    }
+
+    &__results {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      z-index: 100;
+      max-height: 420px;
+      overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    &__empty {
+      padding: 1rem;
+      color: var(--color-text-muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+  }
+</style>
+
+<style lang="scss" is:global>
+  .set-result {
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.6rem;
+
+    &:last-child { border-bottom: none; }
+
+    &__icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      margin-top: 3px;
+      filter: invert(1) opacity(0.6);
+
+      @media (min-width: 480px) { width: 26px; height: 26px; }
+    }
+
+    &__info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    &__name {
+      font-weight: 500;
+      font-size: 0.88rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &__meta {
+      color: var(--color-text-muted);
+      font-size: 0.73rem;
+      margin-top: 1px;
+    }
+
+    /* Buttons row — full width on mobile so they wrap below the name */
+    &__types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      width: 100%;
+      /* indent to align with name, past icon + gap */
+      padding-left: calc(22px + 0.6rem);
+
+      @media (min-width: 480px) {
+        width: auto;
+        padding-left: 0;
+        flex-shrink: 0;
+        align-self: center;
+      }
+    }
+
+    &__add-group {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    &__qty {
+      width: 2.8rem;
+      padding: 0.2rem 0.25rem;
+      font-size: 0.73rem;
+      text-align: center;
+      border: 1px solid var(--color-border);
+      border-right: none;
+      border-radius: var(--radius) 0 0 var(--radius);
+      background: var(--color-surface);
+      color: var(--color-text);
+      &:focus { outline: none; border-color: var(--color-accent); }
+    }
+
+    &__add-btn {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 0.22rem 0.5rem;
+      font-size: 0.73rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.1s, color 0.1s;
+
+      &:hover { border-color: var(--color-accent); color: var(--color-accent); }
+      &.added { border-color: var(--color-success); color: var(--color-success); cursor: default; }
+      &.error { border-color: var(--color-danger); color: var(--color-danger); cursor: default; }
+      &:disabled { opacity: 0.5; cursor: not-allowed; }
+    }
+  }
+</style>
+
+<script>
+  let debounceTimer: ReturnType<typeof setTimeout>;
+
+  const input = document.getElementById('search-input') as HTMLInputElement;
+  const results = document.getElementById('search-results') as HTMLDivElement;
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { results.hidden = true; return; }
+    debounceTimer = setTimeout(() => doSearch(q), 500);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!(e.target as Element).closest('#pack-search')) {
+      results.hidden = true;
+    }
+  });
+
+  async function doSearch(q: string) {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return;
+    const items: any[] = await res.json();
+
+    results.innerHTML = '';
+
+    if (items.length === 0) {
+      results.innerHTML = '<div class="search__empty">No sets found</div>';
+      results.hidden = false;
+      return;
+    }
+
+    items.forEach((set) => {
+      const row = document.createElement('div');
+      row.className = 'set-result';
+
+      const year = set.releasedAt?.slice(0, 4) ?? '';
+      const typeLabel = set.setType.replace('_', ' ');
+
+      const typeButtons = (set.productTypes as string[]).map((pt) => `
+        <span class="set-result__add-group">
+          <input class="set-result__qty" type="number" value="1" min="1" max="999"
+            data-product-type="${pt}" title="Quantity" />
+          <button class="set-result__add-btn"
+            data-code="${set.code}"
+            data-set-name="${set.name}"
+            data-product-type="${pt}">
+            + ${pt}
+          </button>
+        </span>
+      `).join('');
+
+      row.innerHTML = `
+        <img class="set-result__icon" src="${set.iconUrl}" alt="" />
+        <div class="set-result__info">
+          <div class="set-result__name">${set.name}</div>
+          <div class="set-result__meta">${year} · ${typeLabel}</div>
+        </div>
+        <div class="set-result__types">${typeButtons}</div>
+      `;
+
+      results.appendChild(row);
+    });
+
+    results.hidden = false;
+
+    results.querySelectorAll<HTMLButtonElement>('.set-result__add-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+
+        const code = btn.dataset.code!;
+        const setName = btn.dataset.setName!;
+        const productType = btn.dataset.productType!;
+        const name = `${setName} ${productType}`;
+        const qtyInput = btn.closest('.set-result__add-group')?.querySelector<HTMLInputElement>('.set-result__qty');
+        const quantity = parseInt(qtyInput?.value ?? '1') || 1;
+
+        const res = await fetch('/api/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scryfallSetCode: code,
+            name,
+            setName,
+            productType,
+            quantity,
+            weight: 1.0,
+          }),
+        });
+
+        if (res.ok) {
+          btn.textContent = '✓ Added';
+          btn.classList.add('added');
+          document.dispatchEvent(new CustomEvent('collection-updated'));
+        } else if (res.status === 409) {
+          btn.textContent = '✓ In collection';
+          btn.classList.add('added');
+        } else {
+          btn.textContent = 'Error';
+          btn.classList.add('error');
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+</script>

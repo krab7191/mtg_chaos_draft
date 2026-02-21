@@ -1,18 +1,26 @@
-# Environment
+# Environment — keep only the example file
 .env
+.env.*
+!.env.example
 
 # Terraform
 terraform/.terraform
 terraform/*.tfstate*
 terraform/terraform.tfvars
 
-# Go
+# Go binaries
 api/server
+api/api
+api/mtg-chaos-draft
+api/tmp
 
 # Node
 frontend/node_modules
 frontend/dist
 frontend/.astro
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # IDE
 .idea
@@ -21,3 +29,6 @@ frontend/.astro
 
 # OS
 .DS_Store
+
+# Postgres
+*.sql

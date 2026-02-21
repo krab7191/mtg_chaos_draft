@@ -1,0 +1,391 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+const meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+if (user.role !== 'admin') return Astro.redirect('/select');
+
+const [colRes, settingsRes] = await Promise.all([
+  fetch(`${apiUrl}/api/collection`, { headers: { cookie } }),
+  fetch(`${apiUrl}/api/settings`,   { headers: { cookie } }),
+]);
+const packs    = colRes.ok      ? await colRes.json()      : [];
+const settings = settingsRes.ok ? await settingsRes.json() : { priceSensitivity: 0.5, scarcitySensitivity: 0.5 };
+
+const LEVELS = [
+  { label: 'Off',    value: 0    },
+  { label: 'Low',    value: 0.25 },
+  { label: 'Medium', value: 0.5  },
+  { label: 'High',   value: 0.75 },
+  { label: 'Max',    value: 1    },
+];
+
+function nearest(v: number) {
+  return LEVELS.reduce((a, b) => Math.abs(b.value - v) < Math.abs(a.value - v) ? b : a).value;
+}
+
+const priceLevel    = nearest(settings.priceSensitivity);
+const scarcityLevel = nearest(settings.scarcitySensitivity);
+---
+
+<Layout title="Weights" user={user}>
+  <div class="page">
+    <h1 class="page__title">Weights</h1>
+
+    <!-- ── Sensitivity controls ─────────────────────────────── -->
+    <div class="rules">
+      <div class="rule">
+        <div class="rule__header">
+          <span class="rule__label">Price sensitivity</span>
+          <span class="rule__hint">Penalises expensive packs</span>
+        </div>
+        <div class="seg" id="price-seg" data-setting="priceSensitivity">
+          {LEVELS.map(l => (
+            <button
+              class={`seg__btn${l.value === priceLevel ? ' seg__btn--active' : ''}`}
+              data-value={l.value}
+            >{l.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule__header">
+          <span class="rule__label">Scarcity sensitivity</span>
+          <span class="rule__hint">Penalises low-stock packs</span>
+        </div>
+        <div class="seg" id="scarcity-seg" data-setting="scarcitySensitivity">
+          {LEVELS.map(l => (
+            <button
+              class={`seg__btn${l.value === scarcityLevel ? ' seg__btn--active' : ''}`}
+              data-value={l.value}
+            >{l.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Pack table ─────────────────────────────────────────── -->
+    {packs.length === 0 ? (
+      <p class="page__empty">No packs yet — <a href="/admin/collection">add some first</a>.</p>
+    ) : (
+      <div class="table-scroll">
+        <table class="table" id="weights-table"
+          data-price-sensitivity={priceLevel}
+          data-scarcity-sensitivity={scarcityLevel}
+        >
+          <thead>
+            <tr>
+              <th>Set</th>
+              <th>Type</th>
+              <th>Qty</th>
+              <th>Base&nbsp;weight</th>
+              <th>Effective odds</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {packs.map((pack: any) => (
+              <tr
+                data-id={pack.id}
+                data-weight={pack.weight}
+                data-qty={pack.quantity}
+                data-price={pack.marketPrice ?? ''}
+              >
+                <td class="col-set">{pack.setName}</td>
+                <td class="col-type">{pack.productType}</td>
+                <td class="col-num">{pack.quantity}</td>
+                <td class="col-num">
+                  <input type="number" class="inline-edit" value={pack.weight}
+                    step="0.1" min="0" data-field="weight" data-id={pack.id} />
+                </td>
+                <td class="col-odds">
+                  <div class="odds">
+                    <div class="odds__bar"><div class="odds__fill" style="width:0%"></div></div>
+                    <span class="odds__label">—</span>
+                  </div>
+                </td>
+                <td class="col-actions">
+                  <button class="btn-delete" data-id={pack.id} title="Remove">✕</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</Layout>
+
+<style lang="scss">
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 1rem; }
+    &__empty { color: var(--color-text-muted); padding: 3rem 0; text-align: center; }
+  }
+
+  /* ── Rule cards ──────────────────────────────────────────── */
+  .rules {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .rule {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+
+    &__header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      margin-bottom: 0.65rem;
+      flex-wrap: wrap;
+    }
+
+    &__label {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    &__hint {
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+    }
+  }
+
+  /* ── Segmented control ───────────────────────────────────── */
+  .seg {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+
+    &__btn {
+      flex: 1;
+      padding: 0.5rem 0.25rem;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+
+      &:last-child { border-right: none; }
+      &:hover:not(.seg__btn--active) { background: var(--color-bg); color: var(--color-text); }
+
+      &--active {
+        background: var(--color-accent);
+        color: white;
+      }
+    }
+  }
+
+  /* ── Table ───────────────────────────────────────────────── */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+
+    th {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+      border-bottom: 2px solid var(--color-border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: middle;
+    }
+
+    tr:hover td { background: var(--color-surface); }
+
+    .col-set  { font-weight: 500; white-space: nowrap; }
+    .col-type { color: var(--color-text-muted); font-size: 0.85rem; white-space: nowrap; }
+    .col-num  { width: 6rem; }
+    .col-odds { min-width: 10rem; }
+  }
+
+  .inline-edit {
+    width: 4.5rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-text);
+    text-align: right;
+    font-size: 0.9rem;
+
+    &:hover { border-color: var(--color-border); }
+    &:focus  { border-color: var(--color-accent); background: var(--color-surface); outline: none; }
+  }
+
+  .odds {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    &__bar {
+      flex: 1;
+      height: 6px;
+      background: var(--color-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    &__fill {
+      height: 100%;
+      background: var(--color-accent);
+      border-radius: 3px;
+      transition: width 0.25s ease;
+    }
+
+    &__label {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      min-width: 3rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  .btn-delete {
+    background: none;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: var(--radius);
+    padding: 0.2rem 0.45rem;
+    font-size: 0.78rem;
+    &:hover { border-color: var(--color-danger); color: var(--color-danger); }
+  }
+</style>
+
+<script>
+  // ── Effective weight formula (mirrors server-side logic) ──────
+  function computeEffectiveWeights(
+    rows: NodeListOf<HTMLTableRowElement>,
+    priceSens: number,
+    scarcitySens: number,
+  ): number[] {
+    const packs = Array.from(rows).map(r => ({
+      weight: parseFloat(r.dataset.weight ?? '1') || 1,
+      qty:    parseInt(r.dataset.qty   ?? '1') || 1,
+      price:  r.dataset.price ? parseFloat(r.dataset.price) : null,
+    }));
+
+    const prices = packs.map(p => p.price).filter((p): p is number => p !== null && p > 0);
+    const minPrice = prices.length ? Math.min(...prices) : 0;
+    const maxQty   = Math.max(...packs.map(p => p.qty), 1);
+
+    return packs.map(p => {
+      let priceFactor = 1;
+      if (priceSens > 0 && p.price && p.price > 0 && minPrice > 0) {
+        priceFactor = (1 - priceSens) + priceSens * (minPrice / p.price);
+      }
+      const qtyFactor = (1 - scarcitySens) + scarcitySens * (p.qty / maxQty);
+      return p.weight * priceFactor * qtyFactor;
+    });
+  }
+
+  function recalcOdds() {
+    const table = document.getElementById('weights-table') as HTMLElement;
+    const rows  = table.querySelectorAll<HTMLTableRowElement>('tbody tr');
+    const priceSens    = parseFloat(table.dataset.priceSensitivity    ?? '0');
+    const scarcitySens = parseFloat(table.dataset.scarcitySensitivity ?? '0');
+
+    const weights = computeEffectiveWeights(rows, priceSens, scarcitySens);
+    const total   = weights.reduce((a, b) => a + b, 0);
+
+    rows.forEach((row, i) => {
+      const pct   = total > 0 ? (weights[i] / total) * 100 : 0;
+      const fill  = row.querySelector<HTMLElement>('.odds__fill')!;
+      const label = row.querySelector<HTMLElement>('.odds__label')!;
+      fill.style.width  = `${pct}%`;
+      label.textContent = `${pct.toFixed(1)}%`;
+    });
+  }
+
+  // ── Segmented controls ────────────────────────────────────────
+  let saveTimer: ReturnType<typeof setTimeout>;
+
+  function saveSettings() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      const table = document.getElementById('weights-table') as HTMLElement | null;
+      const priceSens    = table ? parseFloat(table.dataset.priceSensitivity    ?? '0') : 0;
+      const scarcitySens = table ? parseFloat(table.dataset.scarcitySensitivity ?? '0') : 0;
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceSensitivity: priceSens, scarcitySensitivity: scarcitySens }),
+      });
+    }, 400);
+  }
+
+  document.querySelectorAll<HTMLElement>('.seg').forEach((seg) => {
+    const setting = seg.dataset.setting!;
+    seg.querySelectorAll<HTMLButtonElement>('.seg__btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        seg.querySelectorAll('.seg__btn').forEach(b => b.classList.remove('seg__btn--active'));
+        btn.classList.add('seg__btn--active');
+
+        const table = document.getElementById('weights-table') as HTMLElement | null;
+        if (table) {
+          if (setting === 'priceSensitivity')    table.dataset.priceSensitivity    = btn.dataset.value!;
+          if (setting === 'scarcitySensitivity') table.dataset.scarcitySensitivity = btn.dataset.value!;
+        }
+        recalcOdds();
+        saveSettings();
+      });
+    });
+  });
+
+  // ── Base weight inline edit ───────────────────────────────────
+  document.querySelectorAll<HTMLInputElement>('.inline-edit').forEach((input) => {
+    const save = async () => {
+      const id    = input.dataset.id;
+      const value = parseFloat(input.value);
+      if (isNaN(value)) return;
+      const row = input.closest<HTMLTableRowElement>('tr');
+      if (row) row.dataset.weight = String(value);
+      recalcOdds();
+      await fetch(`/api/collection/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weight: value }),
+      });
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  });
+
+  // ── Delete ────────────────────────────────────────────────────
+  document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Remove this pack?')) return;
+      const res = await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
+      if (res.ok) { btn.closest('tr')?.remove(); recalcOdds(); }
+    });
+  });
+
+  recalcOdds();
+</script>

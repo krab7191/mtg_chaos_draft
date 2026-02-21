@@ -1,0 +1,260 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import PackSearch from '../../components/PackSearch.astro';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+const meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+if (user.role !== 'admin') return Astro.redirect('/select');
+
+const colRes = await fetch(`${apiUrl}/api/collection`, { headers: { cookie } });
+const packs = colRes.ok ? await colRes.json() : [];
+---
+
+<Layout title="Manage Collection" user={user}>
+  <div class="page">
+    <h1 class="page__title">Manage Collection</h1>
+    <p class="page__sub">Search to add packs, or remove ones you no longer have.</p>
+
+    <PackSearch />
+
+    <section class="collection">
+      <h2 class="collection__heading">In your collection</h2>
+
+      {packs.length === 0 ? (
+        <p class="collection__empty">Nothing yet — search above to add some packs.</p>
+      ) : (
+        <div class="table-scroll">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Set</th>
+                <th>Type</th>
+                <th>Qty</th>
+                <th>MTGStocks ID</th>
+                <th>Market price</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="collection-body">
+              {packs.map((pack: any) => (
+                <tr data-id={pack.id}>
+                  <td class="col-set">{pack.setName}</td>
+                  <td class="col-type">{pack.productType}</td>
+                  <td class="col-qty">
+                    <div class="qty" data-id={pack.id}>
+                      <button class="qty__btn qty__btn--dec" data-id={pack.id}>−</button>
+                      <span class="qty__val">{pack.quantity}</span>
+                      <button class="qty__btn qty__btn--inc" data-id={pack.id}>+</button>
+                    </div>
+                  </td>
+                  <td class="col-mtg">
+                    <input
+                      type="number"
+                      class="mtg-input"
+                      placeholder="e.g. 5067"
+                      value={pack.mtgstocksId ?? ''}
+                      data-id={pack.id}
+                    />
+                  </td>
+                  <td class="col-price">
+                    <span class="price-val" data-id={pack.id}>
+                      {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
+                    </span>
+                  </td>
+                  <td class="col-actions">
+                    <button class="btn-delete" data-id={pack.id} title="Remove">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+
+    <p class="page__hint">
+      Adjust odds on the <a href="/admin/weights">Weights</a> page.
+    </p>
+  </div>
+</Layout>
+
+<style lang="scss">
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    &__sub   { color: var(--color-text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+    &__hint  { margin-top: 1.25rem; color: var(--color-text-muted); font-size: 0.85rem; }
+  }
+
+  .collection {
+    &__heading {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    &__empty {
+      color: var(--color-text-muted);
+      padding: 2rem 0;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+
+    th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+      border-bottom: 2px solid var(--color-border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: middle;
+    }
+
+    tr:hover td { background: var(--color-surface); }
+
+    .col-set   { font-weight: 500; }
+    .col-type  { color: var(--color-text-muted); font-size: 0.85rem; }
+    .col-qty   { width: 7rem; }
+    .col-mtg   { width: 8rem; }
+    .col-price { width: 7rem; font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+  }
+
+  .qty {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    &__val {
+      min-width: 1.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.9rem;
+    }
+
+    &__btn {
+      background: none;
+      border: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+      border-radius: var(--radius);
+      width: 1.6rem;
+      height: 1.6rem;
+      font-size: 1rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+
+      &:hover { border-color: var(--color-accent); color: var(--color-accent); }
+      &:disabled { opacity: 0.3; cursor: not-allowed; }
+    }
+  }
+
+  .mtg-input {
+    width: 100%;
+    padding: 0.22rem 0.4rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.85rem;
+
+    &:focus { border-color: var(--color-accent); background: var(--color-surface); outline: none; }
+    &::placeholder { color: var(--color-text-muted); }
+  }
+
+  .btn-delete {
+    background: none;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: var(--radius);
+    padding: 0.2rem 0.45rem;
+    font-size: 0.78rem;
+    &:hover { border-color: var(--color-danger); color: var(--color-danger); }
+  }
+</style>
+
+<script>
+  // +/- qty buttons
+  document.querySelectorAll<HTMLElement>('.qty').forEach((widget) => {
+    const id      = widget.dataset.id!;
+    const valEl   = widget.querySelector<HTMLElement>('.qty__val')!;
+    const decBtn  = widget.querySelector<HTMLButtonElement>('.qty__btn--dec')!;
+    const incBtn  = widget.querySelector<HTMLButtonElement>('.qty__btn--inc')!;
+
+    const update = async (delta: number) => {
+      const current = parseInt(valEl.textContent ?? '1');
+      const next    = Math.max(0, current + delta);
+      valEl.textContent = String(next);
+      decBtn.disabled   = next === 0;
+      await fetch(`/api/collection/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: next }),
+      });
+    };
+
+    decBtn.disabled = parseInt(valEl.textContent ?? '1') === 0;
+    decBtn.addEventListener('click', () => update(-1));
+    incBtn.addEventListener('click', () => update(+1));
+  });
+
+  // MTGStocks ID — link price on Enter or blur
+  document.querySelectorAll<HTMLInputElement>('.mtg-input').forEach((input) => {
+    const linkPrice = async () => {
+      const id  = input.dataset.id!;
+      const val = parseInt(input.value);
+      if (!val || isNaN(val)) return;
+
+      const priceEl = document.querySelector<HTMLElement>(`.price-val[data-id="${id}"]`);
+      if (priceEl) priceEl.textContent = '…';
+
+      const res = await fetch(`/api/collection/${id}/link-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mtgstocksId: val }),
+      });
+      if (res.ok && priceEl) {
+        const pack = await res.json();
+        priceEl.textContent = pack.marketPrice != null
+          ? `$${pack.marketPrice.toFixed(2)}`
+          : 'No price';
+      }
+    };
+    input.addEventListener('blur', linkPrice);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  });
+
+  // Delete
+  document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Remove this pack from the collection?')) return;
+      const res = await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
+      if (res.ok) btn.closest('tr')?.remove();
+    });
+  });
+
+  // Reload when PackSearch adds something
+  document.addEventListener('collection-updated', () => window.location.reload());
+</script>

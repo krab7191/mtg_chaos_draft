@@ -4,17 +4,10 @@
         reverse_proxy api:8080
     }
 
-    # Static mode: serve files from /srv
+    # SSR frontend
     handle {
-        root * /srv
-        file_server
-        try_files {path} /index.html
+        reverse_proxy frontend:4321
     }
-
-    # SSR mode: uncomment below, comment out static block above
-    # handle {
-    #     reverse_proxy frontend:4321
-    # }
 
     header {
         X-Content-Type-Options nosniff

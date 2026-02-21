@@ -1,0 +1,84 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+// Redirect if already logged in
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const meRes = await fetch(`${apiUrl}/api/auth/me`, {
+  headers: { cookie: Astro.request.headers.get('cookie') ?? '' },
+});
+if (meRes.ok) {
+  const user = await meRes.json();
+  return Astro.redirect(user.role === 'admin' ? '/admin/collection' : '/select');
+}
+---
+
+<Layout title="Sign In">
+  <div class="login">
+    <div class="login__card">
+      <h1 class="login__title">MTG Chaos Draft</h1>
+      <p class="login__sub">Sign in to access your draft session</p>
+      <a href="/api/auth/login" class="login__btn">
+        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.5-1.45-.79-3-.79-4.59s.29-3.14.79-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        </svg>
+        Sign in with Google
+      </a>
+    </div>
+  </div>
+</Layout>
+
+<style lang="scss">
+  .login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+
+    &__card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      max-width: 380px;
+      width: 100%;
+
+      @media (min-width: 480px) {
+        padding: 3rem 2.5rem;
+      }
+    }
+
+    &__title {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    &__sub {
+      color: var(--color-text-muted);
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    &__btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: white;
+      color: #333;
+      padding: 0.7rem 1.4rem;
+      border-radius: var(--radius);
+      font-weight: 500;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: box-shadow 0.15s;
+
+      &:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        text-decoration: none;
+      }
+    }
+  }
+</style>
