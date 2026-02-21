@@ -156,7 +156,7 @@ sudo usermod -aG docker ubuntu
 # Log out and back in
 
 # Clone the repo
-git clone https://github.com/yourusername/mtg-chaos-draft ~/app
+git clone https://github.com/krab7191/mtg_chaos_draft ~/app
 cd ~/app
 
 # Create .env on the server

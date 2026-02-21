@@ -2,36 +2,21 @@
 
 [![Deploy](https://github.com/krab7191/mtg_chaos_draft/actions/workflows/deploy.yml/badge.svg)](https://github.com/krab7191/mtg_chaos_draft/actions/workflows/deploy.yml)
 
-A personal app for facilitating Magic: The Gathering chaos drafts. Admins manage a sealed product collection; players get a weighted-random pack drawn from it.
+A personal app for running Magic: The Gathering chaos drafts. Instead of everyone drafting from the same set, players draw randomly from a mixed collection of sealed packs — with configurable odds.
 
-## Stack
+## How it works
 
-- **API**: Go + chi, PostgreSQL
-- **Frontend**: Astro (SSR, Node adapter)
-- **Auth**: Google OAuth2 with server-side sessions
-- **Reverse proxy**: Caddy
-- **Infra**: Oracle Cloud Always Free (ARM VM), provisioned with Terraform
+An admin builds a collection of sealed products (Draft Boosters, Set Boosters, Collector Boosters, etc.) from any sets they own. Before a draft, players choose which packs to include in the pool and hit a button to draw one at random.
+
+Odds aren't purely uniform — the admin can dial in **price sensitivity** (cheaper packs get picked more often) and **scarcity sensitivity** (packs with more copies get picked more often), so rare or expensive product doesn't dominate the pool.
 
 ## Features
 
-- Google SSO — admin role granted to `ADMIN_EMAIL`
-- Admin: search sets (via Scryfall), add packs by product type, manage quantities
-- Admin: link MTGStocks IDs to pull live market prices
+- Google SSO — sign in with your Google account
+- Admin: search sets and add packs by product type (Draft, Set, Collector, Play, Jumpstart)
+- Admin: track quantities and link MTGStocks IDs to pull live market prices
 - Admin: configure price and scarcity sensitivity for weighted draws
-- Player: select which packs to include, see live odds, draw a random pack
-
-## GitHub Secrets
-
-| Secret | Description |
-|--------|-------------|
-| `SERVER_HOST` | Server IP |
-| `SERVER_USER` | `ubuntu` |
-| `SERVER_SSH_KEY` | Private SSH key |
-| `DATABASE_URL` | `postgres://user:pass@db:5432/myapp` |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URL` | `https://yourdomain/api/auth/callback` |
-| `ADMIN_EMAIL` | Email address granted admin role |
+- Player: choose which packs to include, see live odds per pack, draw a random result
 
 ## Project Structure
 
@@ -42,12 +27,12 @@ A personal app for facilitating Magic: The Gathering chaos drafts. Admins manage
 │   ├── handlers/
 │   ├── middleware/
 │   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   └── Dockerfile
 ├── docs/
 │   ├── development.md
 │   └── production.md
+├── frontend/
+│   ├── src/
+│   └── Dockerfile
 ├── terraform/
 │   ├── main.tf
 │   ├── variables.tf
