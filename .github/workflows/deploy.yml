@@ -118,7 +118,7 @@ jobs:
             docker compose pull
             docker compose up -d
             sleep 20
-            curl -fsS http://localhost/login > /dev/null || { echo "Health check failed"; docker compose logs --tail=50; exit 1; }
+            curl -fsS http://localhost/api/health > /dev/null || { echo "Health check failed"; docker compose logs --tail=50; exit 1; }
             echo "Deploy successful"
           '
 

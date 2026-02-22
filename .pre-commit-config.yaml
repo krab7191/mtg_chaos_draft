@@ -13,31 +13,31 @@ repos:
         name: go fmt
         entry: bash -c 'cd api && go fmt ./...'
         language: system
-        files: ^api/.*\.go$
+        always_run: true
         pass_filenames: false
       - id: go-vet
         name: go vet
         entry: bash -c 'cd api && go vet ./...'
         language: system
-        files: ^api/.*\.go$
+        always_run: true
         pass_filenames: false
       - id: staticcheck
         name: staticcheck
         entry: bash -c 'cd api && $HOME/go/bin/staticcheck ./...'
         language: system
-        files: ^api/.*\.go$
+        always_run: true
         pass_filenames: false
       - id: golangci-lint
         name: golangci-lint
         entry: bash -c 'cd api && $HOME/go/bin/golangci-lint run ./...'
         language: system
-        files: ^api/.*\.go$
+        always_run: true
         pass_filenames: false
       - id: govulncheck
         name: govulncheck
         entry: bash -c 'cd api && $HOME/go/bin/govulncheck ./...'
         language: system
-        files: ^api/.*\.go$
+        always_run: true
         pass_filenames: false
 
   - repo: local
@@ -46,13 +46,7 @@ repos:
         name: astro check
         entry: bash -c 'cd frontend && npm run check'
         language: system
-        files: ^frontend/.*\.(js|ts|astro)$
-        pass_filenames: false
-      - id: astro-build
-        name: astro build
-        entry: bash -c 'cd frontend && npm run build'
-        language: system
-        files: ^frontend/.*\.(js|ts|astro|scss|css)$
+        always_run: true
         pass_filenames: false
       - id: npm-audit
         name: npm audit

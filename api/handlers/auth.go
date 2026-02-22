@@ -20,10 +20,11 @@ type AuthHandler struct {
 	oauthConfig  *oauth2.Config
 	adminEmail   string
 	viewerEmails []string
+	secure       bool
 }
 
-func NewAuthHandler(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string, viewerEmails []string) *AuthHandler {
-	return &AuthHandler{pool: pool, oauthConfig: oauthConfig, adminEmail: adminEmail, viewerEmails: viewerEmails}
+func NewAuthHandler(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string, viewerEmails []string, secure bool) *AuthHandler {
+	return &AuthHandler{pool: pool, oauthConfig: oauthConfig, adminEmail: adminEmail, viewerEmails: viewerEmails, secure: secure}
 }
 
 func randomHex(n int) (string, error) {
@@ -45,6 +46,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		MaxAge:   300,
 		HttpOnly: true,
+		Secure:   h.secure,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 	})
@@ -125,6 +127,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Expires:  expiresAt,
 		HttpOnly: true,
+		Secure:   h.secure,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 	})

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"mtg-chaos-draft/db"
 	"mtg-chaos-draft/handlers"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httprate"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -30,10 +32,11 @@ func main() {
 	}
 	defer pool.Close()
 
+	redirectURL := mustEnv("GOOGLE_REDIRECT_URL")
 	oauthConfig := &oauth2.Config{
 		ClientID:     mustEnv("GOOGLE_CLIENT_ID"),
 		ClientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
-		RedirectURL:  mustEnv("GOOGLE_REDIRECT_URL"),
+		RedirectURL:  redirectURL,
 		Scopes:       []string{"openid", "email", "profile"},
 		Endpoint:     google.Endpoint,
 	}
@@ -46,7 +49,8 @@ func main() {
 			}
 		}
 	}
-	authHandler := handlers.NewAuthHandler(pool, oauthConfig, mustEnv("ADMIN_EMAIL"), viewerEmails)
+	secureCookies := strings.HasPrefix(redirectURL, "https://")
+	authHandler := handlers.NewAuthHandler(pool, oauthConfig, mustEnv("ADMIN_EMAIL"), viewerEmails, secureCookies)
 	collectionHandler := handlers.NewCollectionHandler(pool)
 	selectHandler := handlers.NewSelectHandler(pool)
 	settingsHandler := handlers.NewSettingsHandler(pool)
@@ -55,6 +59,12 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(httprate.LimitByIP(100, time.Minute))
+
+	// Health check
+	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	// Public auth routes
 	r.Get("/api/auth/login", authHandler.Login)
