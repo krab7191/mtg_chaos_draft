@@ -7,6 +7,7 @@ interface Props {
 }
 
 const { title, user } = Astro.props;
+const version = import.meta.env.PUBLIC_APP_VERSION;
 ---
 
 <!doctype html>
@@ -43,10 +44,13 @@ const { title, user } = Astro.props;
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/collection" class="nav-menu__item">Manage Collection</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/weights" class="nav-menu__item">Weights</a>}
           <div class="nav-menu__footer">
-            <span class="nav-menu__user">{user.name}</span>
-            <form method="POST" action="/api/auth/logout" style="display:inline">
-              <button type="submit" class="nav-menu__logout">Sign out</button>
-            </form>
+            <div class="nav-menu__footer-row">
+              <span class="nav-menu__user">{user.name}</span>
+              <form method="POST" action="/api/auth/logout" style="display:inline">
+                <button type="submit" class="nav-menu__logout">Sign out</button>
+              </form>
+            </div>
+            <span class="nav-menu__version">{version}</span>
           </div>
         </div>
       </>
@@ -173,6 +177,12 @@ const { title, user } = Astro.props;
       padding: 1rem 1.25rem;
       border-top: 1px solid var(--color-border);
       display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    &__footer-row {
+      display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.75rem;
@@ -184,6 +194,12 @@ const { title, user } = Astro.props;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    &__version {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+      opacity: 0.5;
     }
 
     &__logout {

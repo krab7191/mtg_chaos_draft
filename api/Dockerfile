@@ -1,5 +1,5 @@
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
-ARG TARGETARCH
+FROM golang:1.26.0-alpine AS builder
+ARG VERSION
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o server .
+RUN CGO_ENABLED=0 go build -ldflags="-X main.Version=${VERSION}" -o server .
 
 FROM alpine:3.21
 

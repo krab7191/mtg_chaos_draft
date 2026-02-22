@@ -17,7 +17,11 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
+var Version string
+
 func main() {
+	log.Printf("starting mtg-chaos-draft %s", Version)
+
 	ctx := context.Background()
 
 	pool, err := db.New(ctx, mustEnv("DATABASE_URL"))
