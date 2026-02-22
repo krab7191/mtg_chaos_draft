@@ -83,24 +83,3 @@ jobs:
               --restart unless-stopped \
               ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
           '
-
-# SSR mode: add these steps and remove the static frontend build steps above
-#     - name: Build and push Frontend
-#       uses: docker/build-push-action@v6
-#       with:
-#         context: ./frontend
-#         platforms: linux/arm64
-#         push: true
-#         tags: ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
-#
-#     - name: Deploy frontend container
-#       run: |
-#         ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
-#           docker pull ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
-#           docker stop frontend 2>/dev/null || true
-#           docker rm frontend 2>/dev/null || true
-#           docker run -d --name frontend --network app --network-alias frontend \
-#             -e API_URL="http://api:8080" \
-#             --restart unless-stopped \
-#             ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
-#         '
