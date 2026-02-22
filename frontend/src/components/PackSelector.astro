@@ -38,8 +38,8 @@ const { packs } = Astro.props;
                 data-product-type={pack.productType}
               />
               <span class="pack-item__info">
-                <span class="pack-item__name">{pack.name}</span>
-                <span class="pack-item__meta">{pack.setName}</span>
+                <span class="pack-item__name">{pack.setName}</span>
+                <span class="pack-item__meta">{pack.productType}</span>
               </span>
               <span class="pack-item__price">
                 {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
@@ -58,13 +58,8 @@ const { packs } = Astro.props;
         </label>
       </div>
 
-      <div class="result" id="result" hidden>
-        <div class="result__card">
-          <p class="result__label">You're drafting with:</p>
-          <h2 class="result__name" id="result-name"></h2>
-          <p class="result__set" id="result-set"></p>
-          <div class="result__links" id="result-links"></div>
-        </div>
+      <div class="toast" id="result" hidden>
+        <span class="toast__text" id="result-text"></span>
       </div>
 
       <div class="history" id="history-section" hidden>
@@ -312,54 +307,30 @@ const { packs } = Astro.props;
     }
   }
 
-  .result {
-    margin-top: 2rem;
+  .toast {
+    position: fixed;
+    top: 3.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-surface);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius);
+    padding: 0.85rem 1.75rem;
+    font-size: 1.05rem;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    z-index: 50;
+    animation: slideDown 0.2s ease;
 
-    &__card {
-      background: var(--color-surface);
-      border: 1px solid var(--color-accent);
-      border-radius: 12px;
-      padding: 2rem;
-      text-align: center;
-      animation: pop 0.3s ease;
-    }
-
-    &__label {
-      color: var(--color-text-muted);
-      margin-bottom: 0.5rem;
-    }
-
-    &__name {
-      font-size: 1.8rem;
-      margin-bottom: 0.25rem;
-    }
-
-    &__set {
-      color: var(--color-text-muted);
-      margin-bottom: 1rem;
-    }
-
-    &__links {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.5rem;
-
-      a {
-        background: var(--color-surface-2);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius);
-        padding: 0.3rem 0.8rem;
-        font-size: 0.85rem;
-        color: var(--color-text);
-        &:hover { border-color: var(--color-accent); text-decoration: none; }
-      }
+    &__text {
+      color: var(--color-text);
     }
   }
 
-  @keyframes pop {
-    from { transform: scale(0.92); opacity: 0; }
-    to   { transform: scale(1);    opacity: 1; }
+  @keyframes slideDown {
+    from { transform: translateX(-50%) translateY(-0.75rem); opacity: 0; }
+    to   { transform: translateX(-50%) translateY(0);        opacity: 1; }
   }
 </style>
 
@@ -367,12 +338,10 @@ const { packs } = Astro.props;
   const HISTORY_KEY = 'draft-history';
   const MAX_HISTORY = 12;
 
-  const pickBtn      = document.getElementById('pick-btn') as HTMLButtonElement;
-  const resultDiv    = document.getElementById('result') as HTMLDivElement;
-  const resultName   = document.getElementById('result-name') as HTMLElement;
-  const resultSet    = document.getElementById('result-set') as HTMLElement;
-  const resultLinks  = document.getElementById('result-links') as HTMLElement;
-  const countEl      = document.getElementById('selected-count') as HTMLElement;
+  const pickBtn    = document.getElementById('pick-btn') as HTMLButtonElement;
+  const resultDiv  = document.getElementById('result') as HTMLDivElement;
+  const resultText = document.getElementById('result-text') as HTMLElement;
+  const countEl    = document.getElementById('selected-count') as HTMLElement;
   const historyToggle   = document.getElementById('history-on') as HTMLInputElement;
   const historySection  = document.getElementById('history-section') as HTMLElement;
   const historyList     = document.getElementById('history-list') as HTMLElement;
@@ -498,25 +467,29 @@ const { packs } = Astro.props;
     if (!res.ok) return;
     const { selectedPack } = await res.json();
 
-    resultName.textContent = selectedPack.name;
-    resultSet.textContent = `${selectedPack.setName}${selectedPack.productType ? ' · ' + selectedPack.productType : ''}`;
+    const type = selectedPack.productType ? ` · ${selectedPack.productType}` : '';
+    resultText.textContent = `${selectedPack.setName}${type}`;
 
     addToHistory(selectedPack);
 
-    resultLinks.innerHTML = '';
-    try {
-      const priceRes = await fetch(`/api/price/${selectedPack.mtgstocksId}`);
-      if (priceRes.ok) {
-        const data = await priceRes.json();
-        const urls = data.purchase_urls ?? {};
-        if (urls.tcgplayer)   resultLinks.innerHTML += `<a href="${urls.tcgplayer}" target="_blank" rel="noopener">TCGPlayer</a>`;
-        if (urls.cardkingdom) resultLinks.innerHTML += `<a href="${urls.cardkingdom}" target="_blank" rel="noopener">Card Kingdom</a>`;
-        if (urls.cardmarket)  resultLinks.innerHTML += `<a href="${urls.cardmarket}" target="_blank" rel="noopener">Cardmarket</a>`;
-      }
-    } catch { /* links optional */ }
-
-    resultDiv.hidden = false;
-    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Re-trigger animation on repeat picks
+    resultDiv.hidden = true;
+    requestAnimationFrame(() => { resultDiv.hidden = false; });
+    scheduleToastDismiss();
   });
+
+  let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function dismissToast() {
+    resultDiv.hidden = true;
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+  }
+
+  function scheduleToastDismiss() {
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(dismissToast, 3000);
+  }
+
+  resultDiv.addEventListener('click', dismissToast);
 
 </script>

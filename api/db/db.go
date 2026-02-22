@@ -37,11 +37,29 @@ func New(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
+	if _, err := pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			filename   TEXT PRIMARY KEY,
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)
+	`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
 	entries, err := migrations.ReadDir("migrations")
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
+		var count int
+		if err := pool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM schema_migrations WHERE filename = $1`, entry.Name(),
+		).Scan(&count); err != nil {
+			return fmt.Errorf("check migration %s: %w", entry.Name(), err)
+		}
+		if count > 0 {
+			continue
+		}
 		sql, err := migrations.ReadFile("migrations/" + entry.Name())
 		if err != nil {
 			return err
@@ -49,6 +67,12 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		if _, err := pool.Exec(ctx, string(sql)); err != nil {
 			return fmt.Errorf("migration %s: %w", entry.Name(), err)
 		}
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO schema_migrations (filename) VALUES ($1)`, entry.Name(),
+		); err != nil {
+			return fmt.Errorf("record migration %s: %w", entry.Name(), err)
+		}
+		fmt.Printf("applied migration %s\n", entry.Name())
 	}
 	return nil
 }

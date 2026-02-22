@@ -5,7 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"mtg-chaos-draft/db"
@@ -24,13 +26,28 @@ var Version string
 func main() {
 	log.Printf("starting mtg-chaos-draft %s", Version)
 
-	ctx := context.Background()
+	bgCtx, bgCancel := context.WithCancel(context.Background())
 
-	pool, err := db.New(ctx, mustEnv("DATABASE_URL"))
+	pool, err := db.New(bgCtx, mustEnv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("db init: %v", err)
 	}
 	defer pool.Close()
+
+	// Daily price refresh goroutine
+	go func() {
+		handlers.RefreshPrices(bgCtx, pool)
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				handlers.RefreshPrices(bgCtx, pool)
+			case <-bgCtx.Done():
+				return
+			}
+		}
+	}()
 
 	redirectURL := mustEnv("GOOGLE_REDIRECT_URL")
 	oauthConfig := &oauth2.Config{
@@ -99,8 +116,28 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("API listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, r))
+
+	srv := &http.Server{Addr: ":" + port, Handler: r}
+
+	go func() {
+		log.Printf("API listening on :%s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+	<-quit
+
+	bgCancel()
+	log.Printf("shutting down...")
+	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutCtx); err != nil {
+		log.Fatalf("shutdown: %v", err)
+	}
+	log.Printf("shutdown complete")
 }
 
 func mustEnv(key string) string {

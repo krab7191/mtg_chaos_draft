@@ -74,6 +74,25 @@ func DeletePack(ctx context.Context, pool *pgxpool.Pool, id int) error {
 	return err
 }
 
+func BulkUpdatePrices(ctx context.Context, pool *pgxpool.Pool, prices map[int]float64) error {
+	if len(prices) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(prices))
+	vals := make([]float64, 0, len(prices))
+	for id, price := range prices {
+		ids = append(ids, id)
+		vals = append(vals, price)
+	}
+	_, err := pool.Exec(ctx, `
+		UPDATE collection_packs
+		SET market_price = v.price
+		FROM unnest($1::int[], $2::numeric[]) AS v(mtgstocks_id, price)
+		WHERE collection_packs.mtgstocks_id = v.mtgstocks_id
+	`, ids, vals)
+	return err
+}
+
 func GetPacksByIDs(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]CollectionPack, error) {
 	rows, err := pool.Query(ctx, `SELECT `+packColumns+` FROM collection_packs WHERE id = ANY($1)`, ids)
 	if err != nil {

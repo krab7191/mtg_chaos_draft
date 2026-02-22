@@ -29,15 +29,19 @@ func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		PriceSensitivity     float64 `json:"priceSensitivity"`
-		ScaricitySensitivity float64 `json:"scarcitySensitivity"`
+		PriceSensitivity     float64         `json:"priceSensitivity"`
+		ScaricitySensitivity float64         `json:"scarcitySensitivity"`
+		PriceCap             float64         `json:"priceCap"`
+		PriceFloor           float64         `json:"priceFloor"`
+		QuantityCap          int             `json:"quantityCap"`
+		PackWeights          map[int]float64 `json:"packWeights"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	// Clamp to [0, 1]
-	clamp := func(v float64) float64 {
+
+	clamp01 := func(v float64) float64 {
 		if v < 0 {
 			return 0
 		}
@@ -46,12 +50,37 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		return v
 	}
-	s, err := db.UpdateWeightSettings(r.Context(), h.pool,
-		clamp(body.PriceSensitivity), clamp(body.ScaricitySensitivity))
+	clampPos := func(v float64) float64 {
+		if v < 0 {
+			return 0
+		}
+		return v
+	}
+
+	// Clamp pack multipliers to a sane range
+	for k, v := range body.PackWeights {
+		if v < 0 {
+			body.PackWeights[k] = 0
+		}
+	}
+
+	s := &db.WeightSettings{
+		PriceSensitivity:     clamp01(body.PriceSensitivity),
+		ScaricitySensitivity: clamp01(body.ScaricitySensitivity),
+		PriceCap:             clampPos(body.PriceCap),
+		PriceFloor:           clampPos(body.PriceFloor),
+		QuantityCap:          max(0, body.QuantityCap),
+		PackWeights:          body.PackWeights,
+	}
+	if s.PackWeights == nil {
+		s.PackWeights = map[int]float64{}
+	}
+
+	result, err := db.UpdateWeightSettings(r.Context(), h.pool, s)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s)
+	_ = json.NewEncoder(w).Encode(result)
 }

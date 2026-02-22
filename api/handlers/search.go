@@ -59,9 +59,15 @@ var excludePackTypes = map[string]bool{
 }
 
 func deriveProductType(p msProduct) (string, bool) {
+	nameLower := strings.ToLower(p.Name)
+	sleevedPrefix := ""
+	if strings.Contains(nameLower, "sleeved") {
+		sleevedPrefix = "Sleeved "
+	}
+
 	if p.Type != nil {
 		if label, ok := knownPackTypes[*p.Type]; ok {
-			return label, true
+			return sleevedPrefix + label, true
 		}
 		if excludePackTypes[*p.Type] {
 			return "", false
@@ -69,19 +75,18 @@ func deriveProductType(p msProduct) (string, bool) {
 	}
 
 	// null type — include only if name suggests it's a booster pack
-	nameLower := strings.ToLower(p.Name)
 	if strings.Contains(nameLower, "booster pack") {
 		switch {
 		case strings.Contains(nameLower, "jumpstart"):
-			return "Jumpstart Booster", true
+			return sleevedPrefix + "Jumpstart Booster", true
 		case strings.Contains(nameLower, "play"):
-			return "Play Booster", true
+			return sleevedPrefix + "Play Booster", true
 		case strings.Contains(nameLower, "set"):
-			return "Set Booster", true
+			return sleevedPrefix + "Set Booster", true
 		case strings.Contains(nameLower, "draft"):
-			return "Draft Booster", true
+			return sleevedPrefix + "Draft Booster", true
 		case strings.Contains(nameLower, "collector"):
-			return "Collector Booster", true
+			return sleevedPrefix + "Collector Booster", true
 		default:
 			return p.Name, true
 		}

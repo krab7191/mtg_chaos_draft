@@ -19,7 +19,16 @@ if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
 const colRes = await fetch(`${apiUrl}/api/collection`, { headers: { cookie } });
 const packs = colRes.ok ? await colRes.json() : [];
 
-packs.sort((a: any, b: any) => (a.quantity === 0 ? 1 : 0) - (b.quantity === 0 ? 1 : 0));
+// Group by set, preserving server sort (empty packs last within each set)
+const setMap = new Map<string, any[]>();
+for (const pack of packs) {
+  if (!setMap.has(pack.setName)) setMap.set(pack.setName, []);
+  setMap.get(pack.setName)!.push(pack);
+}
+for (const [, group] of setMap) {
+  group.sort((a: any, b: any) => (a.quantity === 0 ? 1 : 0) - (b.quantity === 0 ? 1 : 0));
+}
+const sets = Array.from(setMap.entries());
 
 const totalValue: number = packs.reduce((sum: number, p: any) =>
   sum + (p.marketPrice ?? 0) * p.quantity, 0);
@@ -37,50 +46,44 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
         <h2 class="collection__heading">In your collection</h2>
         {totalValue > 0 && (
           <span class="collection__value">
-            Total value: <strong id="collection-total">${totalValue.toFixed(2)}</strong>
+            Total: <strong id="collection-total">${totalValue.toFixed(2)}</strong>
           </span>
         )}
       </div>
 
+      <p class="collection__disclaimer">Prices update automatically once a day.</p>
+
       <p class="collection__empty" id="collection-empty" style={packs.length > 0 ? 'display:none' : ''}>
         Nothing yet — search above to add some packs.
       </p>
-      <div class="table-scroll" id="collection-table-scroll" style={packs.length === 0 ? 'display:none' : ''}>
-        <table class="table">
-            <thead>
-              <tr>
-                <th>Set</th>
-                <th>Type</th>
-                <th>Qty</th>
-                <th>Market price</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="collection-body">
-              {packs.map((pack: any) => (
-                <tr data-id={pack.id} data-price={pack.marketPrice ?? 0} data-order={packs.indexOf(pack)} class:list={[{ 'row--empty': pack.quantity === 0 }]}>
-                  <td class="col-set">{pack.setName}</td>
-                  <td class="col-type">{pack.productType}</td>
-                  <td class="col-qty">
-                    <div class="qty" data-id={pack.id}>
-                      <button class="qty__btn qty__btn--dec" data-id={pack.id}>−</button>
-                      <span class="qty__val">{pack.quantity}</span>
-                      <button class="qty__btn qty__btn--inc" data-id={pack.id}>+</button>
-                    </div>
-                  </td>
-                  <td class="col-price">
-                    <span class="price-val" data-id={pack.id}>
-                      {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
-                    </span>
-                  </td>
-                  <td class="col-actions">
-                    <button class="btn-delete" data-id={pack.id} title="Remove">✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      <div class="pack-list" id="collection-list" style={packs.length === 0 ? 'display:none' : ''}>
+        {sets.map(([setName, setPacks]) => (
+          <div class="set-group">
+            <div class="set-group__header">
+              <span class="set-group__name">{setName}</span>
+            </div>
+            {setPacks.map((pack: any, i: number) => (
+              <div
+                class:list={['pack-row', { 'row--empty': pack.quantity === 0 }]}
+                data-id={pack.id}
+                data-price={pack.marketPrice ?? 0}
+                data-order={i}
+              >
+                <span class="pack-row__type col-set">{pack.productType}</span>
+                <div class="qty" data-id={pack.id}>
+                  <button class="qty__btn qty__btn--dec" data-id={pack.id}>−</button>
+                  <span class="qty__val">{pack.quantity}</span>
+                  <button class="qty__btn qty__btn--inc" data-id={pack.id}>+</button>
+                </div>
+                <span class="price-val" data-id={pack.id}>
+                  {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
+                </span>
+                <button class="btn-delete" data-id={pack.id} title="Remove">✕</button>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </section>
   </div>
@@ -90,7 +93,6 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
   .page {
     &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
     &__sub   { color: var(--color-text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
-    &__hint  { margin-top: 1.25rem; color: var(--color-text-muted); font-size: 0.85rem; }
   }
 
   .collection {
@@ -114,6 +116,13 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
       strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
     }
 
+    &__disclaimer {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      opacity: 0.6;
+      margin-bottom: 0.75rem;
+    }
+
     &__empty {
       color: var(--color-text-muted);
       padding: 2rem 0;
@@ -122,41 +131,66 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
     }
   }
 
-  .table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  /* ── Set groups ──────────────────────────────────────────── */
+  .pack-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  .table {
-    width: 100%;
-    min-width: 560px;
-    border-collapse: collapse;
-    font-size: 0.9rem;
+  .set-group {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
 
-    th {
-      text-align: left;
-      padding: 0.5rem 0.75rem;
-      color: var(--color-text-muted);
-      font-weight: 600;
-      border-bottom: 2px solid var(--color-border);
-      white-space: nowrap;
-    }
-
-    td {
-      padding: 0.5rem 0.75rem;
+    &__header {
+      padding: 0.45rem 0.75rem;
+      background: var(--color-surface);
       border-bottom: 1px solid var(--color-border);
-      vertical-align: middle;
     }
 
-    tr:hover td { background: var(--color-surface); }
-    tr.row--empty td { opacity: 0.4; }
-
-    .col-set   { font-weight: 500; }
-    .col-type  { color: var(--color-text-muted); font-size: 0.85rem; }
-    .col-qty   { width: 7rem; }
-    .col-price { width: 7rem; font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+    &__name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
   }
 
+  /* ── Pack rows ───────────────────────────────────────────── */
+  .pack-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+
+    &:last-child { border-bottom: none; }
+    &:hover { background: var(--color-surface); }
+    &.row--empty { opacity: 0.4; }
+
+    &__type {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .price-val {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+    width: 4.5rem;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Qty widget ──────────────────────────────────────────── */
   .qty {
     display: flex;
     align-items: center;
@@ -195,29 +229,30 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
     border-radius: var(--radius);
     padding: 0.2rem 0.45rem;
     font-size: 0.78rem;
+    flex-shrink: 0;
     &:hover { border-color: var(--color-danger); color: var(--color-danger); }
   }
 </style>
 
 <script>
   function reorderRows() {
-    const tbody = document.getElementById('collection-body');
-    if (!tbody) return;
-    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr[data-order]'));
-    rows.sort((a, b) => {
-      const aEmpty = a.classList.contains('row--empty') ? 1 : 0;
-      const bEmpty = b.classList.contains('row--empty') ? 1 : 0;
-      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
-      return parseInt(a.dataset.order!) - parseInt(b.dataset.order!);
+    document.querySelectorAll<HTMLElement>('.set-group').forEach(group => {
+      const rows = Array.from(group.querySelectorAll<HTMLElement>('.pack-row'));
+      rows.sort((a, b) => {
+        const aEmpty = a.classList.contains('row--empty') ? 1 : 0;
+        const bEmpty = b.classList.contains('row--empty') ? 1 : 0;
+        if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+        return parseInt(a.dataset.order!) - parseInt(b.dataset.order!);
+      });
+      rows.forEach(row => group.appendChild(row));
     });
-    rows.forEach(row => tbody.appendChild(row));
   }
 
   function recalcTotal() {
     const totalEl = document.getElementById('collection-total');
     if (!totalEl) return;
     let sum = 0;
-    document.querySelectorAll<HTMLElement>('tr[data-price]').forEach((row) => {
+    document.querySelectorAll<HTMLElement>('.pack-row[data-price]').forEach((row) => {
       const price = parseFloat(row.dataset.price ?? '0');
       const qty   = parseInt(row.querySelector<HTMLElement>('.qty__val')?.textContent ?? '0');
       sum += price * qty;
@@ -237,7 +272,7 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
       const next    = Math.max(0, current + delta);
       valEl.textContent = String(next);
       decBtn.disabled   = next === 0;
-      widget.closest('tr')?.classList.toggle('row--empty', next === 0);
+      widget.closest('.pack-row')?.classList.toggle('row--empty', next === 0);
       reorderRows();
       recalcTotal();
       await fetch(`/api/collection/${id}`, {
@@ -255,7 +290,7 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
   // Delete
   document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const row = btn.closest<HTMLElement>('tr')!;
+      const row = btn.closest<HTMLElement>('.pack-row')!;
       const label = row.querySelector('.col-set')?.textContent ?? 'Pack';
       row.style.opacity = '0.3';
       row.style.pointerEvents = 'none';
@@ -263,10 +298,14 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
         `Remove "${label}"?`,
         async () => {
           await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
+          const group = row.closest<HTMLElement>('.set-group')!;
           row.remove();
           recalcTotal();
-          if (document.getElementById('collection-body')?.querySelectorAll('tr').length === 0) {
-            document.getElementById('collection-table-scroll')!.style.display = 'none';
+          if (group.querySelectorAll('.pack-row').length === 0) {
+            group.remove();
+          }
+          if (document.getElementById('collection-list')?.querySelectorAll('.pack-row').length === 0) {
+            document.getElementById('collection-list')!.style.display = 'none';
             document.getElementById('collection-empty')!.style.display = '';
           }
         },

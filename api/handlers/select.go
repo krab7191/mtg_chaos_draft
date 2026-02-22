@@ -34,7 +34,13 @@ func (h *SelectHandler) Select(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	weights := effectiveWeights(packs)
+	settings, err := db.GetWeightSettings(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	weights := effectiveWeights(packs, settings)
 	selected := weightedRandom(packs, weights)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -44,20 +50,33 @@ func (h *SelectHandler) Select(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// effectiveWeights computes odds as min(priceOdds, scarcityOdds) per pack, then returns
-// those as raw weights for weightedRandom (which renormalises internally).
-//
-// priceOdds:    normalised 1/price  — expensive packs are less likely
-// scarcityOdds: normalised 1/qty    — scarce packs are less likely
-// The smaller of the two applies, so a pack is penalised if it is EITHER expensive OR scarce.
-// Packs with qty=0 get weight 0 (excluded). Unpriced packs use average price as fallback.
-func effectiveWeights(packs []db.CollectionPack) []float64 {
+// effectiveWeights computes odds as min(priceOdds, scarcityOdds) per pack.
+// Caps clamp price and quantity to a maximum before weighting — packs above the
+// cap are treated as if they cost/have exactly the cap value, so they aren't
+// penalised further. A cap of 0 means no cap.
+func effectiveWeights(packs []db.CollectionPack, settings *db.WeightSettings) []float64 {
+	capPrice := func(price float64) float64 {
+		if settings.PriceFloor > 0 && price < settings.PriceFloor {
+			price = settings.PriceFloor
+		}
+		if settings.PriceCap > 0 && price > settings.PriceCap {
+			price = settings.PriceCap
+		}
+		return price
+	}
+	capQty := func(qty int) int {
+		if settings.QuantityCap > 0 && qty > settings.QuantityCap {
+			return settings.QuantityCap
+		}
+		return qty
+	}
+
 	// Avg price fallback for unpriced packs
 	var priceSum float64
 	var priceCount int
 	for _, p := range packs {
 		if p.MarketPrice != nil && *p.MarketPrice > 0 {
-			priceSum += *p.MarketPrice
+			priceSum += capPrice(*p.MarketPrice)
 			priceCount++
 		}
 	}
@@ -66,32 +85,37 @@ func effectiveWeights(packs []db.CollectionPack) []float64 {
 		avgPrice = priceSum / float64(priceCount)
 	}
 
-	pw := make([]float64, len(packs)) // price weights
-	sw := make([]float64, len(packs)) // scarcity weights
+	pw := make([]float64, len(packs))
+	sw := make([]float64, len(packs))
 	var priceTotal, scarcityTotal float64
 	for i, p := range packs {
 		price := avgPrice
 		if p.MarketPrice != nil && *p.MarketPrice > 0 {
-			price = *p.MarketPrice
+			price = capPrice(*p.MarketPrice)
 		}
 		pw[i] = 1.0 / price
 		priceTotal += pw[i]
 
-		if p.Quantity > 0 {
-			sw[i] = 1.0 / float64(p.Quantity)
+		qty := capQty(p.Quantity)
+		if qty > 0 {
+			sw[i] = 1.0 / float64(qty)
 			scarcityTotal += sw[i]
 		}
 	}
 
 	result := make([]float64, len(packs))
-	for i := range packs {
+	for i, p := range packs {
 		if sw[i] == 0 {
-			result[i] = 0 // qty=0: excluded
+			result[i] = 0
 			continue
 		}
 		priceOdds := pw[i] / priceTotal
 		scarcityOdds := sw[i] / scarcityTotal
-		result[i] = math.Min(priceOdds, scarcityOdds)
+		w := math.Min(priceOdds, scarcityOdds)
+		if mult, ok := settings.PackWeights[p.ID]; ok && mult > 0 {
+			w *= mult
+		}
+		result[i] = w
 	}
 	return result
 }
