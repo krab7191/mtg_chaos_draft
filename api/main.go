@@ -34,15 +34,21 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Daily price refresh goroutine
+	// Daily price refresh + session cleanup goroutine
 	go func() {
 		handlers.RefreshPrices(bgCtx, pool)
+		if err := db.DeleteExpiredSessions(bgCtx, pool); err != nil {
+			log.Printf("session cleanup: %v", err)
+		}
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
 				handlers.RefreshPrices(bgCtx, pool)
+				if err := db.DeleteExpiredSessions(bgCtx, pool); err != nil {
+					log.Printf("session cleanup: %v", err)
+				}
 			case <-bgCtx.Done():
 				return
 			}

@@ -35,3 +35,8 @@ func DeleteSession(ctx context.Context, pool *pgxpool.Pool, id string) error {
 	_, err := pool.Exec(ctx, `DELETE FROM sessions WHERE id = $1`, id)
 	return err
 }
+
+func DeleteExpiredSessions(ctx context.Context, pool *pgxpool.Pool) error {
+	_, err := pool.Exec(ctx, `DELETE FROM sessions WHERE expires_at <= NOW()`)
+	return err
+}
