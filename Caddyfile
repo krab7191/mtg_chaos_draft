@@ -1,12 +1,18 @@
 {$DOMAIN:localhost} {
     # API routes
     handle /api/* {
-        reverse_proxy api:8080
+        reverse_proxy api:8080 {
+            lb_try_duration 30s
+            lb_try_interval 250ms
+        }
     }
 
     # SSR frontend
     handle {
-        reverse_proxy frontend:4321
+        reverse_proxy frontend:4321 {
+            lb_try_duration 30s
+            lb_try_interval 250ms
+        }
     }
 
     header {
