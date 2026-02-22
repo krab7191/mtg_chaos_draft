@@ -35,3 +35,5 @@ frontend/.env.*
 # Postgres
 # *.sql — migrations are committed, only ignore local dump files
 *.dump
+
+TODO.md

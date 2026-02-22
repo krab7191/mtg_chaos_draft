@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -141,7 +142,9 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("session")
 	if err == nil {
-		db.DeleteSession(r.Context(), h.pool, c.Value)
+		if err := db.DeleteSession(r.Context(), h.pool, c.Value); err != nil {
+			log.Printf("logout: delete session: %v", err)
+		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: "session", MaxAge: -1, Path: "/"})
 	http.Redirect(w, r, "/login", http.StatusFound)
@@ -150,5 +153,5 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	user := mw.UserFromContext(r.Context())
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	_ = json.NewEncoder(w).Encode(user)
 }

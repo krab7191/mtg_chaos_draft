@@ -112,28 +112,57 @@ func getMTGStocksProducts() ([]SearchResult, error) {
 	}
 
 	var products []SearchResult
+	type seenKey struct{ setCode, productType string }
+	seen := make(map[seenKey]bool)
+
+	addProduct := func(s msSet, p msProduct) {
+		productType, ok := deriveProductType(p)
+		if !ok {
+			return
+		}
+		key := seenKey{s.Abbreviation, productType}
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		result := SearchResult{
+			MTGStocksID: p.ID,
+			Name:        p.Name,
+			SetName:     s.Name,
+			SetCode:     s.Abbreviation,
+			ReleasedAt:  s.Date,
+			ProductType: productType,
+		}
+		if p.LatestPrice != nil {
+			// Prefer average price — matches what MTGStocks UI displays
+			if p.LatestPrice.Average != nil && *p.LatestPrice.Average > 0 {
+				result.MarketPrice = p.LatestPrice.Average
+			} else if p.LatestPrice.Market != nil && *p.LatestPrice.Market > 0 {
+				result.MarketPrice = p.LatestPrice.Market
+			}
+		}
+		products = append(products, result)
+	}
+
 	for _, s := range sets {
+		// Pass 1: explicitly-typed products win deduplication
 		for _, p := range s.Products {
-			productType, ok := deriveProductType(p)
-			if !ok {
+			if p.Type == nil {
 				continue
 			}
-			result := SearchResult{
-				MTGStocksID: p.ID,
-				Name:        p.Name,
-				SetName:     s.Name,
-				SetCode:     s.Abbreviation,
-				ReleasedAt:  s.Date,
-				ProductType: productType,
+			if _, ok := knownPackTypes[*p.Type]; !ok {
+				continue
 			}
-			if p.LatestPrice != nil {
-				if p.LatestPrice.Market != nil && *p.LatestPrice.Market > 0 {
-					result.MarketPrice = p.LatestPrice.Market
-				} else if p.LatestPrice.Average != nil && *p.LatestPrice.Average > 0 {
-					result.MarketPrice = p.LatestPrice.Average
+			addProduct(s, p)
+		}
+		// Pass 2: null/unknown-typed products only fill slots not already taken
+		for _, p := range s.Products {
+			if p.Type != nil {
+				if _, ok := knownPackTypes[*p.Type]; ok {
+					continue
 				}
 			}
-			products = append(products, result)
+			addProduct(s, p)
 		}
 	}
 
@@ -151,7 +180,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if len(q) < 2 {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("[]"))
+		_, _ = w.Write([]byte("[]"))
 		return
 	}
 
@@ -192,13 +221,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(results) > 12 {
-		results = results[:12]
+	if len(results) > 30 {
+		results = results[:30]
 	}
 	if results == nil {
 		results = []SearchResult{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	_ = json.NewEncoder(w).Encode(results)
 }

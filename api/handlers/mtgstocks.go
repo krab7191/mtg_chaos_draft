@@ -49,7 +49,7 @@ func fetchSealedPrice(mtgstocksID int) (float64, bool) {
 	}
 
 	lp := data.LatestPrice
-	for _, v := range []*float64{lp.Market, lp.Average, lp.Low} {
+	for _, v := range []*float64{lp.Average, lp.Market, lp.Low} {
 		if v != nil && *v > 0 {
 			return *v, true
 		}
@@ -66,5 +66,5 @@ func Price(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	w.Write(body)
+	_, _ = w.Write(body)
 }

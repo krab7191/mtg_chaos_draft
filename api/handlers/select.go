@@ -38,7 +38,7 @@ func (h *SelectHandler) Select(w http.ResponseWriter, r *http.Request) {
 	selected := weightedRandom(packs, weights)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"selectedId":   selected.ID,
 		"selectedPack": selected,
 	})

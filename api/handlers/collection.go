@@ -28,7 +28,7 @@ func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 		packs = []db.CollectionPack{}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(packs)
+	_ = json.NewEncoder(w).Encode(packs)
 }
 
 func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +66,7 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(pack)
+	_ = json.NewEncoder(w).Encode(pack)
 }
 
 func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +91,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pack)
+	_ = json.NewEncoder(w).Encode(pack)
 }
 
 // LinkPrice saves an MTGStocks ID for a pack and immediately fetches its price.
@@ -120,7 +120,7 @@ func (h *CollectionHandler) LinkPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pack)
+	_ = json.NewEncoder(w).Encode(pack)
 }
 
 func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
