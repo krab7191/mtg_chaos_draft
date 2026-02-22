@@ -5,8 +5,6 @@ services:
       POSTGRES_DB: mtg_chaos_draft
       POSTGRES_USER: mtg
       POSTGRES_PASSWORD: mtg
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -14,8 +12,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   api:
+    image: ${API_IMAGE:-ghcr.io/krab7191/mtg_chaos_draft-api:latest}
     build: ./api
     environment:
       DATABASE_URL: postgres://mtg:mtg@postgres:5432/mtg_chaos_draft
@@ -23,6 +23,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost/api/auth/callback}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
+      VIEWER_EMAILS: ${VIEWER_EMAILS:-}
       PORT: "8080"
     depends_on:
       postgres:
@@ -30,6 +31,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/krab7191/mtg_chaos_draft-frontend:latest}
     build: ./frontend
     environment:
       API_URL: http://api:8080
@@ -50,6 +52,9 @@ services:
       - caddy_config:/config
     environment:
       DOMAIN: ${DOMAIN:-localhost}
+    depends_on:
+      - frontend
+      - api
     restart: unless-stopped
 
 volumes:
