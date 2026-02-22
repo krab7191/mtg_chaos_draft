@@ -56,6 +56,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # Deploy
       - name: Copy static files to server
@@ -79,6 +81,7 @@ jobs:
             docker stop api 2>/dev/null || true
             docker rm api 2>/dev/null || true
             docker run -d --name api --network app --network-alias api \
+              --env-file ~/app/.env \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               --restart unless-stopped \
               ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
