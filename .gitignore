@@ -33,4 +33,5 @@ frontend/.env.*
 .DS_Store
 
 # Postgres
-*.sql
+# *.sql — migrations are committed, only ignore local dump files
+*.dump
