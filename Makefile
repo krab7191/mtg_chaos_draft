@@ -27,7 +27,8 @@ install: ## Install all dev dependencies and git hooks
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	pre-commit install
-	printf '#!/bin/sh\ngit fetch --tags\n' > .git/hooks/post-push && chmod +x .git/hooks/post-push
+	printf '#!/bin/sh\nCURRENT=$$(git tag --points-at HEAD | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+$$" | head -1)\nif [ -n "$$CURRENT" ]; then exit 0; fi\nLATEST=$$(git tag --sort=-v:refname | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+$$" | head -1)\nif [ -z "$$LATEST" ]; then LATEST="v0.0.0"; fi\nMAJOR=$$(echo $$LATEST | sed "s/v//" | cut -d. -f1)\nMINOR=$$(echo $$LATEST | sed "s/v//" | cut -d. -f2)\nPATCH=$$(echo $$LATEST | sed "s/v//" | cut -d. -f3)\nNEW_TAG="v$${MAJOR}.$${MINOR}.$$(( PATCH + 1 ))"\ngit tag "$$NEW_TAG"\necho "auto-tagged $$NEW_TAG"\n' > .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+	git config push.followTags true
 
 check: ## Run pre-commit checks (fmt, vet, astro check)
 	pre-commit run --all-files
