@@ -8,15 +8,15 @@ import (
 )
 
 type CollectionPack struct {
-	ID          int      `json:"id"`
-	Name        string   `json:"name"`
-	SetName     string   `json:"setName"`
-	ProductType string   `json:"productType"`
-	MTGStocksID *int     `json:"mtgstocksId"`
-	MarketPrice *float64 `json:"marketPrice"`
-	Quantity    int      `json:"quantity"`
-	Weight      float64  `json:"weight"`
-	Notes       string   `json:"notes"`
+	ID          int       `json:"id"`
+	Name        string    `json:"name"`
+	SetName     string    `json:"setName"`
+	ProductType string    `json:"productType"`
+	MTGStocksID *int      `json:"mtgstocksId"`
+	MarketPrice *float64  `json:"marketPrice"`
+	Quantity    int       `json:"quantity"`
+	Weight      float64   `json:"weight"`
+	Notes       string    `json:"notes"`
 	AddedAt     time.Time `json:"addedAt"`
 }
 

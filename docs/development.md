@@ -98,6 +98,29 @@ The Vite dev proxy is already configured — browser-side `/api/*` calls are aut
 
 ---
 
+## Shortcut: run everything with `make dev`
+
+Instead of three terminals, install [hivemind](https://github.com/DarthSim/hivemind):
+
+```bash
+# macOS
+brew install hivemind
+
+# Linux (download from GitHub releases)
+curl -Lo hivemind.gz https://github.com/DarthSim/hivemind/releases/latest/download/hivemind-Linux-x86_64.gz
+gunzip hivemind.gz && chmod +x hivemind && sudo mv hivemind /usr/local/bin/
+```
+
+Then from the project root:
+
+```bash
+make dev
+```
+
+This starts all three processes (db, api, web) defined in `Procfile` in one terminal.
+
+---
+
 ## Dev flow summary
 
 | Terminal | Command |
@@ -107,6 +130,28 @@ The Vite dev proxy is already configured — browser-side `/api/*` calls are aut
 | 3 | `cd frontend && API_URL=http://localhost:8080 npm run dev` |
 
 Then open **http://localhost:4321** — sign in with Google, get redirected based on your role.
+
+---
+
+## Pre-commit hooks
+
+The repo ships with a `.pre-commit-config.yaml` that runs on every commit:
+- `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-added-large-files`
+- `go fmt` and `go vet` on all Go files
+- `astro check` (TypeScript check) on frontend files
+
+To install the hooks:
+
+```bash
+pip install pre-commit   # or: brew install pre-commit
+pre-commit install
+```
+
+After that, hooks run automatically on `git commit`. To run manually:
+
+```bash
+pre-commit run --all-files
+```
 
 ---
 

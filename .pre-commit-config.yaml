@@ -7,17 +7,26 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
 
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
+  - repo: local
     hooks:
       - id: go-fmt
+        name: go fmt
+        entry: bash -c 'cd api && go fmt ./...'
+        language: system
+        files: ^api/.*\.go$
+        pass_filenames: false
       - id: go-vet
+        name: go vet
+        entry: bash -c 'cd api && go vet ./...'
+        language: system
+        files: ^api/.*\.go$
+        pass_filenames: false
 
   - repo: local
     hooks:
-      - id: eslint
-        name: eslint
-        entry: npm run lint --prefix frontend
+      - id: astro-check
+        name: astro check
+        entry: bash -c 'cd frontend && npm run check'
         language: system
         files: ^frontend/.*\.(js|ts|astro)$
         pass_filenames: false

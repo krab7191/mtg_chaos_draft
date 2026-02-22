@@ -7,7 +7,7 @@ import (
 )
 
 type WeightSettings struct {
-	PriceSensitivity    float64 `json:"priceSensitivity"`
+	PriceSensitivity     float64 `json:"priceSensitivity"`
 	ScaricitySensitivity float64 `json:"scarcitySensitivity"`
 }
 

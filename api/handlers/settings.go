@@ -29,7 +29,7 @@ func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		PriceSensitivity    float64 `json:"priceSensitivity"`
+		PriceSensitivity     float64 `json:"priceSensitivity"`
 		ScaricitySensitivity float64 `json:"scarcitySensitivity"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -38,8 +38,12 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	// Clamp to [0, 1]
 	clamp := func(v float64) float64 {
-		if v < 0 { return 0 }
-		if v > 1 { return 1 }
+		if v < 0 {
+			return 0
+		}
+		if v > 1 {
+			return 1
+		}
 		return v
 	}
 	s, err := db.UpdateWeightSettings(r.Context(), h.pool,
