@@ -57,7 +57,7 @@ resource "hcloud_server" "main" {
   user_data = <<-EOF
     #!/bin/bash
     apt-get update
-    apt-get install -y docker.io fail2ban
+    apt-get install -y docker.io docker-compose-plugin fail2ban
     systemctl enable docker fail2ban
     systemctl start docker fail2ban
     docker network create app
