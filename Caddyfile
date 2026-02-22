@@ -4,10 +4,16 @@
         reverse_proxy api:8080
     }
 
-    # SSR frontend
+    # Static frontend
     handle {
-        reverse_proxy frontend:4321
+        root * /srv
+        file_server
     }
+
+    # SSR frontend (uncomment and remove static block above to enable)
+    # handle {
+    #     reverse_proxy frontend:4321
+    # }
 
     header {
         X-Content-Type-Options nosniff
