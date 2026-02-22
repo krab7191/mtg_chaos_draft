@@ -60,23 +60,20 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Deploy
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
       - name: Copy static files to server
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "frontend/dist/*"
-          target: "/srv"
-          strip_components: 2
+        run: |
+          scp -i ~/.ssh/deploy_key -r frontend/dist/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/srv/
 
       - name: Deploy API container
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
             docker pull ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
             docker stop api 2>/dev/null || true
             docker rm api 2>/dev/null || true
@@ -85,8 +82,9 @@ jobs:
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               --restart unless-stopped \
               ${{ env.REGISTRY }}/${{ github.repository }}-api:latest
+          '
 
-# SSR mode: uncomment below, comment out static frontend steps above
+# SSR mode: add these steps and remove the static frontend build steps above
 #     - name: Build and push Frontend
 #       uses: docker/build-push-action@v6
 #       with:
@@ -96,12 +94,8 @@ jobs:
 #         tags: ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
 #
 #     - name: Deploy frontend container
-#       uses: appleboy/ssh-action@v1
-#       with:
-#         host: ${{ secrets.SERVER_HOST }}
-#         username: ${{ secrets.SERVER_USER }}
-#         key: ${{ secrets.SERVER_SSH_KEY }}
-#         script: |
+#       run: |
+#         ssh -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
 #           docker pull ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
 #           docker stop frontend 2>/dev/null || true
 #           docker rm frontend 2>/dev/null || true
@@ -109,3 +103,4 @@ jobs:
 #             -e API_URL="http://api:8080" \
 #             --restart unless-stopped \
 #             ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
+#         '
