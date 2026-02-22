@@ -15,13 +15,14 @@ import (
 )
 
 type AuthHandler struct {
-	pool        *pgxpool.Pool
-	oauthConfig *oauth2.Config
-	adminEmail  string
+	pool         *pgxpool.Pool
+	oauthConfig  *oauth2.Config
+	adminEmail   string
+	viewerEmails []string
 }
 
-func NewAuthHandler(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string) *AuthHandler {
-	return &AuthHandler{pool: pool, oauthConfig: oauthConfig, adminEmail: adminEmail}
+func NewAuthHandler(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string, viewerEmails []string) *AuthHandler {
+	return &AuthHandler{pool: pool, oauthConfig: oauthConfig, adminEmail: adminEmail, viewerEmails: viewerEmails}
 }
 
 func randomHex(n int) (string, error) {
@@ -95,6 +96,17 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 			user.Role = "admin"
 		}
 	}
+	// Promote to viewer if email is in VIEWER_EMAILS (and not already admin)
+	if user.Role != "admin" {
+		for _, email := range h.viewerEmails {
+			if user.Email == email && user.Role != "viewer" {
+				if err := db.SetUserRole(r.Context(), h.pool, user.ID, "viewer"); err == nil {
+					user.Role = "viewer"
+				}
+				break
+			}
+		}
+	}
 
 	sessionID, err := randomHex(32)
 	if err != nil {
@@ -116,11 +128,14 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 	})
 
-	if user.Role == "admin" {
-		http.Redirect(w, r, "/admin/collection", http.StatusFound)
-	} else {
-		http.Redirect(w, r, "/select", http.StatusFound)
+	adminRoles := []string{"admin", "viewer"}
+	for _, role := range adminRoles {
+		if user.Role == role {
+			http.Redirect(w, r, "/admin/collection", http.StatusFound)
+			return
+		}
 	}
+	http.Redirect(w, r, "/select", http.StatusFound)
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {

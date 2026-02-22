@@ -1,5 +1,5 @@
 ---
-// Client-side search component — talks to /api/search (Scryfall-backed)
+// Client-side search component — talks to /api/search (MTGStocks-backed)
 ---
 
 <div class="search" id="pack-search">
@@ -58,21 +58,10 @@
     padding: 0.65rem 0.75rem;
     border-bottom: 1px solid var(--color-border);
     display: flex;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.6rem;
+    align-items: center;
+    gap: 0.6rem;
 
     &:last-child { border-bottom: none; }
-
-    &__icon {
-      width: 22px;
-      height: 22px;
-      flex-shrink: 0;
-      margin-top: 3px;
-      filter: invert(1) opacity(0.6);
-
-      @media (min-width: 480px) { width: 26px; height: 26px; }
-    }
 
     &__info {
       flex: 1;
@@ -82,9 +71,7 @@
     &__name {
       font-weight: 500;
       font-size: 0.88rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.3;
     }
 
     &__meta {
@@ -93,26 +80,18 @@
       margin-top: 1px;
     }
 
-    /* Buttons row — full width on mobile so they wrap below the name */
-    &__types {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      width: 100%;
-      /* indent to align with name, past icon + gap */
-      padding-left: calc(22px + 0.6rem);
-
-      @media (min-width: 480px) {
-        width: auto;
-        padding-left: 0;
-        flex-shrink: 0;
-        align-self: center;
-      }
+    &__price {
+      color: var(--color-text-muted);
+      font-size: 0.73rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
     &__add-group {
-      display: inline-flex;
+      display: flex;
       align-items: center;
+      gap: 0;
+      flex-shrink: 0;
     }
 
     &__qty {
@@ -133,7 +112,7 @@
       border: 1px solid var(--color-border);
       color: var(--color-text);
       border-radius: 0 var(--radius) var(--radius) 0;
-      padding: 0.22rem 0.5rem;
+      padding: 0.22rem 0.6rem;
       font-size: 0.73rem;
       cursor: pointer;
       white-space: nowrap;
@@ -174,38 +153,35 @@
     results.innerHTML = '';
 
     if (items.length === 0) {
-      results.innerHTML = '<div class="search__empty">No sets found</div>';
+      results.innerHTML = '<div class="search__empty">No products found</div>';
       results.hidden = false;
       return;
     }
 
-    items.forEach((set) => {
+    items.forEach((product) => {
       const row = document.createElement('div');
       row.className = 'set-result';
 
-      const year = set.releasedAt?.slice(0, 4) ?? '';
-      const typeLabel = set.setType.replace('_', ' ');
-
-      const typeButtons = (set.productTypes as string[]).map((pt) => `
-        <span class="set-result__add-group">
-          <input class="set-result__qty" type="number" value="1" min="1" max="999"
-            data-product-type="${pt}" title="Quantity" />
-          <button class="set-result__add-btn"
-            data-code="${set.code}"
-            data-set-name="${set.name}"
-            data-product-type="${pt}">
-            + ${pt}
-          </button>
-        </span>
-      `).join('');
+      const year = product.releasedAt?.slice(0, 4) ?? '';
+      const price = product.marketPrice != null ? `$${product.marketPrice.toFixed(2)}` : '';
 
       row.innerHTML = `
-        <img class="set-result__icon" src="${set.iconUrl}" alt="" />
         <div class="set-result__info">
-          <div class="set-result__name">${set.name}</div>
-          <div class="set-result__meta">${year} · ${typeLabel}</div>
+          <div class="set-result__name">${product.setName}</div>
+          <div class="set-result__meta">${product.productType}${year ? ' · ' + year : ''}</div>
         </div>
-        <div class="set-result__types">${typeButtons}</div>
+        ${price ? `<span class="set-result__price">${price}</span>` : ''}
+        <div class="set-result__add-group">
+          <input class="set-result__qty" type="number" value="1" min="1" max="999" title="Quantity" />
+          <button class="set-result__add-btn"
+            data-id="${product.mtgstocksId}"
+            data-name="${product.name}"
+            data-set-name="${product.setName}"
+            data-product-type="${product.productType}"
+            data-price="${product.marketPrice ?? ''}">
+            + Add
+          </button>
+        </div>
       `;
 
       results.appendChild(row);
@@ -217,23 +193,21 @@
       btn.addEventListener('click', async () => {
         btn.disabled = true;
 
-        const code = btn.dataset.code!;
-        const setName = btn.dataset.setName!;
-        const productType = btn.dataset.productType!;
-        const name = `${setName} ${productType}`;
         const qtyInput = btn.closest('.set-result__add-group')?.querySelector<HTMLInputElement>('.set-result__qty');
         const quantity = parseInt(qtyInput?.value ?? '1') || 1;
+        const marketPrice = btn.dataset.price ? parseFloat(btn.dataset.price) : null;
 
         const res = await fetch('/api/collection', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            scryfallSetCode: code,
-            name,
-            setName,
-            productType,
+            mtgstocksId: parseInt(btn.dataset.id!),
+            name: btn.dataset.name,
+            setName: btn.dataset.setName,
+            productType: btn.dataset.productType,
             quantity,
             weight: 1.0,
+            marketPrice,
           }),
         });
 

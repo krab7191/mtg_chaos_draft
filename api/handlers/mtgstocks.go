@@ -34,29 +34,26 @@ func proxyMTGStocks(url string) ([]byte, int, error) {
 func fetchSealedPrice(mtgstocksID int) (float64, bool) {
 	body, status, err := proxyMTGStocks(fmt.Sprintf("https://api.mtgstocks.com/sealed/%d", mtgstocksID))
 	if err != nil || status != 200 {
-		fmt.Printf("fetchSealedPrice %d: status=%d err=%v\n", mtgstocksID, status, err)
-		return 0, false
-	}
-	fmt.Printf("fetchSealedPrice %d raw: %s\n", mtgstocksID, string(body))
-
-	var data map[string]json.RawMessage
-	if err := json.Unmarshal(body, &data); err != nil {
 		return 0, false
 	}
 
-	// Try every plausible top-level numeric field
-	for _, key := range []string{"avg", "market", "low", "high", "price", "market_price", "latest_price"} {
-		raw, ok := data[key]
-		if !ok {
-			continue
-		}
-		var v float64
-		if err := json.Unmarshal(raw, &v); err == nil && v > 0 {
-			fmt.Printf("fetchSealedPrice %d: using field %q = %.2f\n", mtgstocksID, key, v)
-			return v, true
+	var data struct {
+		LatestPrice *struct {
+			Market  *float64 `json:"market"`
+			Average *float64 `json:"average"`
+			Low     *float64 `json:"low"`
+		} `json:"latestPrice"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil || data.LatestPrice == nil {
+		return 0, false
+	}
+
+	lp := data.LatestPrice
+	for _, v := range []*float64{lp.Market, lp.Average, lp.Low} {
+		if v != nil && *v > 0 {
+			return *v, true
 		}
 	}
-	fmt.Printf("fetchSealedPrice %d: no usable price field found\n", mtgstocksID)
 	return 0, false
 }
 

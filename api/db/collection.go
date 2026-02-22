@@ -8,25 +8,24 @@ import (
 )
 
 type CollectionPack struct {
-	ID              int       `json:"id"`
-	ScryfallSetCode string    `json:"scryfallSetCode"`
-	Name            string    `json:"name"`
-	SetName         string    `json:"setName"`
-	ProductType     string    `json:"productType"`
-	MTGStocksID     *int      `json:"mtgstocksId"`
-	MarketPrice     *float64  `json:"marketPrice"`
-	Quantity        int       `json:"quantity"`
-	Weight          float64   `json:"weight"`
-	Notes           string    `json:"notes"`
-	AddedAt         time.Time `json:"addedAt"`
+	ID          int      `json:"id"`
+	Name        string   `json:"name"`
+	SetName     string   `json:"setName"`
+	ProductType string   `json:"productType"`
+	MTGStocksID *int     `json:"mtgstocksId"`
+	MarketPrice *float64 `json:"marketPrice"`
+	Quantity    int      `json:"quantity"`
+	Weight      float64  `json:"weight"`
+	Notes       string   `json:"notes"`
+	AddedAt     time.Time `json:"addedAt"`
 }
 
-const packColumns = `id, scryfall_set_code, name, set_name, product_type, mtgstocks_id,
+const packColumns = `id, name, set_name, product_type, mtgstocks_id,
 	market_price, quantity, weight, COALESCE(notes, ''), added_at`
 
 func scanPack(row interface{ Scan(...any) error }) (*CollectionPack, error) {
 	p := &CollectionPack{}
-	err := row.Scan(&p.ID, &p.ScryfallSetCode, &p.Name, &p.SetName, &p.ProductType,
+	err := row.Scan(&p.ID, &p.Name, &p.SetName, &p.ProductType,
 		&p.MTGStocksID, &p.MarketPrice, &p.Quantity, &p.Weight, &p.Notes, &p.AddedAt)
 	return p, err
 }
@@ -40,9 +39,8 @@ func ListCollection(ctx context.Context, pool *pgxpool.Pool) ([]CollectionPack, 
 
 	var packs []CollectionPack
 	for rows.Next() {
-		p := &CollectionPack{}
-		if err := rows.Scan(&p.ID, &p.ScryfallSetCode, &p.Name, &p.SetName, &p.ProductType,
-			&p.MTGStocksID, &p.MarketPrice, &p.Quantity, &p.Weight, &p.Notes, &p.AddedAt); err != nil {
+		p, err := scanPack(rows)
+		if err != nil {
 			return nil, err
 		}
 		packs = append(packs, *p)
@@ -50,12 +48,12 @@ func ListCollection(ctx context.Context, pool *pgxpool.Pool) ([]CollectionPack, 
 	return packs, rows.Err()
 }
 
-func AddPack(ctx context.Context, pool *pgxpool.Pool, scryfallSetCode, name, setName, productType string, quantity int, weight float64) (*CollectionPack, error) {
+func AddPack(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, setName, productType string, quantity int, weight float64, marketPrice *float64) (*CollectionPack, error) {
 	return scanPack(pool.QueryRow(ctx, `
-		INSERT INTO collection_packs (scryfall_set_code, name, set_name, product_type, quantity, weight)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO collection_packs (name, set_name, product_type, mtgstocks_id, quantity, weight, market_price)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING `+packColumns,
-		scryfallSetCode, name, setName, productType, quantity, weight))
+		name, setName, productType, mtgstocksID, quantity, weight, marketPrice))
 }
 
 func UpdatePack(ctx context.Context, pool *pgxpool.Pool, id int, quantity *int, weight *float64, notes *string, mtgstocksID *int, marketPrice *float64) (*CollectionPack, error) {
@@ -85,9 +83,8 @@ func GetPacksByIDs(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]Collec
 
 	var packs []CollectionPack
 	for rows.Next() {
-		p := &CollectionPack{}
-		if err := rows.Scan(&p.ID, &p.ScryfallSetCode, &p.Name, &p.SetName, &p.ProductType,
-			&p.MTGStocksID, &p.MarketPrice, &p.Quantity, &p.Weight, &p.Notes, &p.AddedAt); err != nil {
+		p, err := scanPack(rows)
+		if err != nil {
 			return nil, err
 		}
 		packs = append(packs, *p)

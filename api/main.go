@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"mtg-chaos-draft/db"
 	"mtg-chaos-draft/handlers"
@@ -33,7 +34,15 @@ func main() {
 		Endpoint:     google.Endpoint,
 	}
 
-	authHandler := handlers.NewAuthHandler(pool, oauthConfig, mustEnv("ADMIN_EMAIL"))
+	var viewerEmails []string
+	if v := os.Getenv("VIEWER_EMAILS"); v != "" {
+		for _, e := range strings.Split(v, ",") {
+			if trimmed := strings.TrimSpace(e); trimmed != "" {
+				viewerEmails = append(viewerEmails, trimmed)
+			}
+		}
+	}
+	authHandler := handlers.NewAuthHandler(pool, oauthConfig, mustEnv("ADMIN_EMAIL"), viewerEmails)
 	collectionHandler := handlers.NewCollectionHandler(pool)
 	selectHandler := handlers.NewSelectHandler(pool)
 	settingsHandler := handlers.NewSettingsHandler(pool)

@@ -8,7 +8,8 @@ const meRes = await fetch(`${apiUrl}/api/auth/me`, {
 });
 if (meRes.ok) {
   const user = await meRes.json();
-  return Astro.redirect(user.role === 'admin' ? '/admin/collection' : '/select');
+  const ADMIN_ROLES = ['admin', 'viewer'];
+  return Astro.redirect(ADMIN_ROLES.includes(user.role) ? '/admin/collection' : '/select');
 }
 ---
 

@@ -8,10 +8,16 @@ const cookie = Astro.request.headers.get('cookie') ?? '';
 const meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
 if (!meRes.ok) return Astro.redirect('/login');
 const user = await meRes.json();
-if (user.role !== 'admin') return Astro.redirect('/select');
+const ADMIN_ROLES = ['admin', 'viewer'];
+if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
 
 const colRes = await fetch(`${apiUrl}/api/collection`, { headers: { cookie } });
 const packs = colRes.ok ? await colRes.json() : [];
+
+packs.sort((a: any, b: any) => (a.quantity === 0 ? 1 : 0) - (b.quantity === 0 ? 1 : 0));
+
+const totalValue: number = packs.reduce((sum: number, p: any) =>
+  sum + (p.marketPrice ?? 0) * p.quantity, 0);
 ---
 
 <Layout title="Manage Collection" user={user}>
@@ -22,26 +28,32 @@ const packs = colRes.ok ? await colRes.json() : [];
     <PackSearch />
 
     <section class="collection">
-      <h2 class="collection__heading">In your collection</h2>
+      <div class="collection__header">
+        <h2 class="collection__heading">In your collection</h2>
+        {totalValue > 0 && (
+          <span class="collection__value">
+            Total value: <strong id="collection-total">${totalValue.toFixed(2)}</strong>
+          </span>
+        )}
+      </div>
 
-      {packs.length === 0 ? (
-        <p class="collection__empty">Nothing yet — search above to add some packs.</p>
-      ) : (
-        <div class="table-scroll">
-          <table class="table">
+      <p class="collection__empty" id="collection-empty" style={packs.length > 0 ? 'display:none' : ''}>
+        Nothing yet — search above to add some packs.
+      </p>
+      <div class="table-scroll" id="collection-table-scroll" style={packs.length === 0 ? 'display:none' : ''}>
+        <table class="table">
             <thead>
               <tr>
                 <th>Set</th>
                 <th>Type</th>
                 <th>Qty</th>
-                <th>MTGStocks ID</th>
                 <th>Market price</th>
                 <th></th>
               </tr>
             </thead>
             <tbody id="collection-body">
               {packs.map((pack: any) => (
-                <tr data-id={pack.id}>
+                <tr data-id={pack.id} data-price={pack.marketPrice ?? 0} data-order={packs.indexOf(pack)} class:list={[{ 'row--empty': pack.quantity === 0 }]}>
                   <td class="col-set">{pack.setName}</td>
                   <td class="col-type">{pack.productType}</td>
                   <td class="col-qty">
@@ -50,15 +62,6 @@ const packs = colRes.ok ? await colRes.json() : [];
                       <span class="qty__val">{pack.quantity}</span>
                       <button class="qty__btn qty__btn--inc" data-id={pack.id}>+</button>
                     </div>
-                  </td>
-                  <td class="col-mtg">
-                    <input
-                      type="number"
-                      class="mtg-input"
-                      placeholder="e.g. 5067"
-                      value={pack.mtgstocksId ?? ''}
-                      data-id={pack.id}
-                    />
                   </td>
                   <td class="col-price">
                     <span class="price-val" data-id={pack.id}>
@@ -73,12 +76,8 @@ const packs = colRes.ok ? await colRes.json() : [];
             </tbody>
           </table>
         </div>
-      )}
+      </div>
     </section>
-
-    <p class="page__hint">
-      Adjust odds on the <a href="/admin/weights">Weights</a> page.
-    </p>
   </div>
 </Layout>
 
@@ -90,11 +89,24 @@ const packs = colRes.ok ? await colRes.json() : [];
   }
 
   .collection {
+    &__header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
     &__heading {
       font-size: 1rem;
       font-weight: 600;
       color: var(--color-text-muted);
-      margin-bottom: 0.75rem;
+      margin-bottom: 0;
+    }
+
+    &__value {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+      strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
     }
 
     &__empty {
@@ -132,11 +144,11 @@ const packs = colRes.ok ? await colRes.json() : [];
     }
 
     tr:hover td { background: var(--color-surface); }
+    tr.row--empty td { opacity: 0.4; }
 
     .col-set   { font-weight: 500; }
     .col-type  { color: var(--color-text-muted); font-size: 0.85rem; }
     .col-qty   { width: 7rem; }
-    .col-mtg   { width: 8rem; }
     .col-price { width: 7rem; font-variant-numeric: tabular-nums; font-size: 0.88rem; }
   }
 
@@ -171,19 +183,6 @@ const packs = colRes.ok ? await colRes.json() : [];
     }
   }
 
-  .mtg-input {
-    width: 100%;
-    padding: 0.22rem 0.4rem;
-    border-radius: var(--radius);
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text);
-    font-size: 0.85rem;
-
-    &:focus { border-color: var(--color-accent); background: var(--color-surface); outline: none; }
-    &::placeholder { color: var(--color-text-muted); }
-  }
-
   .btn-delete {
     background: none;
     border: 1px solid var(--color-border);
@@ -196,6 +195,31 @@ const packs = colRes.ok ? await colRes.json() : [];
 </style>
 
 <script>
+  function reorderRows() {
+    const tbody = document.getElementById('collection-body');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr[data-order]'));
+    rows.sort((a, b) => {
+      const aEmpty = a.classList.contains('row--empty') ? 1 : 0;
+      const bEmpty = b.classList.contains('row--empty') ? 1 : 0;
+      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+      return parseInt(a.dataset.order!) - parseInt(b.dataset.order!);
+    });
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  function recalcTotal() {
+    const totalEl = document.getElementById('collection-total');
+    if (!totalEl) return;
+    let sum = 0;
+    document.querySelectorAll<HTMLElement>('tr[data-price]').forEach((row) => {
+      const price = parseFloat(row.dataset.price ?? '0');
+      const qty   = parseInt(row.querySelector<HTMLElement>('.qty__val')?.textContent ?? '0');
+      sum += price * qty;
+    });
+    totalEl.textContent = `$${sum.toFixed(2)}`;
+  }
+
   // +/- qty buttons
   document.querySelectorAll<HTMLElement>('.qty').forEach((widget) => {
     const id      = widget.dataset.id!;
@@ -208,6 +232,9 @@ const packs = colRes.ok ? await colRes.json() : [];
       const next    = Math.max(0, current + delta);
       valEl.textContent = String(next);
       decBtn.disabled   = next === 0;
+      widget.closest('tr')?.classList.toggle('row--empty', next === 0);
+      reorderRows();
+      recalcTotal();
       await fetch(`/api/collection/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -220,38 +247,29 @@ const packs = colRes.ok ? await colRes.json() : [];
     incBtn.addEventListener('click', () => update(+1));
   });
 
-  // MTGStocks ID — link price on Enter or blur
-  document.querySelectorAll<HTMLInputElement>('.mtg-input').forEach((input) => {
-    const linkPrice = async () => {
-      const id  = input.dataset.id!;
-      const val = parseInt(input.value);
-      if (!val || isNaN(val)) return;
-
-      const priceEl = document.querySelector<HTMLElement>(`.price-val[data-id="${id}"]`);
-      if (priceEl) priceEl.textContent = '…';
-
-      const res = await fetch(`/api/collection/${id}/link-price`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mtgstocksId: val }),
-      });
-      if (res.ok && priceEl) {
-        const pack = await res.json();
-        priceEl.textContent = pack.marketPrice != null
-          ? `$${pack.marketPrice.toFixed(2)}`
-          : 'No price';
-      }
-    };
-    input.addEventListener('blur', linkPrice);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
-  });
-
   // Delete
   document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('Remove this pack from the collection?')) return;
-      const res = await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
-      if (res.ok) btn.closest('tr')?.remove();
+    btn.addEventListener('click', () => {
+      const row = btn.closest<HTMLElement>('tr')!;
+      const label = row.querySelector('.col-set')?.textContent ?? 'Pack';
+      row.style.opacity = '0.3';
+      row.style.pointerEvents = 'none';
+      window.deleteToast(
+        `Remove "${label}"?`,
+        async () => {
+          await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
+          row.remove();
+          recalcTotal();
+          if (document.getElementById('collection-body')?.querySelectorAll('tr').length === 0) {
+            document.getElementById('collection-table-scroll')!.style.display = 'none';
+            document.getElementById('collection-empty')!.style.display = '';
+          }
+        },
+        () => {
+          row.style.opacity = '';
+          row.style.pointerEvents = '';
+        },
+      );
     });
   });
 

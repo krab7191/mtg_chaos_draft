@@ -33,19 +33,20 @@ func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		ScryfallSetCode string  `json:"scryfallSetCode"`
-		Name            string  `json:"name"`
-		SetName         string  `json:"setName"`
-		ProductType     string  `json:"productType"`
-		Quantity        int     `json:"quantity"`
-		Weight          float64 `json:"weight"`
+		MTGStocksID int      `json:"mtgstocksId"`
+		Name        string   `json:"name"`
+		SetName     string   `json:"setName"`
+		ProductType string   `json:"productType"`
+		Quantity    int      `json:"quantity"`
+		Weight      float64  `json:"weight"`
+		MarketPrice *float64 `json:"marketPrice"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if body.ScryfallSetCode == "" || body.ProductType == "" {
-		http.Error(w, "scryfallSetCode and productType required", http.StatusBadRequest)
+	if body.MTGStocksID == 0 || body.ProductType == "" {
+		http.Error(w, "mtgstocksId and productType required", http.StatusBadRequest)
 		return
 	}
 	if body.Quantity == 0 {
@@ -54,7 +55,7 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	if body.Weight == 0 {
 		body.Weight = 1.0
 	}
-	pack, err := db.AddPack(r.Context(), h.pool, body.ScryfallSetCode, body.Name, body.SetName, body.ProductType, body.Quantity, body.Weight)
+	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.ProductType, body.Quantity, body.Weight, body.MarketPrice)
 	if err != nil {
 		if isUniqueViolation(err) {
 			http.Error(w, "pack already in collection", http.StatusConflict)
@@ -78,14 +79,13 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Quantity    *int     `json:"quantity"`
 		Weight      *float64 `json:"weight"`
 		Notes       *string  `json:"notes"`
-		MTGStocksID *int     `json:"mtgstocksId"`
 		MarketPrice *float64 `json:"marketPrice"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	pack, err := db.UpdatePack(r.Context(), h.pool, id, body.Quantity, body.Weight, body.Notes, body.MTGStocksID, body.MarketPrice)
+	pack, err := db.UpdatePack(r.Context(), h.pool, id, body.Quantity, body.Weight, body.Notes, nil, body.MarketPrice)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return

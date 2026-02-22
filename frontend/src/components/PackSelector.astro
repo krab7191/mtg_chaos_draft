@@ -5,21 +5,14 @@ interface Pack {
   setName: string;
   productType: string;
   quantity: number;
-  weight: number;
   marketPrice?: number | null;
-}
-
-interface Settings {
-  priceSensitivity: number;
-  scarcitySensitivity: number;
 }
 
 interface Props {
   packs: Pack[];
-  settings: Settings;
 }
 
-const { packs, settings } = Astro.props;
+const { packs } = Astro.props;
 ---
 
 <div class="selector">
@@ -27,10 +20,7 @@ const { packs, settings } = Astro.props;
     <p class="selector__empty">The collection is empty. Ask your admin to add some packs!</p>
   ) : (
     <>
-      <div class="selector__controls"
-        data-price-sensitivity={settings.priceSensitivity}
-        data-scarcity-sensitivity={settings.scarcitySensitivity}
-      >
+      <div class="selector__controls">
         <button id="select-all" class="btn btn--secondary">Select all</button>
         <button id="deselect-all" class="btn btn--secondary">Deselect all</button>
         <span class="selector__count" id="selected-count">0 selected</span>
@@ -41,19 +31,32 @@ const { packs, settings } = Astro.props;
           <li class="pack-item">
             <label class="pack-item__label">
               <input type="checkbox" class="pack-checkbox" value={pack.id} checked
-                data-weight={pack.weight}
-                data-qty={pack.quantity}
                 data-price={pack.marketPrice ?? ''}
+                data-qty={pack.quantity}
+                data-name={pack.name}
+                data-set={pack.setName}
+                data-product-type={pack.productType}
               />
-              <span class="pack-item__name">{pack.name}</span>
-              <span class="pack-item__meta">{pack.setName}</span>
+              <span class="pack-item__info">
+                <span class="pack-item__name">{pack.name}</span>
+                <span class="pack-item__meta">{pack.setName}</span>
+              </span>
+              <span class="pack-item__price">
+                {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
+              </span>
               <span class="pack-item__odds">—</span>
             </label>
           </li>
         ))}
       </ul>
 
-      <button id="pick-btn" class="btn btn--primary btn--large">🎲 Pick a Pack</button>
+      <div class="pick-row">
+        <button id="pick-btn" class="btn btn--primary btn--large">🎲 Pick a Pack</button>
+        <label class="history-toggle">
+          <input type="checkbox" id="history-on" />
+          Record draft
+        </label>
+      </div>
 
       <div class="result" id="result" hidden>
         <div class="result__card">
@@ -61,8 +64,15 @@ const { packs, settings } = Astro.props;
           <h2 class="result__name" id="result-name"></h2>
           <p class="result__set" id="result-set"></p>
           <div class="result__links" id="result-links"></div>
-          <button id="pick-again" class="btn btn--secondary" style="margin-top:1rem">Pick again</button>
         </div>
+      </div>
+
+      <div class="history" id="history-section" hidden>
+        <div class="history__header">
+          <span class="history__title">Draft history</span>
+          <button class="history__clear" id="history-clear">Clear</button>
+        </div>
+        <ol class="history__list" id="history-list"></ol>
       </div>
     </>
   )}
@@ -106,32 +116,56 @@ const { packs, settings } = Astro.props;
   }
 
   .pack-item {
+    min-width: 0;
+
     &__label {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.5rem;
       padding: 0.65rem 0.8rem;
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius);
       cursor: pointer;
       transition: border-color 0.1s;
-      min-height: 2.8rem; /* bigger tap target */
+      min-height: 2.8rem;
+      min-width: 0;
+      overflow: hidden;
 
       &:hover { border-color: var(--color-accent); }
+    }
+
+    &__info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
     }
 
     &__name {
       font-weight: 500;
       font-size: 0.88rem;
-      flex: 1;
-      line-height: 1.3;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     &__meta {
       color: var(--color-text-muted);
-      font-size: 0.75rem;
+      font-size: 0.73rem;
+      overflow: hidden;
       white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    &__price {
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     &__odds {
@@ -139,9 +173,114 @@ const { packs, settings } = Astro.props;
       font-size: 0.78rem;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
+      flex-shrink: 0;
     }
 
     input[type="checkbox"] { accent-color: var(--color-accent); flex-shrink: 0; }
+  }
+
+  .pick-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .history-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    user-select: none;
+
+    input { accent-color: var(--color-accent); }
+  }
+
+  .history {
+    margin-top: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+
+    &__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.55rem 0.85rem;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    &__title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-text-muted);
+    }
+
+    &__clear {
+      background: none;
+      border: none;
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      padding: 0;
+      &:hover { color: var(--color-danger); }
+    }
+
+    &__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    &__item {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.5rem 0.85rem;
+      border-bottom: 1px solid var(--color-border);
+      font-size: 0.88rem;
+
+      &:last-child { border-bottom: none; }
+    }
+
+    &__num {
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      min-width: 1.2rem;
+    }
+
+    &__pack-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+    }
+
+    &__pack-name {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    &__pack-set {
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    &__pack-price {
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
   }
 
   .btn {
@@ -163,12 +302,10 @@ const { packs, settings } = Astro.props;
       border: 1px solid var(--color-border);
     }
     &--large {
-      width: 100%;
       padding: 0.85rem 1.5rem;
       font-size: 1rem;
 
       @media (min-width: 480px) {
-        width: auto;
         padding: 0.75rem 2rem;
         font-size: 1.1rem;
       }
@@ -227,36 +364,98 @@ const { packs, settings } = Astro.props;
 </style>
 
 <script>
-  const pickBtn = document.getElementById('pick-btn') as HTMLButtonElement;
-  const resultDiv = document.getElementById('result') as HTMLDivElement;
-  const resultName = document.getElementById('result-name') as HTMLElement;
-  const resultSet = document.getElementById('result-set') as HTMLElement;
-  const resultLinks = document.getElementById('result-links') as HTMLElement;
-  const pickAgain = document.getElementById('pick-again') as HTMLButtonElement;
-  const countEl = document.getElementById('selected-count') as HTMLElement;
+  const HISTORY_KEY = 'draft-history';
+  const MAX_HISTORY = 12;
+
+  const pickBtn      = document.getElementById('pick-btn') as HTMLButtonElement;
+  const resultDiv    = document.getElementById('result') as HTMLDivElement;
+  const resultName   = document.getElementById('result-name') as HTMLElement;
+  const resultSet    = document.getElementById('result-set') as HTMLElement;
+  const resultLinks  = document.getElementById('result-links') as HTMLElement;
+  const countEl      = document.getElementById('selected-count') as HTMLElement;
+  const historyToggle   = document.getElementById('history-on') as HTMLInputElement;
+  const historySection  = document.getElementById('history-section') as HTMLElement;
+  const historyList     = document.getElementById('history-list') as HTMLElement;
+  const historyClear    = document.getElementById('history-clear') as HTMLButtonElement;
   const checkboxes = () => document.querySelectorAll<HTMLInputElement>('.pack-checkbox');
 
-  const controls = document.querySelector<HTMLElement>('.selector__controls')!;
-  const priceSens    = parseFloat(controls.dataset.priceSensitivity    ?? '0');
-  const scarcitySens = parseFloat(controls.dataset.scarcitySensitivity ?? '0');
+  // ── History ──────────────────────────────────────────────────
+  interface HistoryEntry { name: string; setName: string; price: string; }
 
+  function loadHistory(): HistoryEntry[] {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); } catch { return []; }
+  }
+
+  function saveHistory(entries: HistoryEntry[]) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+  }
+
+  function renderHistory() {
+    const entries = loadHistory();
+    historySection.hidden = !historyToggle.checked || entries.length === 0;
+    historyList.innerHTML = entries.map((e, i) => `
+      <li class="history__item">
+        <span class="history__num">${i + 1}.</span>
+        <span class="history__pack-info">
+          <span class="history__pack-name">${e.name}</span>
+          <span class="history__pack-set">${e.setName}</span>
+        </span>
+        <span class="history__pack-price">${e.price}</span>
+      </li>`).join('');
+  }
+
+  function addToHistory(pack: { name: string; setName: string; marketPrice?: number | null }) {
+    if (!historyToggle.checked) return;
+    const entries = loadHistory();
+    if (entries.length >= MAX_HISTORY) return;
+    entries.push({
+      name:    pack.name,
+      setName: pack.setName,
+      price:   pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—',
+    });
+    saveHistory(entries);
+    renderHistory();
+    if (entries.length >= MAX_HISTORY) historyToggle.checked = false;
+  }
+
+  historyToggle.addEventListener('change', renderHistory);
+
+  historyClear.addEventListener('click', () => {
+    saveHistory([]);
+    renderHistory();
+  });
+
+  // Restore toggle state from localStorage
+  historyToggle.checked = loadHistory().length > 0 && loadHistory().length < MAX_HISTORY;
+  renderHistory();
+
+  // ── Odds ─────────────────────────────────────────────────────
   function effectiveWeight(cb: HTMLInputElement, checkedBoxes: HTMLInputElement[]): number {
-    const weight = parseFloat(cb.dataset.weight ?? '1') || 1;
-    const qty    = parseInt(cb.dataset.qty     ?? '1') || 1;
-    const price  = cb.dataset.price ? parseFloat(cb.dataset.price) : null;
+    const qty = parseInt(cb.dataset.qty ?? '0');
+    if (qty === 0) return 0;
 
+    const price  = cb.dataset.price ? parseFloat(cb.dataset.price) : null;
     const prices = checkedBoxes
       .map(c => c.dataset.price ? parseFloat(c.dataset.price) : null)
       .filter((p): p is number => p !== null && p > 0);
-    const minPrice = prices.length ? Math.min(...prices) : 0;
-    const maxQty   = Math.max(...checkedBoxes.map(c => parseInt(c.dataset.qty ?? '1') || 1), 1);
+    const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 1;
 
-    let priceFactor = 1;
-    if (priceSens > 0 && price && price > 0 && minPrice > 0) {
-      priceFactor = (1 - priceSens) + priceSens * (minPrice / price);
-    }
-    const qtyFactor = (1 - scarcitySens) + scarcitySens * (qty / maxQty);
-    return weight * priceFactor * qtyFactor;
+    const pw = checkedBoxes.map(c => {
+      const p = c.dataset.price ? parseFloat(c.dataset.price) : null;
+      return 1 / ((p && p > 0) ? p : avgPrice);
+    });
+    const sw = checkedBoxes.map(c => {
+      const q = parseInt(c.dataset.qty ?? '0');
+      return q > 0 ? 1 / q : 0;
+    });
+
+    const priceTotal    = pw.reduce((a, b) => a + b, 0);
+    const scarcityTotal = sw.reduce((a, b) => a + b, 0);
+
+    const idx = checkedBoxes.indexOf(cb);
+    const priceOdds    = priceTotal    > 0 ? pw[idx] / priceTotal    : 0;
+    const scarcityOdds = scarcityTotal > 0 ? sw[idx] / scarcityTotal : 0;
+    return Math.min(priceOdds, scarcityOdds);
   }
 
   function updateCount() {
@@ -265,7 +464,6 @@ const { packs, settings } = Astro.props;
     countEl.textContent = `${checked.length} selected`;
     pickBtn.disabled = checked.length === 0;
 
-    // Recompute effective odds for checked items
     const total = checked.reduce((s, c) => s + effectiveWeight(c, checked), 0);
     all.forEach(cb => {
       const oddsEl = cb.closest('.pack-item__label')?.querySelector('.pack-item__odds');
@@ -281,6 +479,7 @@ const { packs, settings } = Astro.props;
   document.getElementById('deselect-all')?.addEventListener('click', () => { checkboxes().forEach(c => c.checked = false); updateCount(); });
   updateCount();
 
+  // ── Pick ─────────────────────────────────────────────────────
   pickBtn.addEventListener('click', async () => {
     const ids = [...checkboxes()].filter(c => c.checked).map(c => parseInt(c.value));
     if (ids.length === 0) return;
@@ -303,16 +502,17 @@ const { packs, settings } = Astro.props;
     resultName.textContent = selectedPack.name;
     resultSet.textContent = `${selectedPack.setName}${selectedPack.productType ? ' · ' + selectedPack.productType : ''}`;
 
-    // Fetch live links
+    addToHistory(selectedPack);
+
     resultLinks.innerHTML = '';
     try {
       const priceRes = await fetch(`/api/price/${selectedPack.mtgstocksId}`);
       if (priceRes.ok) {
         const data = await priceRes.json();
         const urls = data.purchase_urls ?? {};
-        if (urls.tcgplayer) resultLinks.innerHTML += `<a href="${urls.tcgplayer}" target="_blank" rel="noopener">TCGPlayer</a>`;
+        if (urls.tcgplayer)   resultLinks.innerHTML += `<a href="${urls.tcgplayer}" target="_blank" rel="noopener">TCGPlayer</a>`;
         if (urls.cardkingdom) resultLinks.innerHTML += `<a href="${urls.cardkingdom}" target="_blank" rel="noopener">Card Kingdom</a>`;
-        if (urls.cardmarket) resultLinks.innerHTML += `<a href="${urls.cardmarket}" target="_blank" rel="noopener">Cardmarket</a>`;
+        if (urls.cardmarket)  resultLinks.innerHTML += `<a href="${urls.cardmarket}" target="_blank" rel="noopener">Cardmarket</a>`;
       }
     } catch { /* links optional */ }
 
@@ -320,5 +520,4 @@ const { packs, settings } = Astro.props;
     resultDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
-  pickAgain?.addEventListener('click', () => { resultDiv.hidden = true; });
 </script>
