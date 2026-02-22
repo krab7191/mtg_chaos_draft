@@ -27,6 +27,7 @@ install: ## Install all dev dependencies and git hooks
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	pre-commit install
+	printf '#!/bin/sh\ngit fetch --tags\n' > .git/hooks/post-push && chmod +x .git/hooks/post-push
 
 check: ## Run pre-commit checks (fmt, vet, astro check)
 	pre-commit run --all-files
