@@ -8,6 +8,7 @@ terraform/.terraform
 terraform/*.tfstate*
 terraform/terraform.tfvars
 .terraform.lock.hcl
+terraform.oracle.tfvars
 
 # Go binaries
 api/server

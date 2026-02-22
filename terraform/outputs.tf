@@ -1,9 +1,9 @@
-output "instance_public_ip" {
-  description = "Public IP of the instance"
-  value       = oci_core_instance.main.public_ip
+output "server_ip" {
+  description = "Public IPv4 address of the server"
+  value       = hcloud_server.main.ipv4_address
 }
 
 output "ssh_command" {
   description = "SSH command to connect"
-  value       = "ssh ubuntu@${oci_core_instance.main.public_ip}"
+  value       = "ssh root@${hcloud_server.main.ipv4_address}"
 }

@@ -50,9 +50,6 @@ services:
       - caddy_config:/config
     environment:
       DOMAIN: ${DOMAIN:-localhost}
-    depends_on:
-      - api
-      - frontend
     restart: unless-stopped
 
 volumes:

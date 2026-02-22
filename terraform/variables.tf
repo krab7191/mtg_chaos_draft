@@ -1,58 +1,28 @@
-variable "tenancy_ocid" {
-  description = "OCI tenancy OCID"
+variable "hcloud_token" {
+  description = "Hetzner Cloud API token"
   type        = string
-}
-
-variable "user_ocid" {
-  description = "OCI user OCID"
-  type        = string
-}
-
-variable "fingerprint" {
-  description = "OCI API key fingerprint"
-  type        = string
-}
-
-variable "private_key_path" {
-  description = "Path to OCI API private key"
-  type        = string
-}
-
-variable "region" {
-  description = "OCI region"
-  type        = string
-}
-
-variable "compartment_ocid" {
-  description = "OCI compartment OCID"
-  type        = string
-}
-
-variable "availability_domain" {
-  description = "OCI availability domain"
-  type        = string
+  sensitive   = true
 }
 
 variable "app_name" {
-  description = "Application name"
+  description = "Application name (used for resource naming)"
   type        = string
-  default     = "myapp"
+  default     = "mtg-chaos-draft"
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key for instance access"
+variable "server_type" {
+  description = "Hetzner server type"
   type        = string
+  default     = "cax11"
 }
 
-# Always Free limits: 4 OCPUs, 24GB RAM total across all A1 instances
-variable "instance_ocpus" {
-  description = "Number of OCPUs"
-  type        = number
-  default     = 1
+variable "location" {
+  description = "Hetzner datacenter location"
+  type        = string
+  default     = "nbg1"
 }
 
-variable "instance_memory_gb" {
-  description = "Memory in GB"
-  type        = number
-  default     = 2
+variable "ssh_key_name" {
+  description = "Name of an existing SSH key in your Hetzner project (Cloud Console → Security → SSH Keys)"
+  type        = string
 }
