@@ -310,10 +310,9 @@ const { title, user } = Astro.props;
   };
 
   // ── Nav ───────────────────────────────────────────────────────
-  const toggle  = document.getElementById('nav-toggle');
-  const menu    = document.getElementById('nav-menu');
-  const overlay = document.getElementById('nav-overlay');
-  if (!toggle || !menu || !overlay) throw new Error('nav elements missing');
+  const toggle  = document.getElementById('nav-toggle') as HTMLButtonElement;
+  const menu    = document.getElementById('nav-menu') as HTMLElement;
+  const overlay = document.getElementById('nav-overlay') as HTMLElement;
 
   function openMenu() {
     menu.classList.add('open');

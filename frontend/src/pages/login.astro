@@ -7,9 +7,7 @@ const meRes = await fetch(`${apiUrl}/api/auth/me`, {
   headers: { cookie: Astro.request.headers.get('cookie') ?? '' },
 });
 if (meRes.ok) {
-  const user = await meRes.json();
-  const ADMIN_ROLES = ['admin', 'viewer'];
-  return Astro.redirect(ADMIN_ROLES.includes(user.role) ? '/admin/collection' : '/select');
+  return Astro.redirect(['admin', 'viewer'].includes((await meRes.json()).role) ? '/admin/collection' : '/select');
 }
 ---
 

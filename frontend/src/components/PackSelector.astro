@@ -434,7 +434,6 @@ const { packs } = Astro.props;
     const qty = parseInt(cb.dataset.qty ?? '0');
     if (qty === 0) return 0;
 
-    const price  = cb.dataset.price ? parseFloat(cb.dataset.price) : null;
     const prices = checkedBoxes
       .map(c => c.dataset.price ? parseFloat(c.dataset.price) : null)
       .filter((p): p is number => p !== null && p > 0);
