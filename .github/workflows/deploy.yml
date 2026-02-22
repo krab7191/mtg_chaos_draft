@@ -82,6 +82,8 @@ jobs:
             docker run -d --name frontend --network app --network-alias frontend \
               --env-file ~/app/.env \
               -e API_URL="http://api:8080" \
+              -e HOST="0.0.0.0" \
+              -e PORT="4321" \
               --restart unless-stopped \
               ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest
           '
