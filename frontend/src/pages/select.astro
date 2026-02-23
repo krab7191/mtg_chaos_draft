@@ -14,16 +14,22 @@ try {
 if (!meRes.ok) return Astro.redirect('/login');
 const user = await meRes.json();
 
-const collRes = await fetch(`${apiUrl}/api/collection`, { headers: { cookie } });
+const [collRes, settingsRes] = await Promise.all([
+  fetch(`${apiUrl}/api/collection`, { headers: { cookie } }),
+  fetch(`${apiUrl}/api/settings`,   { headers: { cookie } }),
+]);
 const allPacks = collRes.ok ? await collRes.json() : [];
 const packs = allPacks.filter((p: any) => p.quantity > 0);
+const settings = settingsRes.ok
+  ? await settingsRes.json()
+  : { packWeights: {} };
 ---
 
 <Layout title="Pick a Pack" user={user}>
   <div class="page">
     <h1 class="page__title">Pick a Pack</h1>
     <p class="page__sub">Select the packs you want in the pool.</p>
-    <PackSelector packs={packs} />
+    <PackSelector packs={packs} packWeights={settings.packWeights ?? {}} />
   </div>
 </Layout>
 

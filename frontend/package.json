@@ -8,7 +8,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "check": "astro check",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage && node -e \"const s=JSON.parse(require('fs').readFileSync('./coverage/coverage-summary.json','utf8'));console.log('Coverage: '+s.total.statements.pct+'%')\""
   },
   "engines": {
     "node": ">=24.13.1"

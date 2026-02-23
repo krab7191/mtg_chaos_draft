@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import SetCard from './SetCard.svelte';
 
   let { packs, settings }: {
@@ -12,9 +13,9 @@
   } = $props();
 
   // ── State ──────────────────────────────────────────────────
-  let priceFloor  = $state(settings.priceFloor  > 0 ? settings.priceFloor  : 0);
-  let priceCap    = $state(settings.priceCap    > 0 ? settings.priceCap    : 0);
-  let quantityCap = $state(settings.quantityCap > 0 ? settings.quantityCap : 0);
+  let priceFloor  = $state(untrack(() => settings.priceFloor  > 0 ? settings.priceFloor  : 0));
+  let priceCap    = $state(untrack(() => settings.priceCap    > 0 ? settings.priceCap    : 0));
+  let quantityCap = $state(untrack(() => settings.quantityCap > 0 ? settings.quantityCap : 0));
 
   // Initialize ALL packs so we always send the full set on save (no dynamic key additions needed)
   const initMultipliers = (): Record<string, number> => {
@@ -32,7 +33,10 @@
   // ── Helpers ────────────────────────────────────────────────
   function toNum(v: string)    { const n = parseFloat(v); return isNaN(n) || n <= 0 ? 0 : n; }
   function toInt(v: string)    { const n = parseInt(v);   return isNaN(n) || n <= 0 ? 0 : n; }
-  function updateMult(id: string, value: number) { multipliers[id] = value; }
+  function updateMult(id: string, value: number) {
+    multipliers[id] = value;
+    saveSettings();
+  }
 
   // ── Odds computation ───────────────────────────────────────
   function computeOdds(
@@ -58,20 +62,13 @@
       ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length
       : 1;
 
-    const pw = allPacks.map((_, i) => 1 / (rawPrices[i] ?? avgPrice));
-    const sw = allPacks.map(p => { const q = capQty(p.quantity); return q > 0 ? 1 / q : 0; });
-
-    const priceTotal    = pw.reduce((a, b) => a + b, 0);
-    const scarcityTotal = sw.reduce((a, b) => a + b, 0);
-
+    // weight = qty / price: more copies and cheaper both increase odds.
     const weights = allPacks.map((p, i) => {
-      if (sw[i] === 0) return 0;
-      const base = Math.min(
-        priceTotal    > 0 ? pw[i] / priceTotal    : 0,
-        scarcityTotal > 0 ? sw[i] / scarcityTotal : 0,
-      );
+      const qty = capQty(p.quantity);
+      if (qty === 0) return 0;
+      const price = rawPrices[i] ?? avgPrice;
       const mult = mults[String(p.id)] ?? 0;
-      return base * Math.max(0, 1 + mult);
+      return (qty / price) * Math.max(0, 1 + mult);
     });
 
     const total = weights.reduce((a, b) => a + b, 0);
@@ -89,38 +86,26 @@
     key: typeof sortKey,
     dir: typeof sortDir,
   ): [string, any[]][] {
-    const setMap = new Map<string, any[]>();
-    for (const pack of allPacks) {
-      if (!setMap.has(pack.setName)) setMap.set(pack.setName, []);
-      setMap.get(pack.setName)!.push(pack);
-    }
-
-    const packPrice = (p: any) => (p.marketPrice ?? 0) as number;
-    const packOdds  = (p: any) => currentOdds[String(p.id)] ?? 0;
-    const groupMax  = (packList: any[], fn: (p: any) => number) =>
-      Math.max(0, ...packList.map(fn));
-
-    const sets = Array.from(setMap.entries());
-    sets.sort(([nameA, packsA], [nameB, packsB]) => {
-      if (key === 'name') {
-        return dir === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    if (key === 'name') {
+      // Group by set, sort groups alphabetically
+      const setMap = new Map<string, any[]>();
+      for (const pack of allPacks) {
+        if (!setMap.has(pack.setName)) setMap.set(pack.setName, []);
+        setMap.get(pack.setName)!.push(pack);
       }
-      const fn   = key === 'price' ? packPrice : packOdds;
-      const diff = groupMax(packsA, fn) - groupMax(packsB, fn);
-      return dir === 'asc' ? diff : -diff;
-    });
-
-    if (key !== 'name') {
-      const fn = key === 'price' ? packPrice : packOdds;
-      return sets.map(([name, packList]) => [
-        name,
-        [...packList].sort((a, b) => {
-          const diff = fn(a) - fn(b);
-          return dir === 'asc' ? diff : -diff;
-        }),
-      ]);
+      const sets = Array.from(setMap.entries());
+      sets.sort(([a], [b]) => dir === 'asc' ? a.localeCompare(b) : b.localeCompare(a));
+      return sets;
     }
-    return sets;
+
+    // Price / weight: each pack is its own row — true global ordering
+    const fn = key === 'price'
+      ? (p: any) => (p.marketPrice ?? 0) as number
+      : (p: any) => currentOdds[String(p.id)] ?? 0;
+
+    return [...allPacks]
+      .sort((a, b) => dir === 'asc' ? fn(a) - fn(b) : fn(b) - fn(a))
+      .map(pack => [String(pack.id), [pack]]);
   }
 
   // ── Derived ────────────────────────────────────────────────
@@ -143,19 +128,23 @@
   }
 
   // ── Save ───────────────────────────────────────────────────
-  async function save() {
-    saving = true;
+  async function saveSettings(showSuccess = false) {
     const res = await fetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ priceFloor, priceCap, quantityCap, packWeights: { ...multipliers } }),
     });
-    saving = false;
     if (res.ok) {
-      (window as any).showToast?.('Settings saved', 'success');
+      if (showSuccess) (window as any).showToast?.('Settings saved', 'success');
     } else {
       (window as any).showToast?.(`Failed to save: ${res.status} ${res.statusText}`, 'error');
     }
+  }
+
+  async function save() {
+    saving = true;
+    await saveSettings(true);
+    saving = false;
   }
 </script>
 
@@ -229,7 +218,7 @@
     class="sort-btn"
     class:sort-btn--active={sortKey === 'weight'}
     onclick={() => onSortClick('weight')}
-  >{sortLabel('weight', 'Weight')}</button>
+  >{sortLabel('weight', 'Odds')}</button>
 </div>
 
 <!-- ── Column headers ─────────────────────────────────── -->
@@ -242,9 +231,9 @@
 
 <!-- ── Pack list ───────────────────────────────────────── -->
 <div class="pack-list">
-  {#each sortedSets as [setName, setPacks] (setName)}
+  {#each sortedSets as [groupKey, setPacks] (groupKey)}
     <SetCard
-      {setName}
+      setName={setPacks[0].setName}
       packs={setPacks}
       packOdds={odds}
       {multipliers}

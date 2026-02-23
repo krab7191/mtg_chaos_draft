@@ -92,11 +92,11 @@ func TestEffectiveWeights_PackWeightMultiplierScalesWeight(t *testing.T) {
 		{ID: 1, MarketPrice: fptr(10.0), Quantity: 1},
 		{ID: 2, MarketPrice: fptr(10.0), Quantity: 1},
 	}
-	settings := &db.WeightSettings{PackWeights: map[int]float64{1: 2.0}}
+	// Weight offset +1 → effectiveMult = max(0, 1+1) = 2 → pack 1 should have double the weight
+	settings := &db.WeightSettings{PackWeights: map[int]float64{1: 1.0}}
 	weights := effectiveWeights(packs, settings)
-	// Pack 1 has a 2× multiplier, so it should have double the weight
 	if math.Abs(weights[0]-2*weights[1]) > 1e-9 {
-		t.Errorf("pack with 2× multiplier should have double weight, got %v vs %v", weights[0], weights[1])
+		t.Errorf("pack with +1 weight (2× mult) should have double weight, got %v vs %v", weights[0], weights[1])
 	}
 }
 
@@ -127,9 +127,9 @@ func TestEffectiveWeights_AllNilPricesFallbackToOne(t *testing.T) {
 			t.Errorf("weight[%d] should be non-negative, got %v", i, w)
 		}
 	}
-	// Pack 2 has more quantity so it should be less scarce → lower weight
-	if weights[1] >= weights[0] {
-		t.Errorf("higher-qty pack should have lower scarcity weight, got %v >= %v", weights[1], weights[0])
+	// Pack 2 has more quantity → higher odds (qty/price formula favours more copies)
+	if weights[1] <= weights[0] {
+		t.Errorf("higher-qty pack should have higher weight, got %v <= %v", weights[1], weights[0])
 	}
 }
 

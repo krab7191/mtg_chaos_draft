@@ -235,6 +235,43 @@ func TestCollectionHandler_Delete_BadID(t *testing.T) {
 	}
 }
 
+// ── LinkPrice ─────────────────────────────────────────────────────────────────
+
+func TestCollectionHandler_LinkPrice_BadID(t *testing.T) {
+	h := newCollectionHandler(t)
+	req := httptest.NewRequest(http.MethodPut, "/api/collection/bad/price", nil)
+	req.SetPathValue("id", "notanumber")
+	rr := httptest.NewRecorder()
+	h.LinkPrice(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("want %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestCollectionHandler_LinkPrice_BadJSON(t *testing.T) {
+	h := newCollectionHandler(t)
+	req := httptest.NewRequest(http.MethodPut, "/api/collection/1/price", bytes.NewReader([]byte("bad")))
+	req.SetPathValue("id", "1")
+	rr := httptest.NewRecorder()
+	h.LinkPrice(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("want %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestCollectionHandler_LinkPrice_MissingMTGStocksID(t *testing.T) {
+	h := newCollectionHandler(t)
+	body, _ := json.Marshal(map[string]any{"mtgstocksId": 0})
+	req := httptest.NewRequest(http.MethodPut, "/api/collection/1/price", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("id", "1")
+	rr := httptest.NewRecorder()
+	h.LinkPrice(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("want %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
 func itoa(i int) string {
 	return fmt.Sprintf("%d", i)
 }

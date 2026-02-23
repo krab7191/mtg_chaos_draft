@@ -6,7 +6,7 @@ DATABASE_TEST_URL ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft_test
 HIVEMIND := $(HOME)/go/bin/hivemind
 AIR      := $(HOME)/go/bin/air
 
-COVERAGE_THRESHOLD := 35
+COVERAGE_THRESHOLD := 40
 
 .PHONY: dev db db-test api frontend check install test test-api test-frontend
 
@@ -34,19 +34,24 @@ install: ## Install all dev dependencies and git hooks
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	pre-commit install
-	printf '#!/bin/sh\nCURRENT=$$(git tag --points-at HEAD | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+$$" | head -1)\nif [ -n "$$CURRENT" ]; then exit 0; fi\nLATEST=$$(git tag --sort=-v:refname | grep -E "^v[0-9]+\\.[0-9]+\\.[0-9]+$$" | head -1)\nif [ -z "$$LATEST" ]; then LATEST="v0.0.0"; fi\nMAJOR=$$(echo $$LATEST | sed "s/v//" | cut -d. -f1)\nMINOR=$$(echo $$LATEST | sed "s/v//" | cut -d. -f2)\nPATCH=$$(echo $$LATEST | sed "s/v//" | cut -d. -f3)\nNEW_TAG="v$${MAJOR}.$${MINOR}.$$(( PATCH + 1 ))"\ngit tag "$$NEW_TAG"\necho "auto-tagged $$NEW_TAG"\n' > .git/hooks/pre-push && chmod +x .git/hooks/pre-push
-	git config push.followTags true
 
 check: ## Run pre-commit checks (fmt, vet, astro check)
 	pre-commit run --all-files
 
-test-api: ## Run Go tests with coverage (30% threshold)
-	cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -p 1 ./... -coverprofile=coverage.out -covermode=atomic
+test-api: ## Run Go tests with coverage (40% threshold)
+	@cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -p 1 ./... -coverprofile=coverage.out -covermode=atomic \
+		-coverpkg=mtg-chaos-draft,mtg-chaos-draft/db,mtg-chaos-draft/handlers,mtg-chaos-draft/middleware \
+		| grep -E "^(ok|FAIL)\b|^--- (FAIL|PASS):|panic:" | sed 's/ of statements in.*//' \
+		| sed -E 's/^(ok|FAIL)(\s+)mtg-chaos-draft(\s)/\1\2mtg-chaos-draft\/main.go\3/' \
+		| column -t
 	@cd api && go tool cover -func=coverage.out | \
 		awk '/^total:/ { pct=$$3; sub(/%/,"",pct); printf "Coverage: %s%%\n", pct; \
 		if (pct+0 < $(COVERAGE_THRESHOLD)) { printf "FAIL: %s%% < %d%%\n", pct, $(COVERAGE_THRESHOLD); exit 1 } }'
 
-test-frontend: ## Run frontend tests with coverage (30% threshold)
+coverage: ## Open HTML coverage report in browser (run make test-api first)
+	cd api && go tool cover -html=coverage.out -o coverage.html && explorer.exe coverage.html
+
+test-frontend: ## Run frontend tests with coverage
 	cd frontend && npm test
 
 test: test-api test-frontend ## Run all tests with coverage thresholds

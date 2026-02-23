@@ -85,37 +85,21 @@ func effectiveWeights(packs []db.CollectionPack, settings *db.WeightSettings) []
 		avgPrice = priceSum / float64(priceCount)
 	}
 
-	pw := make([]float64, len(packs))
-	sw := make([]float64, len(packs))
-	var priceTotal, scarcityTotal float64
+	// weight = qty / price: more copies and cheaper both increase odds.
+	result := make([]float64, len(packs))
 	for i, p := range packs {
+		qty := float64(capQty(p.Quantity))
+		if qty == 0 {
+			continue
+		}
 		price := avgPrice
 		if p.MarketPrice != nil && *p.MarketPrice > 0 {
 			price = capPrice(*p.MarketPrice)
 		}
-		pw[i] = 1.0 / price
-		priceTotal += pw[i]
-
-		qty := capQty(p.Quantity)
-		if qty > 0 {
-			sw[i] = 1.0 / float64(qty)
-			scarcityTotal += sw[i]
-		}
-	}
-
-	result := make([]float64, len(packs))
-	for i, p := range packs {
-		if sw[i] == 0 {
-			result[i] = 0
-			continue
-		}
-		priceOdds := pw[i] / priceTotal
-		scarcityOdds := sw[i] / scarcityTotal
-		w := math.Min(priceOdds, scarcityOdds)
-		if mult, ok := settings.PackWeights[p.ID]; ok && mult > 0 {
-			w *= mult
-		}
-		result[i] = w
+		// Weight is an integer offset: 0 = normal, +N = boost, -N = reduce.
+		// effectiveMult = max(0, 1 + weight), so -1 → excluded, 0 → 1×, +1 → 2×.
+		effectiveMult := math.Max(0, 1+settings.PackWeights[p.ID])
+		result[i] = (qty / price) * effectiveMult
 	}
 	return result
 }

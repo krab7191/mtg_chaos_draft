@@ -41,4 +41,5 @@ TODO.md
 # Testing
 lcov.info
 coverage.out
+coverage.html
 frontend/coverage

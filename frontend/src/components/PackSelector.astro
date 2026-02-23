@@ -10,9 +10,10 @@ interface Pack {
 
 interface Props {
   packs: Pack[];
+  packWeights: Record<string, number>;
 }
 
-const { packs } = Astro.props;
+const { packs, packWeights } = Astro.props;
 ---
 
 <div class="selector">
@@ -36,6 +37,7 @@ const { packs } = Astro.props;
                 data-name={pack.name}
                 data-set={pack.setName}
                 data-product-type={pack.productType}
+                data-weight={packWeights[String(pack.id)] ?? 0}
               />
               <span class="pack-item__info">
                 <span class="pack-item__name">{pack.setName}</span>
@@ -408,22 +410,13 @@ const { packs } = Astro.props;
       .filter((p): p is number => p !== null && p > 0);
     const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 1;
 
-    const pw = checkedBoxes.map(c => {
-      const p = c.dataset.price ? parseFloat(c.dataset.price) : null;
-      return 1 / ((p && p > 0) ? p : avgPrice);
-    });
-    const sw = checkedBoxes.map(c => {
-      const q = parseInt(c.dataset.qty ?? '0');
-      return q > 0 ? 1 / q : 0;
-    });
+    const rawPrice = cb.dataset.price ? parseFloat(cb.dataset.price) : null;
+    const price = (rawPrice && rawPrice > 0) ? rawPrice : avgPrice;
 
-    const priceTotal    = pw.reduce((a, b) => a + b, 0);
-    const scarcityTotal = sw.reduce((a, b) => a + b, 0);
-
-    const idx = checkedBoxes.indexOf(cb);
-    const priceOdds    = priceTotal    > 0 ? pw[idx] / priceTotal    : 0;
-    const scarcityOdds = scarcityTotal > 0 ? sw[idx] / scarcityTotal : 0;
-    return Math.min(priceOdds, scarcityOdds);
+    const weight = parseFloat(cb.dataset.weight ?? '0') || 0;
+    const effectiveMult = Math.max(0, 1 + weight);
+    // weight = qty / price: more copies and cheaper both increase odds.
+    return (qty / price) * effectiveMult;
   }
 
   function updateCount() {
