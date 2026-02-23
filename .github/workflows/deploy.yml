@@ -175,5 +175,5 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ env.VERSION }}
+          git tag -a ${{ env.VERSION }} -m "${{ env.VERSION }}"
           git push origin ${{ env.VERSION }}
