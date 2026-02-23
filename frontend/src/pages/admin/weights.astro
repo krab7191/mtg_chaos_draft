@@ -420,8 +420,10 @@ const sets = Array.from(setMap.entries());
   const sortWeightBtn = document.getElementById('sort-weight') as HTMLButtonElement;
   const packList      = document.getElementById('pack-list');
 
-  const rowPrice  = (r: HTMLElement) => { const p = parseFloat(r.dataset.price ?? ''); return isNaN(p) ? Infinity : p; };
+  const rowPrice  = (r: HTMLElement) => parseFloat(r.dataset.price ?? '0') || 0;
   const rowWeight = (r: HTMLElement) => parseFloat(r.querySelector<HTMLElement>('.odds__label')?.textContent ?? '0') || 0;
+  const groupMax  = (g: HTMLElement, fn: (r: HTMLElement) => number) =>
+    Math.max(0, ...Array.from(g.querySelectorAll<HTMLElement>('.pack-row')).map(fn));
 
   function applySort() {
     if (!packList) return;
@@ -433,25 +435,18 @@ const sets = Array.from(setMap.entries());
         const bn = b.querySelector('.set-group__name')?.textContent ?? '';
         return sortDir === 'asc' ? an.localeCompare(bn) : bn.localeCompare(an);
       }
-      const val = (g: HTMLElement) => {
-        const rows = Array.from(g.querySelectorAll<HTMLElement>('.pack-row'));
-        if (sortKey === 'price') {
-          const prices = rows.map(rowPrice).filter(p => p !== Infinity);
-          return prices.length ? Math.min(...prices) : Infinity;
-        }
-        return Math.max(...rows.map(rowWeight));
-      };
-      const diff = val(a) - val(b);
+      const fn = sortKey === 'price' ? rowPrice : rowWeight;
+      const diff = groupMax(a, fn) - groupMax(b, fn);
       return sortDir === 'asc' ? diff : -diff;
     });
 
     if (sortKey !== 'name') {
       groups.forEach(group => {
         const rows = Array.from(group.querySelectorAll<HTMLElement>('.pack-row'));
+        const fn = sortKey === 'price' ? rowPrice : rowWeight;
         rows.sort((a, b) => {
-          const av = sortKey === 'price' ? rowPrice(a) : rowWeight(a);
-          const bv = sortKey === 'price' ? rowPrice(b) : rowWeight(b);
-          return sortDir === 'asc' ? av - bv : bv - av;
+          const diff = fn(a) - fn(b);
+          return sortDir === 'asc' ? diff : -diff;
         });
         rows.forEach(r => group.appendChild(r));
       });
