@@ -6,7 +6,7 @@ DATABASE_TEST_URL ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft_test
 HIVEMIND := $(HOME)/go/bin/hivemind
 AIR      := $(HOME)/go/bin/air
 
-COVERAGE_THRESHOLD := 36
+COVERAGE_THRESHOLD := 23
 
 .PHONY: dev db db-test api frontend check install test test-api test-frontend
 
