@@ -1,17 +1,23 @@
 -include .env
 export
 
-DATABASE_URL ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft
+DATABASE_URL      ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft
+DATABASE_TEST_URL ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft_test
 HIVEMIND := $(HOME)/go/bin/hivemind
 AIR      := $(HOME)/go/bin/air
 
-.PHONY: dev db api frontend check install
+COVERAGE_THRESHOLD := 13
+
+.PHONY: dev db db-test api frontend check install test test-api
 
 dev: ## Start everything for local development (requires hivemind)
 	$(HIVEMIND)
 
 db: ## Start postgres in Docker (standalone)
 	docker compose up postgres -d
+
+db-test: db ## Create the test database (run once after `make db`)
+	docker compose exec postgres psql -U mtg -d postgres -c "CREATE DATABASE mtg_chaos_draft_test;" 2>/dev/null || true
 
 api: ## Start Go API with hot reload
 	cd api && $(AIR)
@@ -32,3 +38,11 @@ install: ## Install all dev dependencies and git hooks
 
 check: ## Run pre-commit checks (fmt, vet, astro check)
 	pre-commit run --all-files
+
+test-api: ## Run Go tests with coverage (80% threshold) — requires `make db-test`
+	cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -p 1 ./... -coverprofile=coverage.out -covermode=atomic
+	@cd api && go tool cover -func=coverage.out | \
+		awk '/^total:/ { pct=$$3; sub(/%/,"",pct); printf "Coverage: %s%%\n", pct; \
+		if (pct+0 < $(COVERAGE_THRESHOLD)) { printf "FAIL: %s%% < %d%%\n", pct, $(COVERAGE_THRESHOLD); exit 1 } }'
+
+test: test-api ## Run all tests with coverage thresholds

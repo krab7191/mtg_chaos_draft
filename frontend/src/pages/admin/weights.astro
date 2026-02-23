@@ -67,6 +67,13 @@ const sets = Array.from(setMap.entries());
     {packs.length === 0 ? (
       <p class="page__empty">No packs yet — <a href="/admin/collection">add some first</a>.</p>
     ) : (
+      <>
+      <div class="pack-sort">
+        <span class="pack-sort__label">Sort:</span>
+        <button class="sort-btn sort-btn--active" id="sort-name">Set ↑</button>
+        <button class="sort-btn" id="sort-price">Price</button>
+        <button class="sort-btn" id="sort-weight">Weight</button>
+      </div>
       <div class="pack-list" id="pack-list">
         {sets.map(([setName, setPacks]) => (
           <div class="set-group">
@@ -106,6 +113,7 @@ const sets = Array.from(setMap.entries());
           </div>
         ))}
       </div>
+      </>
     )}
   </div>
 </Layout>
@@ -190,6 +198,34 @@ const sets = Array.from(setMap.entries());
     &:disabled { opacity: 0.5; cursor: default; }
   }
 
+  /* ── Sort bar ────────────────────────────────────────────── */
+  .pack-sort {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+
+    &__label {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      margin-right: 0.2rem;
+    }
+  }
+
+  .sort-btn {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    transition: border-color 0.1s, color 0.1s;
+
+    &:hover { border-color: var(--color-accent); color: var(--color-text); }
+    &--active { border-color: var(--color-accent); color: var(--color-accent); }
+  }
+
   /* ── Set groups ──────────────────────────────────────────── */
   .pack-list {
     display: flex;
@@ -211,7 +247,7 @@ const sets = Array.from(setMap.entries());
     &__name {
       font-size: 0.82rem;
       font-weight: 600;
-      color: var(--color-text-muted);
+      color: var(--color-text);
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
@@ -226,7 +262,8 @@ const sets = Array.from(setMap.entries());
 
     &__type {
       font-size: 0.9rem;
-      font-weight: 500;
+      font-weight: 400;
+      color: var(--color-text-muted);
       margin-bottom: 0.2rem;
     }
 
@@ -370,7 +407,76 @@ const sets = Array.from(setMap.entries());
       row.querySelector<HTMLElement>('.odds__fill')!.style.width  = `${pct}%`;
       row.querySelector<HTMLElement>('.odds__label')!.textContent = `${pct.toFixed(1)}%`;
     });
+
+    if (sortKey === 'weight') applySort();
   }
+
+  // ── Sort ──────────────────────────────────────────────────
+  let sortKey: 'name' | 'price' | 'weight' = 'name';
+  let sortDir: 'asc' | 'desc' = 'asc';
+
+  const sortNameBtn   = document.getElementById('sort-name')   as HTMLButtonElement;
+  const sortPriceBtn  = document.getElementById('sort-price')  as HTMLButtonElement;
+  const sortWeightBtn = document.getElementById('sort-weight') as HTMLButtonElement;
+  const packList      = document.getElementById('pack-list');
+
+  const rowPrice  = (r: HTMLElement) => { const p = parseFloat(r.dataset.price ?? ''); return isNaN(p) ? Infinity : p; };
+  const rowWeight = (r: HTMLElement) => parseFloat(r.querySelector<HTMLElement>('.odds__label')?.textContent ?? '0') || 0;
+
+  function applySort() {
+    if (!packList) return;
+    const groups = Array.from(packList.querySelectorAll<HTMLElement>('.set-group'));
+
+    groups.sort((a, b) => {
+      if (sortKey === 'name') {
+        const an = a.querySelector('.set-group__name')?.textContent ?? '';
+        const bn = b.querySelector('.set-group__name')?.textContent ?? '';
+        return sortDir === 'asc' ? an.localeCompare(bn) : bn.localeCompare(an);
+      }
+      const val = (g: HTMLElement) => {
+        const rows = Array.from(g.querySelectorAll<HTMLElement>('.pack-row'));
+        if (sortKey === 'price') {
+          const prices = rows.map(rowPrice).filter(p => p !== Infinity);
+          return prices.length ? Math.min(...prices) : Infinity;
+        }
+        return Math.max(...rows.map(rowWeight));
+      };
+      const diff = val(a) - val(b);
+      return sortDir === 'asc' ? diff : -diff;
+    });
+
+    if (sortKey !== 'name') {
+      groups.forEach(group => {
+        const rows = Array.from(group.querySelectorAll<HTMLElement>('.pack-row'));
+        rows.sort((a, b) => {
+          const av = sortKey === 'price' ? rowPrice(a) : rowWeight(a);
+          const bv = sortKey === 'price' ? rowPrice(b) : rowWeight(b);
+          return sortDir === 'asc' ? av - bv : bv - av;
+        });
+        rows.forEach(r => group.appendChild(r));
+      });
+    }
+
+    groups.forEach(g => packList.appendChild(g));
+
+    sortNameBtn.classList.toggle('sort-btn--active', sortKey === 'name');
+    sortPriceBtn.classList.toggle('sort-btn--active', sortKey === 'price');
+    sortWeightBtn.classList.toggle('sort-btn--active', sortKey === 'weight');
+    const arrow = sortDir === 'asc' ? ' ↑' : ' ↓';
+    sortNameBtn.textContent   = 'Set'    + (sortKey === 'name'   ? arrow : '');
+    sortPriceBtn.textContent  = 'Price'  + (sortKey === 'price'  ? arrow : '');
+    sortWeightBtn.textContent = 'Weight' + (sortKey === 'weight' ? arrow : '');
+  }
+
+  function onSortClick(key: typeof sortKey) {
+    if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortKey = key; sortDir = key === 'name' ? 'asc' : 'desc'; }
+    applySort();
+  }
+
+  sortNameBtn?.addEventListener('click',   () => onSortClick('name'));
+  sortPriceBtn?.addEventListener('click',  () => onSortClick('price'));
+  sortWeightBtn?.addEventListener('click', () => onSortClick('weight'));
 
   priceFloorInput.addEventListener('input', recalcOdds);
   priceCapInput.addEventListener('input', recalcOdds);
@@ -395,4 +501,5 @@ const sets = Array.from(setMap.entries());
   });
 
   recalcOdds();
+  applySort();
 </script>

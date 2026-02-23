@@ -66,6 +66,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
         <button class="app-toast__confirm">Remove</button>
         <button class="app-toast__cancel">Cancel</button>
       </div>
+      <button class="app-toast__close" aria-label="Dismiss" hidden>✕</button>
     </div>
   </body>
 </html>
@@ -281,6 +282,20 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
       color: var(--color-text-muted);
       &:hover { border-color: var(--color-text-muted); color: var(--color-text); }
     }
+
+    &__close {
+      background: none;
+      border: none;
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      padding: 0.1rem 0.3rem;
+      flex-shrink: 0;
+      &:hover { color: var(--color-text); }
+      &[hidden] { display: none; }
+    }
+
+    &--error  { border-color: var(--color-danger); }
+    &--success { border-color: var(--color-success); }
   }
 
   @keyframes toast-in {
@@ -301,19 +316,33 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
 </style>
 
 <script>
-  // ── Delete toast ──────────────────────────────────────────────
-  declare global { interface Window { deleteToast(msg: string, onConfirm: () => void, onCancel: () => void): void; } }
+  // ── Toast ──────────────────────────────────────────────────────
+  declare global {
+    interface Window {
+      deleteToast(msg: string, onConfirm: () => void, onCancel: () => void): void;
+      showToast(msg: string, type?: 'error' | 'success' | 'info'): void;
+    }
+  }
 
-  const appToast = document.getElementById('app-toast')!;
-  const toastMsg = appToast.querySelector<HTMLElement>('.app-toast__msg')!;
+  const appToast   = document.getElementById('app-toast')!;
+  const toastMsg   = appToast.querySelector<HTMLElement>('.app-toast__msg')!;
+  const toastActions = appToast.querySelector<HTMLElement>('.app-toast__actions')!;
+  const toastClose = appToast.querySelector<HTMLButtonElement>('.app-toast__close')!;
   let toastConfirm = appToast.querySelector<HTMLButtonElement>('.app-toast__confirm')!;
   let toastCancel  = appToast.querySelector<HTMLButtonElement>('.app-toast__cancel')!;
+  let notifTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function dismissToast() {
+    appToast.hidden = true;
+    appToast.classList.remove('app-toast--error', 'app-toast--success');
+    if (notifTimer) { clearTimeout(notifTimer); notifTimer = null; }
+  }
 
   window.deleteToast = (msg, onConfirm, onCancel) => {
-    // Dismiss any existing toast by cancelling it
-    if (!appToast.hidden) toastCancel.click();
-
+    dismissToast();
     toastMsg.textContent = msg;
+    toastActions.hidden = false;
+    toastClose.hidden = true;
     appToast.hidden = false;
 
     const newConfirm = toastConfirm.cloneNode(true) as HTMLButtonElement;
@@ -321,8 +350,19 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
     toastConfirm.replaceWith(newConfirm); toastConfirm = newConfirm;
     toastCancel.replaceWith(newCancel);   toastCancel  = newCancel;
 
-    toastConfirm.addEventListener('click', () => { appToast.hidden = true; onConfirm(); });
-    toastCancel.addEventListener ('click', () => { appToast.hidden = true; onCancel();  });
+    toastConfirm.addEventListener('click', () => { dismissToast(); onConfirm(); });
+    toastCancel.addEventListener ('click', () => { dismissToast(); onCancel();  });
+  };
+
+  window.showToast = (msg, type = 'info') => {
+    dismissToast();
+    toastMsg.textContent = msg;
+    toastActions.hidden = true;
+    toastClose.hidden = false;
+    if (type !== 'info') appToast.classList.add(`app-toast--${type}`);
+    appToast.hidden = false;
+    toastClose.onclick = dismissToast;
+    notifTimer = setTimeout(dismissToast, 4000);
   };
 
   // ── Nav ───────────────────────────────────────────────────────

@@ -43,9 +43,45 @@ jobs:
       - name: Run checks
         run: make check
 
+  test:
+    runs-on: ubuntu-latest
+    needs: check
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mtg_chaos_draft_test
+          POSTGRES_USER: mtg
+          POSTGRES_PASSWORD: mtg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - name: Run Go tests
+        env:
+          DATABASE_URL: postgres://mtg:mtg@localhost:5432/mtg_chaos_draft_test?sslmode=disable
+        run: make test-api
+
+      - name: Upload Go coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: api/coverage.out
+
   build-and-deploy:
     runs-on: ubuntu-24.04-arm
-    needs: check
+    needs: test
     permissions:
       contents: write
       packages: write

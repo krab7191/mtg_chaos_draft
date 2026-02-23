@@ -37,3 +37,8 @@ frontend/.env.*
 *.dump
 
 TODO.md
+
+# Testing
+lcov.info
+coverage.out
+frontend/coverage
