@@ -1,14 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import CollectionCard from './CollectionCard.svelte';
-
-  interface Pack {
-    id: number;
-    setName: string;
-    productType: string;
-    marketPrice: number | null;
-    quantity: number;
-  }
+  import { computeSortedSets, type Pack } from '../../lib/collection';
 
   let { packs: initialPacks }: { packs: Pack[] } = $props();
 
@@ -20,39 +13,6 @@
   // ── Derived ────────────────────────────────────────────────
   const totalCount = $derived(packs.reduce((s, p) => s + p.quantity, 0));
   const totalValue = $derived(packs.reduce((s, p) => s + (p.marketPrice ?? 0) * p.quantity, 0));
-
-  function computeSortedSets(
-    allPacks: Pack[],
-    key: typeof sortKey,
-    dir: typeof sortDir,
-  ): [string, Pack[]][] {
-    if (key === 'name') {
-      const setMap = new Map<string, Pack[]>();
-      for (const p of allPacks) {
-        if (!setMap.has(p.setName)) setMap.set(p.setName, []);
-        setMap.get(p.setName)!.push(p);
-      }
-      const sets = Array.from(setMap.entries());
-      sets.sort(([a], [b]) => dir === 'asc' ? a.localeCompare(b) : b.localeCompare(a));
-      // Non-empty packs first within each set
-      sets.forEach(([, ps]) =>
-        ps.sort((a, b) => (a.quantity === 0 ? 1 : 0) - (b.quantity === 0 ? 1 : 0))
-      );
-      return sets;
-    }
-
-    // Price / qty: each pack is its own card for true global ordering
-    const fn = key === 'price'
-      ? (p: Pack) => p.marketPrice ?? 0
-      : (p: Pack) => p.quantity;
-
-    return [...allPacks]
-      .sort((a, b) => {
-        const diff = fn(a) - fn(b);
-        return dir === 'asc' ? diff : -diff;
-      })
-      .map(p => [String(p.id), [p]]);
-  }
 
   const sortedSets = $derived(computeSortedSets(packs, sortKey, sortDir));
 
