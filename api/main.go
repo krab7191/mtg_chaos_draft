@@ -65,7 +65,13 @@ func main() {
 	}
 
 	var viewerEmails []string
-	if v := os.Getenv("VIEWER_EMAILS"); v != "" {
+	if data, err := os.ReadFile("/etc/mtg-chaos-draft/viewer_emails"); err == nil {
+		for _, e := range strings.Split(string(data), "\n") {
+			if trimmed := strings.TrimSpace(e); trimmed != "" {
+				viewerEmails = append(viewerEmails, trimmed)
+			}
+		}
+	} else if v := os.Getenv("VIEWER_EMAILS"); v != "" {
 		for _, e := range strings.Split(v, ",") {
 			if trimmed := strings.TrimSpace(e); trimmed != "" {
 				viewerEmails = append(viewerEmails, trimmed)

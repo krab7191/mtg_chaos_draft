@@ -36,6 +36,8 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       VIEWER_EMAILS: ${VIEWER_EMAILS:-}
       PORT: "8080"
+    volumes:
+      - /etc/mtg-chaos-draft/viewer_emails:/etc/mtg-chaos-draft/viewer_emails:ro
     depends_on:
       postgres:
         condition: service_healthy
