@@ -1,6 +1,6 @@
 // Package testhelper manages the test Postgres instance for integration tests.
-// Calling Setup() starts postgres via docker compose and creates the test DB.
-// Tests that need the DB call Pool(); they are skipped if the DB is unreachable.
+// Setup() ensures postgres is running (starting it via docker compose if needed)
+// and that the test database exists. Tests call Pool() to get a connection.
 package testhelper
 
 import (
@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"mtg-chaos-draft/db"
@@ -25,8 +27,7 @@ var (
 	setupErr error
 )
 
-// projectRoot walks up from the current working directory to find the repo
-// root (identified by the presence of docker-compose.yml).
+// projectRoot walks up from the working directory to find docker-compose.yml.
 func projectRoot() string {
 	dir, _ := os.Getwd()
 	for {
@@ -41,37 +42,66 @@ func projectRoot() string {
 	}
 }
 
-// Setup starts postgres via docker compose and ensures the test database
-// exists. It is idempotent — safe to call when postgres is already running.
+// pgReachable returns true if postgres is accepting connections.
+// It connects to the system "postgres" database so it works even before the
+// test database has been created.
+func pgReachable(url string) bool {
+	cfg, err := pgx.ParseConfig(url)
+	if err != nil {
+		return false
+	}
+	cfg.Database = "postgres"
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return false
+	}
+	conn.Close(ctx)
+	return true
+}
+
+// ensureTestDB connects to the system "postgres" database and creates the test
+// database if it does not already exist.
+func ensureTestDB(testURL string) {
+	cfg, err := pgx.ParseConfig(testURL)
+	if err != nil {
+		return
+	}
+	cfg.Database = "postgres"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return
+	}
+	defer conn.Close(ctx)
+	_, _ = conn.Exec(ctx, "CREATE DATABASE mtg_chaos_draft_test")
+}
+
+// Setup ensures postgres is running and the test database exists.
+// If postgres is already listening (e.g. a CI service container or local dev
+// instance) it is used as-is. Otherwise postgres is started via docker compose.
 // Call this from TestMain before m.Run().
 func Setup() {
-	root := projectRoot()
-
-	run := func(args ...string) error {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = root
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "testhelper.Setup %v: %v\n%s\n", args, err, out)
-		}
-		return err
+	url := os.Getenv("DATABASE_URL")
+	if url == "" {
+		url = defaultURL
 	}
 
-	// Start postgres (no-op if already running)
-	_ = run("docker", "compose", "up", "postgres", "-d")
-
-	// Wait until postgres is ready to accept connections
-	for {
-		cmd := exec.Command("docker", "compose", "exec", "postgres", "pg_isready", "-U", "mtg", "-q")
+	if !pgReachable(url) {
+		root := projectRoot()
+		cmd := exec.Command("docker", "compose", "up", "postgres", "-d")
 		cmd.Dir = root
-		if cmd.Run() == nil {
-			break
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Fprintf(os.Stderr, "docker compose up: %v\n%s\n", err, out)
+		}
+		for !pgReachable(url) {
+			// spin until postgres accepts connections
 		}
 	}
 
-	// Create the test database (ignore error — it may already exist)
-	_ = run("docker", "compose", "exec", "postgres",
-		"psql", "-U", "mtg", "-d", "postgres", "-c", "CREATE DATABASE mtg_chaos_draft_test;")
+	ensureTestDB(url)
 }
 
 // Pool returns a *pgxpool.Pool connected to the test database with all
