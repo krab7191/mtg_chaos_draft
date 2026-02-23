@@ -29,8 +29,10 @@
   let picking      = $state(false);
   let result       = $state<{ setName: string; productType: string } | null>(null);
   let history      = $state<HistoryEntry[]>([]);
-  let showHistory  = $state(false);
-  let recordDraft  = $state(false);
+  let showHistory     = $state(false);
+  let recordDraft     = $state(false);
+  let hideDeselected  = $state(false);
+  let pickedCounts    = $state<Record<string, number>>({});
 
   // ── Load history on mount ───────────────────────────────────
   $effect(() => {
@@ -51,7 +53,7 @@
 
   // ── Derived ─────────────────────────────────────────────────
   const sortedPacks = $derived.by(() => {
-    const copy = [...packs];
+    const copy = hideDeselected ? packs.filter(p => checked.has(String(p.id))) : [...packs];
     if (sortKey === 'price') {
       copy.sort((a, b) => {
         const pa = a.marketPrice ?? 0;
@@ -69,6 +71,10 @@
 
   const checkedPacks = $derived(packs.filter(p => checked.has(String(p.id))));
 
+  function effectiveQty(p: Pack): number {
+    return Math.max(0, p.quantity - (pickedCounts[String(p.id)] ?? 0));
+  }
+
   const odds = $derived.by(() => {
     const active = checkedPacks;
     const prices = active
@@ -77,10 +83,11 @@
     const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 1;
 
     const weights = active.map(p => {
-      if (p.quantity === 0) return 0;
+      const qty = effectiveQty(p);
+      if (qty === 0) return 0;
       const price = (p.marketPrice && p.marketPrice > 0) ? p.marketPrice : avgPrice;
       const mult = packWeights[String(p.id)] ?? 0;
-      return (p.quantity / price) * Math.max(0, 1 + mult);
+      return (qty / price) * Math.max(0, 1 + mult);
     });
     const total = weights.reduce((a, b) => a + b, 0);
 
@@ -159,11 +166,17 @@
 {#if packs.length === 0}
   <p class="empty">The collection is empty. Ask your admin to add some packs!</p>
 {:else}
+  <!-- Floating count pill -->
+  <div class="count-pill">{checked.size} selected</div>
+
   <!-- Controls -->
   <div class="controls">
     <button class="btn btn--secondary" onclick={selectAll} disabled={allChecked}>Select all</button>
     <button class="btn btn--secondary" onclick={deselectAll} disabled={noneChecked}>Deselect all</button>
-    <span class="selected-count">{checked.size} selected</span>
+    <label class="toggle-label">
+      <input type="checkbox" bind:checked={hideDeselected} />
+      Hide deselected
+    </label>
   </div>
 
   <!-- Sort bar -->
@@ -274,10 +287,19 @@
     margin-bottom: 0.9rem;
   }
 
-  .selected-count {
-    color: var(--color-text-muted);
+  .count-pill {
+    position: fixed;
+    top: 3.75rem;
+    right: 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-accent);
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
     font-size: 0.82rem;
-    margin-left: auto;
+    font-weight: 500;
+    color: var(--color-accent);
+    z-index: 100;
+    pointer-events: none;
   }
 
   /* ── Sort bar ──────────────────────────────────────────────── */
@@ -395,6 +417,17 @@
     gap: 1rem;
     flex-wrap: wrap;
   }
+
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-label input { accent-color: var(--color-accent); }
 
   .history-toggle {
     display: flex;
