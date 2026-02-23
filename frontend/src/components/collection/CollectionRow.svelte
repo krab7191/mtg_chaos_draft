@@ -53,7 +53,8 @@
     flex: 1;
     min-width: 0;
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 400;
+    color: var(--color-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

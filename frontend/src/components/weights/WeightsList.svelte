@@ -29,12 +29,19 @@
   let sortKey     = $state<'name' | 'price' | 'weight'>('name');
   let sortDir     = $state<'asc' | 'desc'>('asc');
   let saving      = $state(false);
+  let frozenOrder = $state<string[] | null>(null);
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ── Helpers ────────────────────────────────────────────────
   function toNum(v: string)    { const n = parseFloat(v); return isNaN(n) || n <= 0 ? 0 : n; }
   function toInt(v: string)    { const n = parseInt(v);   return isNaN(n) || n <= 0 ? 0 : n; }
   function updateMult(id: string, value: number) {
+    if (sortKey === 'weight' && frozenOrder === null) {
+      frozenOrder = sortedSets.map(([id]) => id);
+    }
     multipliers[id] = value;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => { frozenOrder = null; debounceTimer = null; }, 500);
     saveSettings();
   }
 
@@ -85,7 +92,18 @@
     currentOdds: Record<string, number>,
     key: typeof sortKey,
     dir: typeof sortDir,
+    frozen: string[] | null,
   ): [string, any[]][] {
+    if (key === 'weight' && frozen !== null) {
+      const packById = new Map(allPacks.map(p => [String(p.id), p]));
+      const result: [string, any[]][] = [];
+      for (const id of frozen) {
+        const p = packById.get(id);
+        if (p) result.push([id, [p]]);
+      }
+      return result;
+    }
+
     if (key === 'name') {
       // Group by set, sort groups alphabetically
       const setMap = new Map<string, any[]>();
@@ -110,7 +128,7 @@
 
   // ── Derived ────────────────────────────────────────────────
   const odds       = $derived(computeOdds(packs, priceFloor, priceCap, quantityCap, multipliers));
-  const sortedSets = $derived(computeSortedSets(packs, odds, sortKey, sortDir));
+  const sortedSets = $derived(computeSortedSets(packs, odds, sortKey, sortDir, frozenOrder));
 
   // ── Sort ───────────────────────────────────────────────────
   function onSortClick(key: typeof sortKey) {

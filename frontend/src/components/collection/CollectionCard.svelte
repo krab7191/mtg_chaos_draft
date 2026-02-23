@@ -34,7 +34,7 @@
   .set-group__name {
     font-size: 0.82rem;
     font-weight: 600;
-    color: var(--color-text-muted);
+    color: var(--color-text);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }

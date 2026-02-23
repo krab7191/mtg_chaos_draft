@@ -13,7 +13,7 @@
     onMultChange: (id: string, value: number) => void;
   } = $props();
 
-  const fmt = (n: number) => n > 0 ? `+${n}` : `${n}`;
+  const fmt = (n: number) => n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
 </script>
 
 <div class="pack-row">
@@ -30,11 +30,11 @@
       <span class="odds__label">{odds.toFixed(1)}%</span>
     </div>
     <div class="weight-ctrl">
-      <button class="weight-btn" onclick={() => onMultChange(String(pack.id), multiplier - 1)}>−</button>
+      <button class="weight-btn" onclick={() => onMultChange(String(pack.id), Math.round((multiplier - 0.1) * 10) / 10)}>−</button>
       <span class="weight-val" class:pos={multiplier > 0} class:neg={multiplier < 0}>
         {fmt(multiplier)}
       </span>
-      <button class="weight-btn" onclick={() => onMultChange(String(pack.id), multiplier + 1)}>+</button>
+      <button class="weight-btn" onclick={() => onMultChange(String(pack.id), Math.round((multiplier + 0.1) * 10) / 10)}>+</button>
     </div>
   </div>
 </div>

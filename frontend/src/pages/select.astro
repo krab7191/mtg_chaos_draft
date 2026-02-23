@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import PackSelector from '../components/PackSelector.astro';
+import PackSelector from '../components/PackSelector.svelte';
 
 const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
 const cookie = Astro.request.headers.get('cookie') ?? '';
@@ -29,7 +29,7 @@ const settings = settingsRes.ok
   <div class="page">
     <h1 class="page__title">Pick a Pack</h1>
     <p class="page__sub">Select the packs you want in the pool.</p>
-    <PackSelector packs={packs} packWeights={settings.packWeights ?? {}} />
+    <PackSelector client:load {packs} packWeights={settings.packWeights ?? {}} />
   </div>
 </Layout>
 

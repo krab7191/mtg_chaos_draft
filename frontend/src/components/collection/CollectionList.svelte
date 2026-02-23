@@ -83,7 +83,7 @@
     class="sort-btn"
     class:sort-btn--active={sortKey === 'name'}
     onclick={() => onSortClick('name')}
-  >{sortLabel('name', 'Name')}</button>
+  >{sortLabel('name', 'Set')}</button>
   <button
     class="sort-btn"
     class:sort-btn--active={sortKey === 'qty'}
