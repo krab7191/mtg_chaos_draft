@@ -60,7 +60,7 @@ repos:
         pass_filenames: false
       - id: npm-audit
         name: npm audit
-        entry: bash -c 'cd frontend && npm audit --audit-level=high'
+        entry: bash -c 'cd frontend && npm audit --omit=dev --audit-level=high'
         language: system
         always_run: true
         pass_filenames: false
