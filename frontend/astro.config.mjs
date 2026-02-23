@@ -1,11 +1,15 @@
 import { defineConfig } from 'astro/config';
 import node from '@astrojs/node';
 
+import svelte from '@astrojs/svelte';
+
 export default defineConfig({
   output: 'server',
+
   adapter: node({
     mode: 'standalone',
   }),
+
   vite: {
     // In dev mode, proxy /api/* from the browser to the Go API
     // so you don't need Caddy running locally
@@ -19,4 +23,6 @@ export default defineConfig({
       },
     },
   },
+
+  integrations: [svelte()],
 });

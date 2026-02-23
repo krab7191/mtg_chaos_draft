@@ -57,13 +57,6 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return v
 	}
 
-	// Clamp pack multipliers to a sane range
-	for k, v := range body.PackWeights {
-		if v < 0 {
-			body.PackWeights[k] = 0
-		}
-	}
-
 	s := &db.WeightSettings{
 		PriceSensitivity:     clamp01(body.PriceSensitivity),
 		ScaricitySensitivity: clamp01(body.ScaricitySensitivity),
