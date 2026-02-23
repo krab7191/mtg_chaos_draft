@@ -52,6 +52,7 @@ func AddPack(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, set
 	return scanPack(pool.QueryRow(ctx, `
 		INSERT INTO collection_packs (name, set_name, product_type, mtgstocks_id, quantity, weight, market_price)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (mtgstocks_id) DO UPDATE SET quantity = collection_packs.quantity + EXCLUDED.quantity
 		RETURNING `+packColumns,
 		name, setName, productType, mtgstocksID, quantity, weight, marketPrice))
 }

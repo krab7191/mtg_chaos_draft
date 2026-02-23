@@ -57,10 +57,6 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	}
 	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.ProductType, body.Quantity, body.Weight, body.MarketPrice)
 	if err != nil {
-		if isUniqueViolation(err) {
-			http.Error(w, "pack already in collection", http.StatusConflict)
-			return
-		}
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -134,22 +130,4 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func isUniqueViolation(err error) bool {
-	return err != nil && len(err.Error()) > 0 &&
-		(contains(err.Error(), "23505") || contains(err.Error(), "unique"))
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsStr(s, sub))
-}
-
-func containsStr(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

@@ -16,6 +16,8 @@ const user = await meRes.json();
 const ADMIN_ROLES = ['admin', 'viewer'];
 if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
 
+const isAdmin = user.role === 'admin';
+
 const colRes = await fetch(`${apiUrl}/api/collection`, { headers: { cookie } });
 const packs = colRes.ok ? await colRes.json() : [];
 
@@ -51,6 +53,12 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
         )}
       </div>
 
+      <div class="collection__sort">
+        <span class="collection__sort-label">Sort:</span>
+        <button class="sort-btn sort-btn--active" id="sort-name" data-dir="asc">Name ↑</button>
+        <button class="sort-btn" id="sort-price" data-dir="desc">Price</button>
+      </div>
+
       <p class="collection__disclaimer">Prices update automatically once a day.</p>
 
       <p class="collection__empty" id="collection-empty" style={packs.length > 0 ? 'display:none' : ''}>
@@ -59,7 +67,7 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
 
       <div class="pack-list" id="collection-list" style={packs.length === 0 ? 'display:none' : ''}>
         {sets.map(([setName, setPacks]) => (
-          <div class="set-group">
+          <div class="set-group" data-name={setName}>
             <div class="set-group__header">
               <span class="set-group__name">{setName}</span>
             </div>
@@ -116,6 +124,18 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
       strong { color: var(--color-text); font-variant-numeric: tabular-nums; }
     }
 
+    &__sort {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+
+    &__sort-label {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
+
     &__disclaimer {
       font-size: 0.78rem;
       color: var(--color-text-muted);
@@ -129,6 +149,18 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
       text-align: center;
       font-size: 0.9rem;
     }
+  }
+
+  .sort-btn {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.2rem 0.55rem;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    &:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    &--active { border-color: var(--color-accent); color: var(--color-accent); }
   }
 
   /* ── Set groups ──────────────────────────────────────────── */
@@ -235,7 +267,72 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
 </style>
 
 <script>
+  // ── Sort ─────────────────────────────────────────────────
+  let sortKey: 'name' | 'price' = 'name';
+  let sortDir: 'asc' | 'desc' = 'asc';
+
+  const sortNameBtn  = document.getElementById('sort-name')  as HTMLButtonElement;
+  const sortPriceBtn = document.getElementById('sort-price') as HTMLButtonElement;
+
+  function groupMaxPrice(group: HTMLElement): number {
+    return Math.max(0, ...Array.from(group.querySelectorAll<HTMLElement>('.pack-row'))
+      .map(r => parseFloat(r.dataset.price ?? '0')));
+  }
+
+  function applySort() {
+    const list = document.getElementById('collection-list')!;
+    const groups = Array.from(list.querySelectorAll<HTMLElement>(':scope > .set-group'));
+
+    groups.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'name') {
+        cmp = (a.dataset.name ?? '').localeCompare(b.dataset.name ?? '');
+      } else {
+        cmp = groupMaxPrice(a) - groupMaxPrice(b);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    groups.forEach(g => list.appendChild(g));
+
+    // Within each group, sort pack rows by price when price sort is active
+    if (sortKey === 'price') {
+      groups.forEach(group => {
+        const rows = Array.from(group.querySelectorAll<HTMLElement>('.pack-row'));
+        rows.sort((a, b) => {
+          const aEmpty = a.classList.contains('row--empty') ? 1 : 0;
+          const bEmpty = b.classList.contains('row--empty') ? 1 : 0;
+          if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+          const diff = parseFloat(a.dataset.price ?? '0') - parseFloat(b.dataset.price ?? '0');
+          return sortDir === 'asc' ? diff : -diff;
+        });
+        rows.forEach(r => group.appendChild(r));
+      });
+    }
+
+    // Update button labels
+    sortNameBtn.classList.toggle('sort-btn--active', sortKey === 'name');
+    sortPriceBtn.classList.toggle('sort-btn--active', sortKey === 'price');
+    const nameArrow  = sortKey === 'name'  ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    const priceArrow = sortKey === 'price' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    sortNameBtn.textContent  = 'Name'  + nameArrow;
+    sortPriceBtn.textContent = 'Price' + priceArrow;
+  }
+
+  sortNameBtn.addEventListener('click', () => {
+    if (sortKey === 'name') sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortKey = 'name'; sortDir = 'asc'; }
+    applySort();
+  });
+
+  sortPriceBtn.addEventListener('click', () => {
+    if (sortKey === 'price') sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortKey = 'price'; sortDir = 'desc'; }
+    applySort();
+  });
+
   function reorderRows() {
+    if (sortKey === 'price') { applySort(); return; }
     document.querySelectorAll<HTMLElement>('.set-group').forEach(group => {
       const rows = Array.from(group.querySelectorAll<HTMLElement>('.pack-row'));
       rows.sort((a, b) => {
@@ -275,11 +372,19 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
       widget.closest('.pack-row')?.classList.toggle('row--empty', next === 0);
       reorderRows();
       recalcTotal();
-      await fetch(`/api/collection/${id}`, {
+      const res = await fetch(`/api/collection/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity: next }),
       });
+      if (!res.ok) {
+        valEl.textContent = String(current);
+        decBtn.disabled   = current === 0;
+        widget.closest('.pack-row')?.classList.toggle('row--empty', current === 0);
+        reorderRows();
+        recalcTotal();
+        alert(`Failed to update quantity: ${res.status} ${res.statusText}`);
+      }
     };
 
     decBtn.disabled = parseInt(valEl.textContent ?? '1') === 0;
@@ -297,7 +402,13 @@ const totalValue: number = packs.reduce((sum: number, p: any) =>
       window.deleteToast(
         `Remove "${label}"?`,
         async () => {
-          await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
+          const res = await fetch(`/api/collection/${btn.dataset.id}`, { method: 'DELETE' });
+          if (!res.ok) {
+            row.style.opacity = '';
+            row.style.pointerEvents = '';
+            alert(`Failed to delete: ${res.status} ${res.statusText}`);
+            return;
+          }
           const group = row.closest<HTMLElement>('.set-group')!;
           row.remove();
           recalcTotal();

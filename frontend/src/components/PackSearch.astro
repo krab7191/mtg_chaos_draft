@@ -244,9 +244,6 @@
           btn.textContent = '✓ Added';
           btn.classList.add('added');
           document.dispatchEvent(new CustomEvent('collection-updated'));
-        } else if (res.status === 409) {
-          btn.textContent = '✓ In collection';
-          btn.classList.add('added');
         } else {
           btn.textContent = 'Error';
           btn.classList.add('error');
