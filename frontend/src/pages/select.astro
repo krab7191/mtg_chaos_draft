@@ -29,12 +29,14 @@ const settings = settingsRes.ok
   <div class="page">
     <h1 class="page__title">Pick a Pack</h1>
     <p class="page__sub">Select the packs you want in the pool.</p>
-    <PackSelector client:load {packs} packWeights={settings.packWeights ?? {}} />
+    <PackSelector client:load {packs} {settings} />
   </div>
 </Layout>
 
 <style lang="scss">
   .page {
+    padding-bottom: 6rem;
+
     &__title {
       font-size: 1.6rem;
       margin-bottom: 0.4rem;

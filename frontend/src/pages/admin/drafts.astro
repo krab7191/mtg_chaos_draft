@@ -1,0 +1,34 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import DraftsList from '../../components/drafts/DraftsList.svelte';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+let meRes: Response;
+try {
+  meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+} catch {
+  return Astro.redirect('/login');
+}
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+const ADMIN_ROLES = ['admin', 'viewer'];
+if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
+
+const draftsRes = await fetch(`${apiUrl}/api/drafts`, { headers: { cookie } });
+const drafts: any[] = draftsRes.ok ? await draftsRes.json() : [];
+---
+
+<Layout title="Drafts" user={user}>
+  <div class="page">
+    <h1 class="page__title">Drafts</h1>
+    <DraftsList client:load {drafts} isAdmin={user.role === 'admin'} />
+  </div>
+</Layout>
+
+<style>
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 1rem; }
+  }
+</style>

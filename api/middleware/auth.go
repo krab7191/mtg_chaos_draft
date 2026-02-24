@@ -48,6 +48,17 @@ func RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+func RequireAdminOrViewer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := r.Context().Value(UserContextKey).(*db.User)
+		if !ok || (user.Role != "admin" && user.Role != "viewer") {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func UserFromContext(ctx context.Context) *db.User {
 	u, _ := ctx.Value(UserContextKey).(*db.User)
 	return u

@@ -81,8 +81,8 @@ func main() {
 	secureCookies := strings.HasPrefix(redirectURL, "https://")
 	authHandler := handlers.NewAuthHandler(pool, oauthConfig, mustEnv("ADMIN_EMAIL"), viewerEmails, secureCookies)
 	collectionHandler := handlers.NewCollectionHandler(pool)
-	selectHandler := handlers.NewSelectHandler(pool)
 	settingsHandler := handlers.NewSettingsHandler(pool)
+	draftHandler := handlers.NewDraftHandler(pool)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -105,23 +105,31 @@ func main() {
 		r.Use(mw.RequireAuth(pool))
 
 		r.Get("/api/auth/me", authHandler.Me)
-		r.Get("/api/search", handlers.Search)
-		r.Get("/api/price/{mtgstocksId}", handlers.Price)
 		r.Get("/api/collection", collectionHandler.List)
 		r.Get("/api/settings", settingsHandler.Get)
-		r.Post("/api/select", selectHandler.Select)
-	})
 
-	// Admin-only mutation routes
-	r.Group(func(r chi.Router) {
-		r.Use(mw.RequireAuth(pool))
-		r.Use(mw.RequireAdmin)
+		// Admin/viewer routes (nested)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireAdminOrViewer)
 
-		r.Post("/api/collection", collectionHandler.Add)
-		r.Put("/api/collection/{id}", collectionHandler.Update)
-		r.Post("/api/collection/{id}/link-price", collectionHandler.LinkPrice)
-		r.Delete("/api/collection/{id}", collectionHandler.Delete)
-		r.Put("/api/settings", settingsHandler.Update)
+			r.Get("/api/search", handlers.Search)
+			r.Get("/api/price/{mtgstocksId}", handlers.Price)
+			r.Get("/api/drafts", draftHandler.List)
+		})
+
+		// Admin-only mutation routes (nested)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireAdmin)
+
+			r.Post("/api/collection", collectionHandler.Add)
+			r.Put("/api/collection/{id}", collectionHandler.Update)
+			r.Post("/api/collection/{id}/link-price", collectionHandler.LinkPrice)
+			r.Delete("/api/collection/{id}", collectionHandler.Delete)
+			r.Put("/api/settings", settingsHandler.Update)
+			r.Post("/api/drafts", draftHandler.Create)
+			r.Delete("/api/drafts/{id}", draftHandler.Delete)
+			r.Post("/api/drafts/{id}/approve", draftHandler.Approve)
+		})
 	})
 
 	port := os.Getenv("PORT")

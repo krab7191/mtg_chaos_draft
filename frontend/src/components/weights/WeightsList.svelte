@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import SetCard from './SetCard.svelte';
+  import { toast } from '../../lib/toast.svelte';
 
   let { packs, settings }: {
     packs: any[];
@@ -153,9 +154,9 @@
       body: JSON.stringify({ priceFloor, priceCap, quantityCap, packWeights: { ...multipliers } }),
     });
     if (res.ok) {
-      if (showSuccess) (window as any).showToast?.('Settings saved', 'success');
+      if (showSuccess) toast.show('Settings saved', 'success');
     } else {
-      (window as any).showToast?.(`Failed to save: ${res.status} ${res.statusText}`, 'error');
+      toast.show(`Failed to save: ${res.status} ${res.statusText}`, 'error');
     }
   }
 

@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import CollectionCard from './CollectionCard.svelte';
   import { computeSortedSets, type Pack } from '../../lib/collection';
+  import { toast } from '../../lib/toast.svelte';
 
   let { packs: initialPacks }: { packs: Pack[] } = $props();
 
@@ -45,23 +46,20 @@
     });
     if (!res.ok) {
       pack.quantity = prev;
-      (window as any).showToast?.(`Failed to update quantity: ${res.status} ${res.statusText}`, 'error');
+      toast.show(`Failed to update quantity: ${res.status} ${res.statusText}`, 'error');
     }
   }
 
   // ── Delete ─────────────────────────────────────────────────
   function onDelete(id: number, label: string) {
-    (window as any).deleteToast?.(
-      `Remove "${label}"?`,
-      async () => {
-        const res = await fetch(`/api/collection/${id}`, { method: 'DELETE' });
-        if (!res.ok) {
-          (window as any).showToast?.(`Failed to delete: ${res.status} ${res.statusText}`, 'error');
-          return;
-        }
-        packs = packs.filter(p => p.id !== id);
-      },
-    );
+    toast.confirm(`Remove "${label}"?`, async () => {
+      const res = await fetch(`/api/collection/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        toast.show(`Failed to delete: ${res.status} ${res.statusText}`, 'error');
+        return;
+      }
+      packs = packs.filter(p => p.id !== id);
+    });
   }
 </script>
 

@@ -7,7 +7,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "check": "astro check",
+    "check": "astro check && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run --coverage && node -e \"const s=JSON.parse(require('fs').readFileSync('./coverage/coverage-summary.json','utf8'));console.log('Coverage: '+s.total.statements.pct+'%')\""
   },
   "engines": {
@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
+    "svelte-check": "^4.4.3",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

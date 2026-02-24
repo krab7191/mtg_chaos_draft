@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { toast } from '../lib/toast.svelte';
+
   interface Pack {
     id: number;
     name: string;
@@ -9,47 +11,59 @@
   }
 
   interface HistoryEntry {
+    packId: number | null;
     setName: string;
     productType: string;
+    marketPrice: number | null;
     price: string;
   }
 
-  let { packs, packWeights }: {
+  let { packs, settings }: {
     packs: Pack[];
-    packWeights: Record<string, number>;
+    settings: {
+      priceFloor:  number;
+      priceCap:    number;
+      quantityCap: number;
+      packWeights: Record<string, number>;
+    };
   } = $props();
+
+  const packWeights = $derived(settings.packWeights ?? {});
 
   const HISTORY_KEY = 'draft-history';
   const MAX_HISTORY = 12;
 
+  // ── Initialize from localStorage (SSR-safe) ─────────────────
+  function readHistory(): HistoryEntry[] {
+    if (typeof localStorage === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); } catch { return []; }
+  }
+  const _init = readHistory();
+
   // ── State ───────────────────────────────────────────────────
-  let checked      = $state(new Set(packs.map(p => String(p.id))));
-  let sortKey      = $state<'name' | 'price'>('name');
-  let sortDir      = $state<'asc' | 'desc'>('asc');
-  let picking      = $state(false);
-  let result       = $state<{ setName: string; productType: string } | null>(null);
-  let history      = $state<HistoryEntry[]>([]);
-  let showHistory     = $state(false);
-  let recordDraft     = $state(false);
-  let hideDeselected  = $state(false);
+  let checked         = $state(new Set(packs.map(p => String(p.id))));
+  let sortKey         = $state<'name' | 'price'>('name');
+  let sortDir         = $state<'asc' | 'desc'>('asc');
+  let result          = $state<{ setName: string; productType: string } | null>(null);
+  let history         = $state<HistoryEntry[]>(_init);
+  let recordDraft     = $state(true);
+  let hideDeselected  = $state(true);
   let pickedCounts    = $state<Record<string, number>>({});
 
-  // ── Load history on mount ───────────────────────────────────
+  // ── Persist history whenever it changes ─────────────────────
   $effect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]') as HistoryEntry[];
-      history = stored;
-      recordDraft = stored.length > 0 && stored.length < MAX_HISTORY;
-      showHistory = recordDraft && stored.length > 0;
-    } catch { history = []; }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    }
   });
 
-  // ── Save history when it changes ────────────────────────────
-  $effect(() => {
-    // Access history to subscribe; untrack to avoid loops when we set it above
-    const h = history;
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
-  });
+  // ── Toggle recording ────────────────────────────────────────
+  function setRecordDraft(on: boolean) {
+    recordDraft = on;
+    if (!on) {
+      for (const key in pickedCounts) delete pickedCounts[key];
+    }
+  }
 
   // ── Derived ─────────────────────────────────────────────────
   const sortedPacks = $derived.by(() => {
@@ -75,22 +89,47 @@
     return Math.max(0, p.quantity - (pickedCounts[String(p.id)] ?? 0));
   }
 
-  const odds = $derived.by(() => {
-    const active = checkedPacks;
-    const prices = active
-      .map(p => (p.marketPrice && p.marketPrice > 0) ? p.marketPrice : null)
-      .filter((p): p is number => p !== null);
-    const avgPrice = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 1;
+  function computeWeights(activePacks: Pack[]): number[] {
+    const floor  = settings.priceFloor  > 0 ? settings.priceFloor  : null;
+    const cap    = settings.priceCap    > 0 ? settings.priceCap    : null;
+    const qtyCap = settings.quantityCap > 0 ? settings.quantityCap : null;
 
-    const weights = active.map(p => {
-      const qty = effectiveQty(p);
+    const capPrice = (p: number) => {
+      if (floor && p < floor) p = floor;
+      if (cap   && p > cap)   p = cap;
+      return p;
+    };
+
+    const rawPrices = activePacks.map(p => {
+      const mp = p.marketPrice;
+      return mp && mp > 0 ? capPrice(mp) : null;
+    });
+    const validPrices = rawPrices.filter((p): p is number => p !== null);
+    const avgPrice = validPrices.length ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : 1;
+
+    return activePacks.map((p, i) => {
+      const qty = qtyCap ? Math.min(effectiveQty(p), qtyCap) : effectiveQty(p);
       if (qty === 0) return 0;
-      const price = (p.marketPrice && p.marketPrice > 0) ? p.marketPrice : avgPrice;
+      const price = rawPrices[i] ?? avgPrice;
       const mult = packWeights[String(p.id)] ?? 0;
       return (qty / price) * Math.max(0, 1 + mult);
     });
-    const total = weights.reduce((a, b) => a + b, 0);
+  }
 
+  function weightedRandom(activePacks: Pack[], weights: number[]): Pack {
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < activePacks.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return activePacks[i];
+    }
+    return activePacks[activePacks.length - 1];
+  }
+
+  const odds = $derived.by(() => {
+    const active = checkedPacks;
+    const weights = computeWeights(active);
+    const total = weights.reduce((a, b) => a + b, 0);
     const result: Record<string, number> = {};
     active.forEach((p, i) => {
       result[String(p.id)] = total > 0 ? (weights[i] / total) * 100 : 0;
@@ -125,6 +164,30 @@
     return label + (sortDir === 'asc' ? ' ↑' : ' ↓');
   }
 
+  // ── Draft save ──────────────────────────────────────────────
+  function saveDraft(entries: HistoryEntry[]) {
+    fetch('/api/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        picks: entries.map(e => ({
+          packId: e.packId ?? null,
+          setName: e.setName,
+          productType: e.productType,
+          marketPrice: e.marketPrice ?? null,
+        })),
+      }),
+    }).then(res => {
+      if (res.ok) {
+        toast.show('Draft saved', 'success');
+      } else {
+        toast.show('Failed to save draft', 'error');
+      }
+    }).catch(() => {
+      toast.show('Failed to save draft', 'error');
+    });
+  }
+
   // ── Pick ────────────────────────────────────────────────────
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -138,28 +201,39 @@
     toastTimer = setTimeout(() => { result = null; toastTimer = null; }, 3000);
   }
 
-  async function pick() {
-    const ids = checkedPacks.map(p => p.id);
-    if (ids.length === 0) return;
-    picking = true;
-    const res = await fetch('/api/select', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ packIds: ids }),
-    });
-    picking = false;
-    if (!res.ok) return;
-    const { selectedPack } = await res.json();
+  function pick() {
+    const active = checkedPacks;
+    if (active.length === 0) return;
+
+    const weights = computeWeights(active);
+    const selectedPack = weightedRandom(active, weights);
+
     result = { setName: selectedPack.setName, productType: selectedPack.productType };
+    scheduleToastDismiss();
 
     if (recordDraft && history.length < MAX_HISTORY) {
       const price = selectedPack.marketPrice != null ? `$${selectedPack.marketPrice.toFixed(2)}` : '—';
-      history = [...history, { setName: selectedPack.setName, productType: selectedPack.productType, price }];
-      if (history.length >= MAX_HISTORY) recordDraft = false;
-    }
+      const newHistory = [...history, {
+        packId: selectedPack.id,
+        setName: selectedPack.setName,
+        productType: selectedPack.productType,
+        marketPrice: selectedPack.marketPrice ?? null,
+        price,
+      }];
+      history = newHistory;
 
-    showHistory = recordDraft && history.length > 0;
-    scheduleToastDismiss();
+      const id = String(selectedPack.id);
+      pickedCounts[id] = (pickedCounts[id] ?? 0) + 1;
+      if (pickedCounts[id] >= selectedPack.quantity) {
+        const next = new Set(checked);
+        next.delete(id);
+        checked = next;
+      }
+
+      if (newHistory.length >= MAX_HISTORY) {
+        saveDraft(newHistory);
+      }
+    }
   }
 </script>
 
@@ -201,7 +275,7 @@
       {@const isChecked = checked.has(id)}
       {@const packOdds = isChecked ? (odds[id] ?? 0) : null}
       <li class="pack-item">
-        <label class="pack-item__label" class:pack-item__label--checked={isChecked}>
+        <label class="pack-item__label" class:pack-item__label--checked={isChecked} class:pack-item__label--depleted={effectiveQty(pack) === 0}>
           <input
             type="checkbox"
             class="pack-checkbox"
@@ -210,7 +284,7 @@
           />
           <span class="pack-item__info">
             <span class="pack-item__name">{pack.setName}</span>
-            <span class="pack-item__meta">{pack.productType}</span>
+            <span class="pack-item__meta">{pack.productType} ({effectiveQty(pack)})</span>
           </span>
           <span class="pack-item__price">
             {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
@@ -227,17 +301,15 @@
   <div class="pick-row">
     <button
       class="btn btn--primary btn--large"
-      disabled={picking || noneChecked}
+      disabled={noneChecked || history.length >= MAX_HISTORY}
       onclick={pick}
-    >{picking ? '🎲 Picking...' : '🎲 Pick a Pack'}</button>
+    >🎲 Pick a Pack</button>
     <label class="history-toggle">
-      <input type="checkbox" bind:checked={recordDraft} onchange={() => { showHistory = recordDraft && history.length > 0; }} />
+      <input type="checkbox" checked={recordDraft} disabled={history.length >= MAX_HISTORY} onchange={(e) => setRecordDraft((e.target as HTMLInputElement).checked)} />
       Record draft
     </label>
-    {#if history.length > 0 && recordDraft}
-      <button class="btn btn--secondary" onclick={() => { showHistory = !showHistory; }}>
-        {showHistory ? 'Hide history' : 'Show history'}
-      </button>
+    {#if history.length >= MAX_HISTORY}
+      <span class="draft-full">Draft complete ({MAX_HISTORY}/{MAX_HISTORY})</span>
     {/if}
   </div>
 
@@ -249,11 +321,11 @@
   {/if}
 
   <!-- History -->
-  {#if showHistory && history.length > 0}
+  {#if recordDraft && history.length > 0}
     <div class="history">
       <div class="history__header">
         <span class="history__title">Draft history</span>
-        <button class="history__clear" onclick={() => { history = []; showHistory = false; }}>Clear</button>
+        <button class="history__clear" onclick={() => { history = []; pickedCounts = {}; }}>Clear</button>
       </div>
       <ol class="history__list">
         {#each history as entry, i}
@@ -289,11 +361,11 @@
 
   .count-pill {
     position: fixed;
-    top: 3.75rem;
+    top: 5.25rem;
     right: 1rem;
     background: var(--color-surface);
     border: 1px solid var(--color-accent);
-    border-radius: 999px;
+    border-radius: 8px;
     padding: 0.25rem 0.75rem;
     font-size: 0.82rem;
     font-weight: 500;
@@ -366,6 +438,7 @@
     overflow: hidden;
   }
   .pack-item__label:hover { border-color: var(--color-accent); }
+  .pack-item__label--depleted { opacity: 0.4; }
 
   .pack-item__info {
     flex: 1;
@@ -412,10 +485,14 @@
 
   /* ── Pick row ──────────────────────────────────────────────── */
   .pick-row {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 1.5rem;
     display: flex;
     align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
+    z-index: 100;
   }
 
   .toggle-label {
@@ -440,26 +517,38 @@
   }
   .history-toggle input { accent-color: var(--color-accent); }
 
+  .draft-full {
+    font-size: 0.78rem;
+    color: var(--color-accent);
+    opacity: 0.8;
+  }
+
   /* ── Toast ─────────────────────────────────────────────────── */
   .toast {
     position: fixed;
-    top: 3.75rem;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 1rem;
+    left: 1rem;
+    right: 1rem;
     background: var(--color-surface);
     border: 1px solid var(--color-accent);
     border-radius: var(--radius);
     padding: 0.85rem 1.75rem;
     font-size: 1.05rem;
     font-weight: 500;
-    white-space: nowrap;
+    box-sizing: border-box;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-    z-index: 50;
+    z-index: 250;
     cursor: pointer;
     animation: slideDown 0.2s ease;
   }
 
-  .toast__text { color: var(--color-text); }
+  .toast__text {
+    color: var(--color-text);
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 
   @keyframes slideDown {
     from { transform: translateX(-50%) translateY(-0.75rem); opacity: 0; }

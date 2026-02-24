@@ -1,5 +1,6 @@
 ---
 import '../styles/global.scss';
+import Toast from '../components/Toast.svelte';
 
 interface Props {
   title: string;
@@ -43,6 +44,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
           <a href="/select" class="nav-menu__item">Pick a Pack</a>
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/collection" class="nav-menu__item">Manage Collection</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/weights" class="nav-menu__item">Weights</a>}
+          {['admin', 'viewer'].includes(user.role) && <a href="/admin/drafts" class="nav-menu__item">Drafts</a>}
           <div class="nav-menu__footer">
             <div class="nav-menu__footer-row">
               <span class="nav-menu__user">{user.name}</span>
@@ -60,14 +62,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
       <slot />
     </main>
 
-    <div id="app-toast" class="app-toast" hidden>
-      <span class="app-toast__msg"></span>
-      <div class="app-toast__actions">
-        <button class="app-toast__confirm">Remove</button>
-        <button class="app-toast__cancel">Cancel</button>
-      </div>
-      <button class="app-toast__close" aria-label="Dismiss" hidden>✕</button>
-    </div>
+    <Toast client:load />
   </body>
 </html>
 
@@ -227,82 +222,6 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
     &.open { display: block; }
   }
 
-  /* ── Delete toast ────────────────────────────────────────── */
-  .app-toast {
-    position: fixed;
-    bottom: 1.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    padding: 0.6rem 0.75rem 0.6rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.88rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    z-index: 500;
-    max-width: min(420px, calc(100vw - 2rem));
-    animation: toast-in 0.18s ease;
-
-    &[hidden] { display: none; }
-
-    &__msg {
-      color: var(--color-text);
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-
-    &__actions {
-      display: flex;
-      gap: 0.4rem;
-      flex-shrink: 0;
-    }
-
-    &__confirm, &__cancel {
-      background: none;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius);
-      padding: 0.18rem 0.55rem;
-      font-size: 0.82rem;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    &__confirm {
-      color: var(--color-danger);
-      &:hover { border-color: var(--color-danger); }
-    }
-
-    &__cancel {
-      color: var(--color-text-muted);
-      &:hover { border-color: var(--color-text-muted); color: var(--color-text); }
-    }
-
-    &__close {
-      background: none;
-      border: none;
-      color: var(--color-text-muted);
-      font-size: 0.75rem;
-      padding: 0.1rem 0.3rem;
-      flex-shrink: 0;
-      &:hover { color: var(--color-text); }
-      &[hidden] { display: none; }
-    }
-
-    &--error  { border-color: var(--color-danger); }
-    &--success { border-color: var(--color-success); }
-  }
-
-  @keyframes toast-in {
-    from { opacity: 0; transform: translateX(-50%) translateY(6px); }
-    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
-
   /* ── Main content ────────────────────────────────────────── */
   .main {
     padding: 1.25rem 1rem;
@@ -316,55 +235,6 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
 </style>
 
 <script>
-  // ── Toast ──────────────────────────────────────────────────────
-  declare global {
-    interface Window {
-      deleteToast(msg: string, onConfirm: () => void, onCancel: () => void): void;
-      showToast(msg: string, type?: 'error' | 'success' | 'info'): void;
-    }
-  }
-
-  const appToast   = document.getElementById('app-toast')!;
-  const toastMsg   = appToast.querySelector<HTMLElement>('.app-toast__msg')!;
-  const toastActions = appToast.querySelector<HTMLElement>('.app-toast__actions')!;
-  const toastClose = appToast.querySelector<HTMLButtonElement>('.app-toast__close')!;
-  let toastConfirm = appToast.querySelector<HTMLButtonElement>('.app-toast__confirm')!;
-  let toastCancel  = appToast.querySelector<HTMLButtonElement>('.app-toast__cancel')!;
-  let notifTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function dismissToast() {
-    appToast.hidden = true;
-    appToast.classList.remove('app-toast--error', 'app-toast--success');
-    if (notifTimer) { clearTimeout(notifTimer); notifTimer = null; }
-  }
-
-  window.deleteToast = (msg, onConfirm, onCancel) => {
-    dismissToast();
-    toastMsg.textContent = msg;
-    toastActions.hidden = false;
-    toastClose.hidden = true;
-    appToast.hidden = false;
-
-    const newConfirm = toastConfirm.cloneNode(true) as HTMLButtonElement;
-    const newCancel  = toastCancel.cloneNode(true)  as HTMLButtonElement;
-    toastConfirm.replaceWith(newConfirm); toastConfirm = newConfirm;
-    toastCancel.replaceWith(newCancel);   toastCancel  = newCancel;
-
-    toastConfirm.addEventListener('click', () => { dismissToast(); onConfirm(); });
-    toastCancel.addEventListener ('click', () => { dismissToast(); onCancel();  });
-  };
-
-  window.showToast = (msg, type = 'info') => {
-    dismissToast();
-    toastMsg.textContent = msg;
-    toastActions.hidden = true;
-    toastClose.hidden = false;
-    if (type !== 'info') appToast.classList.add(`app-toast--${type}`);
-    appToast.hidden = false;
-    toastClose.onclick = dismissToast;
-    notifTimer = setTimeout(dismissToast, 4000);
-  };
-
   // ── Nav ───────────────────────────────────────────────────────
   const toggle  = document.getElementById('nav-toggle') as HTMLButtonElement;
   const menu    = document.getElementById('nav-menu') as HTMLElement;
