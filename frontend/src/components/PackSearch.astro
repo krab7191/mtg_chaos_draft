@@ -184,32 +184,61 @@
     for (const [setName, { packs, year }] of setMap) {
       const group = document.createElement('div');
       group.className = 'set-group';
-      group.innerHTML = `
-        <div class="set-group__header">
-          <span class="set-group__name">${setName}</span>
-          ${year ? `<span class="set-group__year">${year}</span>` : ''}
-        </div>
-      `;
+
+      const header = document.createElement('div');
+      header.className = 'set-group__header';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'set-group__name';
+      nameSpan.textContent = setName;
+      header.appendChild(nameSpan);
+      if (year) {
+        const yearSpan = document.createElement('span');
+        yearSpan.className = 'set-group__year';
+        yearSpan.textContent = year;
+        header.appendChild(yearSpan);
+      }
+      group.appendChild(header);
 
       for (const product of packs) {
         const price = product.marketPrice != null ? `$${product.marketPrice.toFixed(2)}` : '';
         const packRow = document.createElement('div');
         packRow.className = 'set-group__pack';
-        packRow.innerHTML = `
-          <span class="set-group__type">${product.productType}</span>
-          ${price ? `<span class="set-group__price">${price}</span>` : ''}
-          <div class="set-result__add-group">
-            <input class="set-result__qty" type="number" value="1" min="1" max="999" title="Quantity" />
-            <button class="set-result__add-btn"
-              data-id="${product.mtgstocksId}"
-              data-name="${product.name}"
-              data-set-name="${product.setName}"
-              data-product-type="${product.productType}"
-              data-price="${product.marketPrice ?? ''}">
-              + Add
-            </button>
-          </div>
-        `;
+
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'set-group__type';
+        typeSpan.textContent = product.productType;
+        packRow.appendChild(typeSpan);
+
+        if (price) {
+          const priceSpan = document.createElement('span');
+          priceSpan.className = 'set-group__price';
+          priceSpan.textContent = price;
+          packRow.appendChild(priceSpan);
+        }
+
+        const addGroup = document.createElement('div');
+        addGroup.className = 'set-result__add-group';
+
+        const input = document.createElement('input');
+        input.className = 'set-result__qty';
+        input.type = 'number';
+        input.value = '1';
+        input.min = '1';
+        input.max = '999';
+        input.title = 'Quantity';
+        addGroup.appendChild(input);
+
+        const btn = document.createElement('button');
+        btn.className = 'set-result__add-btn';
+        btn.dataset.id = String(product.mtgstocksId);
+        btn.dataset.name = product.name;
+        btn.dataset.setName = product.setName;
+        btn.dataset.productType = product.productType;
+        btn.dataset.price = String(product.marketPrice ?? '');
+        btn.textContent = '+ Add';
+        addGroup.appendChild(btn);
+
+        packRow.appendChild(addGroup);
         group.appendChild(packRow);
       }
 

@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
-var mtgstocksClient = &http.Client{}
+var mtgstocksClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
 
 func proxyMTGStocks(url string) ([]byte, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
