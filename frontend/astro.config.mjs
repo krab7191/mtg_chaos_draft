@@ -15,6 +15,9 @@ export default defineConfig({
     // so you don't need Caddy running locally
     server: {
       allowedHosts: ['dora-extraneous-stasia.ngrok-free.dev'],
+      watch: {
+        ignored: ['**/coverage/**', '**/dist/**'],
+      },
       proxy: {
         '/api': {
           target: 'http://localhost:8080',
