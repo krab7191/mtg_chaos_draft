@@ -12,6 +12,9 @@
 <div class="set-group">
   <div class="set-group__header">
     <span class="set-group__name">{setName}</span>
+    {#if packs[0]?.setCode}
+      <span class="set-group__code">({packs[0].setCode})</span>
+    {/if}
   </div>
   {#each packs as pack (pack.id)}
     <CollectionRow {pack} {onQtyChange} {onDelete} />
@@ -37,5 +40,13 @@
     color: var(--color-text);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+  }
+
+  .set-group__code {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
   }
 </style>

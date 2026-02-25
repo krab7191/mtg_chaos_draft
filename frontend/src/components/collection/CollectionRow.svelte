@@ -16,6 +16,7 @@
 
 <div class="pack-row" class:row--empty={pack.quantity === 0}>
   <span class="pack-row__type">{pack.productType}</span>
+  <span class="pack-row__cpp">({pack.cardsPerPack})</span>
   <div class="qty">
     <button
       class="qty__btn qty__btn--dec"
@@ -61,6 +62,12 @@
     text-overflow: ellipsis;
   }
 
+  .pack-row__cpp {
+    font-size: 0.78rem;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+
   .price-val {
     font-size: 0.85rem;
     color: var(--color-text-muted);
@@ -75,6 +82,7 @@
     align-items: center;
     gap: 0.35rem;
     flex-shrink: 0;
+    margin-left: 1rem;
   }
 
   .qty__val {

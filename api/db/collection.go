@@ -11,6 +11,7 @@ type CollectionPack struct {
 	ID           int       `json:"id"`
 	Name         string    `json:"name"`
 	SetName      string    `json:"setName"`
+	SetCode      string    `json:"setCode"`
 	ProductType  string    `json:"productType"`
 	MTGStocksID  *int      `json:"mtgstocksId"`
 	MarketPrice  *float64  `json:"marketPrice"`
@@ -21,12 +22,12 @@ type CollectionPack struct {
 	CardsPerPack int       `json:"cardsPerPack"`
 }
 
-const packColumns = `id, name, set_name, product_type, mtgstocks_id,
+const packColumns = `id, name, set_name, set_code, product_type, mtgstocks_id,
 	market_price, quantity, weight, COALESCE(notes, ''), added_at, cards_per_pack`
 
 func scanPack(row interface{ Scan(...any) error }) (*CollectionPack, error) {
 	p := &CollectionPack{}
-	err := row.Scan(&p.ID, &p.Name, &p.SetName, &p.ProductType,
+	err := row.Scan(&p.ID, &p.Name, &p.SetName, &p.SetCode, &p.ProductType,
 		&p.MTGStocksID, &p.MarketPrice, &p.Quantity, &p.Weight, &p.Notes, &p.AddedAt, &p.CardsPerPack)
 	return p, err
 }
@@ -49,13 +50,13 @@ func ListCollection(ctx context.Context, pool *pgxpool.Pool) ([]CollectionPack, 
 	return packs, rows.Err()
 }
 
-func AddPack(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, setName, productType string, quantity int, weight float64, marketPrice *float64, cardsPerPack int) (*CollectionPack, error) {
+func AddPack(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, setName, setCode, productType string, quantity int, weight float64, marketPrice *float64, cardsPerPack int) (*CollectionPack, error) {
 	return scanPack(pool.QueryRow(ctx, `
-		INSERT INTO collection_packs (name, set_name, product_type, mtgstocks_id, quantity, weight, market_price, cards_per_pack)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO collection_packs (name, set_name, set_code, product_type, mtgstocks_id, quantity, weight, market_price, cards_per_pack)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (mtgstocks_id) WHERE mtgstocks_id IS NOT NULL DO UPDATE SET quantity = collection_packs.quantity + EXCLUDED.quantity
 		RETURNING `+packColumns,
-		name, setName, productType, mtgstocksID, quantity, weight, marketPrice, cardsPerPack))
+		name, setName, setCode, productType, mtgstocksID, quantity, weight, marketPrice, cardsPerPack))
 }
 
 func UpdatePack(ctx context.Context, pool *pgxpool.Pool, id int, quantity *int, weight *float64, notes *string, mtgstocksID *int, marketPrice *float64, cardsPerPack *int) (*CollectionPack, error) {

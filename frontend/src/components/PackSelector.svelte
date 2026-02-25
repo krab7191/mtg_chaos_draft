@@ -87,7 +87,7 @@
   const checkedPacks = $derived(packs.filter(p => checked.has(String(p.id))));
 
   function packsPerSlot(p: Pack): number {
-    return Math.ceil(15 / Math.max(1, p.cardsPerPack));
+    return p.cardsPerPack < 12 ? Math.ceil(15 / p.cardsPerPack) : 1;
   }
 
   function effectiveQty(p: Pack): number {

@@ -57,7 +57,7 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 		body.Weight = 1.0
 	}
 	cardsPerPack := lookupCardsPerPack(body.SetCode, body.ProductType)
-	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack)
+	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return

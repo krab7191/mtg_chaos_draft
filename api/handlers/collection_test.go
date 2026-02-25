@@ -22,7 +22,7 @@ func newCollectionHandler(t *testing.T) *handlers.CollectionHandler {
 func addTestPack(t *testing.T, mtgstocksID int, name, setName, productType string, qty int) *db.CollectionPack {
 	t.Helper()
 	pack, err := db.AddPack(context.Background(), testhelper.Pool(t),
-		mtgstocksID, name, setName, productType, qty, 1.0, nil, 15)
+		mtgstocksID, name, setName, "", productType, qty, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("seed pack: %v", err)
 	}
