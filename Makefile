@@ -6,7 +6,7 @@ DATABASE_TEST_URL ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft_test
 HIVEMIND := $(HOME)/go/bin/hivemind
 AIR      := $(HOME)/go/bin/air
 
-COVERAGE_THRESHOLD := 40
+COVERAGE_THRESHOLD := 60
 
 .PHONY: dev db db-test api frontend check install test test-api test-frontend
 
@@ -35,8 +35,9 @@ install: ## Install all dev dependencies and git hooks
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	pre-commit install
 
-check: ## Run pre-commit checks (fmt, vet, astro check)
+check: ## Run pre-commit checks (fmt, vet, astro check) and tests
 	pre-commit run --all-files
+	$(MAKE) test
 
 test-api: ## Run Go tests with coverage (40% threshold)
 	@cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -p 1 ./... -coverprofile=coverage.out -covermode=atomic \

@@ -64,9 +64,3 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
-      - id: unit-tests
-        name: unit tests
-        entry: bash -c 'make test'
-        language: system
-        always_run: true
-        pass_filenames: false
