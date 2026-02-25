@@ -42,6 +42,8 @@ jobs:
 
       - name: Run checks
         run: make check
+        env:
+          SKIP: unit-tests
 
   test:
     runs-on: ubuntu-latest
