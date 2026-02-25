@@ -35,8 +35,9 @@ install: ## Install all dev dependencies and git hooks
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	pre-commit install
 
-check: ## Run pre-commit checks (fmt, vet, astro check)
+check: ## Run pre-commit checks (fmt, vet, astro check) and tests
 	pre-commit run --all-files
+	$(MAKE) test
 
 test-api: ## Run Go tests with coverage (40% threshold)
 	@cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -p 1 ./... -coverprofile=coverage.out -covermode=atomic \
