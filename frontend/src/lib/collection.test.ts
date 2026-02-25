@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeSortedSets, type Pack } from './collection';
 
 const p = (id: number, setName: string, qty: number, price: number | null = 10): Pack => ({
-  id, setName, productType: 'draft_booster', quantity: qty, marketPrice: price,
+  id, setName, productType: 'draft_booster', quantity: qty, marketPrice: price, cardsPerPack: 15,
 });
 
 describe('computeSortedSets', () => {

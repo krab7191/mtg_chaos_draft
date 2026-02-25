@@ -3,8 +3,8 @@ import { render } from '../../tests/svelte';
 import WeightsList from './WeightsList.svelte';
 
 const packs = [
-  { id: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 10.00, quantity: 2 },
-  { id: 2, setName: 'Beta', productType: 'Set Booster', marketPrice: 5.00, quantity: 1 },
+  { id: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 10.00, quantity: 2, cardsPerPack: 15 },
+  { id: 2, setName: 'Beta', productType: 'Set Booster', marketPrice: 5.00, quantity: 1, cardsPerPack: 15 },
 ];
 
 const settings = { priceFloor: 0, priceCap: 0, quantityCap: 0, packWeights: {} };

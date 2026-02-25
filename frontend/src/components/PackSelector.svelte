@@ -7,6 +7,7 @@
     setName: string;
     productType: string;
     quantity: number;
+    cardsPerPack: number;
     marketPrice?: number | null;
   }
 
@@ -85,8 +86,13 @@
 
   const checkedPacks = $derived(packs.filter(p => checked.has(String(p.id))));
 
+  function packsPerSlot(p: Pack): number {
+    return Math.ceil(15 / Math.max(1, p.cardsPerPack));
+  }
+
   function effectiveQty(p: Pack): number {
-    return Math.max(0, p.quantity - (pickedCounts[String(p.id)] ?? 0));
+    const slots = packsPerSlot(p);
+    return Math.max(0, Math.floor(p.quantity / slots) - (pickedCounts[String(p.id)] ?? 0));
   }
 
   function computeWeights(activePacks: Pack[]): number[] {
@@ -224,7 +230,7 @@
 
       const id = String(selectedPack.id);
       pickedCounts[id] = (pickedCounts[id] ?? 0) + 1;
-      if (pickedCounts[id] >= selectedPack.quantity) {
+      if (effectiveQty(selectedPack) === 0) {
         const next = new Set(checked);
         next.delete(id);
         checked = next;
@@ -284,7 +290,7 @@
           />
           <span class="pack-item__info">
             <span class="pack-item__name">{pack.setName}</span>
-            <span class="pack-item__meta">{pack.productType} ({effectiveQty(pack)})</span>
+            <span class="pack-item__meta">{pack.productType} ({effectiveQty(pack)}{pack.cardsPerPack < 12 ? ' *' : ''})</span>
           </span>
           <span class="pack-item__price">
             {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
@@ -296,6 +302,16 @@
       </li>
     {/each}
   </ul>
+
+  <!-- Non-standard pack size footnote -->
+  {#if checkedPacks.some(p => p.cardsPerPack < 12)}
+    <ul class="pack-footnote">
+      {#each checkedPacks.filter(p => p.cardsPerPack < 12) as p}
+        {@const slots = packsPerSlot(p)}
+        <li>⁎ {p.setName} {p.productType}: {p.cardsPerPack} cards/pack ({slots}× per slot)</li>
+      {/each}
+    </ul>
+  {/if}
 
   <!-- Pick row -->
   <div class="pick-row">
@@ -482,6 +498,16 @@
   }
 
   .pack-checkbox { accent-color: var(--color-accent); flex-shrink: 0; }
+
+  /* ── Footnote ──────────────────────────────────────────────── */
+  .pack-footnote {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    font-size: 0.73rem;
+    color: var(--color-text-muted);
+    opacity: 0.8;
+  }
 
   /* ── Pick row ──────────────────────────────────────────────── */
   .pick-row {

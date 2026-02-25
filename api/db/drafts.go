@@ -162,8 +162,8 @@ func ApproveDraft(ctx context.Context, pool *pgxpool.Pool, draftID, userID int) 
 		FROM draft_picks dp
 		JOIN collection_packs cp ON cp.id = dp.pack_id
 		WHERE dp.draft_id = $1 AND dp.pack_id IS NOT NULL
-		GROUP BY cp.id, cp.set_name, cp.quantity
-		HAVING cp.quantity < COUNT(*)
+		GROUP BY cp.id, cp.set_name, cp.quantity, cp.cards_per_pack
+		HAVING cp.quantity < COUNT(*) * CEIL(15.0 / cp.cards_per_pack)
 	`, draftID)
 	if err != nil {
 		return err
@@ -185,17 +185,17 @@ func ApproveDraft(ctx context.Context, pool *pgxpool.Pool, draftID, userID int) 
 		return &InsufficientQuantityError{PackNames: short}
 	}
 
-	// Decrement each pack by the number of times it appears in this draft's picks.
+	// Decrement each pack by the number of physical packs consumed (slots × packs-per-slot).
 	_, err = tx.Exec(ctx, `
-		UPDATE collection_packs cp
-		SET quantity = quantity - sub.cnt
+		UPDATE collection_packs
+		SET quantity = quantity - sub.cnt * CEIL(15.0 / collection_packs.cards_per_pack)
 		FROM (
 			SELECT pack_id, COUNT(*)::int AS cnt
 			FROM draft_picks
 			WHERE draft_id = $1 AND pack_id IS NOT NULL
 			GROUP BY pack_id
 		) sub
-		WHERE cp.id = sub.pack_id
+		WHERE collection_packs.id = sub.pack_id
 	`, draftID)
 	if err != nil {
 		return err

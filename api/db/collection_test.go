@@ -28,7 +28,7 @@ func TestAddPack_AndList(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	pack, err := db.AddPack(ctx, pool, 11111, "Dominaria", "Dominaria United", "draft_booster", 3, 1.5, fptr(12.99))
+	pack, err := db.AddPack(ctx, pool, 11111, "Dominaria", "Dominaria United", "draft_booster", 3, 1.5, fptr(12.99), 15)
 	if err != nil {
 		t.Fatalf("AddPack: %v", err)
 	}
@@ -56,11 +56,11 @@ func TestAddPack_ConflictIncrementsQuantity(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	_, err := db.AddPack(ctx, pool, 22222, "Kamigawa", "Kamigawa: Neon Dynasty", "draft_booster", 2, 1.0, nil)
+	_, err := db.AddPack(ctx, pool, 22222, "Kamigawa", "Kamigawa: Neon Dynasty", "draft_booster", 2, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("first AddPack: %v", err)
 	}
-	pack, err := db.AddPack(ctx, pool, 22222, "Kamigawa", "Kamigawa: Neon Dynasty", "draft_booster", 3, 1.0, nil)
+	pack, err := db.AddPack(ctx, pool, 22222, "Kamigawa", "Kamigawa: Neon Dynasty", "draft_booster", 3, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("second AddPack (conflict): %v", err)
 	}
@@ -73,7 +73,7 @@ func TestAddPack_NilPrice(t *testing.T) {
 	pool := testhelper.Pool(t)
 	testhelper.Truncate(t, pool, "collection_packs")
 
-	pack, err := db.AddPack(context.Background(), pool, 33333, "Innistrad", "Innistrad: Crimson Vow", "set_booster", 1, 1.0, nil)
+	pack, err := db.AddPack(context.Background(), pool, 33333, "Innistrad", "Innistrad: Crimson Vow", "set_booster", 1, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("AddPack: %v", err)
 	}
@@ -87,12 +87,12 @@ func TestUpdatePack_Quantity(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	orig, err := db.AddPack(ctx, pool, 44444, "Strixhaven", "Strixhaven", "draft_booster", 4, 1.0, nil)
+	orig, err := db.AddPack(ctx, pool, 44444, "Strixhaven", "Strixhaven", "draft_booster", 4, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("AddPack: %v", err)
 	}
 	qty := 7
-	updated, err := db.UpdatePack(ctx, pool, orig.ID, &qty, nil, nil, nil, nil)
+	updated, err := db.UpdatePack(ctx, pool, orig.ID, &qty, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdatePack: %v", err)
 	}
@@ -106,12 +106,12 @@ func TestUpdatePack_Notes(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	orig, err := db.AddPack(ctx, pool, 55555, "Zendikar", "Zendikar Rising", "play_booster", 1, 1.0, nil)
+	orig, err := db.AddPack(ctx, pool, 55555, "Zendikar", "Zendikar Rising", "play_booster", 1, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("AddPack: %v", err)
 	}
 	notes := "gift for friday night"
-	updated, err := db.UpdatePack(ctx, pool, orig.ID, nil, nil, &notes, nil, nil)
+	updated, err := db.UpdatePack(ctx, pool, orig.ID, nil, nil, &notes, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdatePack: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestDeletePack(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	pack, err := db.AddPack(ctx, pool, 66666, "Theros", "Theros Beyond Death", "collector_booster", 1, 1.0, nil)
+	pack, err := db.AddPack(ctx, pool, 66666, "Theros", "Theros Beyond Death", "collector_booster", 1, 1.0, nil, 15)
 	if err != nil {
 		t.Fatalf("AddPack: %v", err)
 	}
@@ -143,9 +143,9 @@ func TestGetPacksByIDs(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	p1, _ := db.AddPack(ctx, pool, 77771, "Set A", "Set A", "draft_booster", 1, 1.0, nil)
-	p2, _ := db.AddPack(ctx, pool, 77772, "Set B", "Set B", "draft_booster", 1, 1.0, nil)
-	_, _ = db.AddPack(ctx, pool, 77773, "Set C", "Set C", "draft_booster", 1, 1.0, nil)
+	p1, _ := db.AddPack(ctx, pool, 77771, "Set A", "Set A", "draft_booster", 1, 1.0, nil, 15)
+	p2, _ := db.AddPack(ctx, pool, 77772, "Set B", "Set B", "draft_booster", 1, 1.0, nil, 15)
+	_, _ = db.AddPack(ctx, pool, 77773, "Set C", "Set C", "draft_booster", 1, 1.0, nil, 15)
 
 	packs, err := db.GetPacksByIDs(ctx, pool, []int{p1.ID, p2.ID})
 	if err != nil {
@@ -172,7 +172,7 @@ func TestBulkUpdatePrices(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	pack, _ := db.AddPack(ctx, pool, 88888, "Eldraine", "Throne of Eldraine", "draft_booster", 1, 1.0, nil)
+	pack, _ := db.AddPack(ctx, pool, 88888, "Eldraine", "Throne of Eldraine", "draft_booster", 1, 1.0, nil, 15)
 
 	err := db.BulkUpdatePrices(ctx, pool, map[int]float64{88888: 24.99})
 	if err != nil {

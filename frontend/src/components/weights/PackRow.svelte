@@ -4,6 +4,7 @@
     productType: string;
     marketPrice: number | null;
     quantity: number;
+    cardsPerPack: number;
   }
 
   let { pack, odds, multiplier, onMultChange }: {
@@ -14,12 +15,17 @@
   } = $props();
 
   const fmt = (n: number) => n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
+  const slots = Math.ceil(15 / Math.max(1, pack.cardsPerPack ?? 15));
+  const effectiveSlots = Math.floor(pack.quantity / slots);
 </script>
 
 <div class="pack-row">
   <div class="pack-row__type">{pack.productType}</div>
   <div class="pack-row__stats">
-    <span class="pack-row__qty">{pack.quantity} packs</span>
+    <span
+      class="pack-row__qty"
+      title={pack.cardsPerPack < 12 ? `${pack.cardsPerPack} cards/pack, ${slots}× per slot` : undefined}
+    >{effectiveSlots}{pack.cardsPerPack < 12 ? '*' : ''} slots</span>
     <span class="pack-row__price">
       {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
     </span>
@@ -30,7 +36,7 @@
       <span class="odds__label">{odds.toFixed(1)}%</span>
     </div>
     <div class="weight-ctrl">
-      <button class="weight-btn" onclick={() => onMultChange(String(pack.id), Math.round((multiplier - 0.1) * 10) / 10)}>−</button>
+      <button class="weight-btn" onclick={() => onMultChange(String(pack.id), Math.round((multiplier - 0.1) * 10) / 10)}>-</button>
       <span class="weight-val" class:pos={multiplier > 0} class:neg={multiplier < 0}>
         {fmt(multiplier)}
       </span>

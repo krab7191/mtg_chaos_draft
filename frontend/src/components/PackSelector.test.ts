@@ -5,8 +5,8 @@ import PackSelector from './PackSelector.svelte';
 const settings = { priceFloor: 0, priceCap: 0, quantityCap: 0, packWeights: {} };
 
 const packs = [
-  { id: 1, name: 'Zendikar Draft Booster', setName: 'Zendikar', productType: 'Draft Booster', quantity: 5, marketPrice: 4.99 },
-  { id: 2, name: 'Alpha Set Booster', setName: 'Alpha', productType: 'Set Booster', quantity: 3, marketPrice: 8.00 },
+  { id: 1, name: 'Zendikar Draft Booster', setName: 'Zendikar', productType: 'Draft Booster', quantity: 5, cardsPerPack: 15, marketPrice: 4.99 },
+  { id: 2, name: 'Alpha Set Booster', setName: 'Alpha', productType: 'Set Booster', quantity: 3, cardsPerPack: 15, marketPrice: 8.00 },
 ];
 
 beforeEach(() => {

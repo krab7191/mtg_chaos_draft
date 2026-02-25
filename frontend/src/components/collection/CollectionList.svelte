@@ -95,6 +95,9 @@
 </div>
 
 <p class="collection__disclaimer">Prices update automatically once a day.</p>
+{#if packs.some(p => p.cardsPerPack < 12)}
+  <p class="collection__footnote">* Non-standard pack size; multiples needed.</p>
+{/if}
 
 <!-- ── List ──────────────────────────────────────────────── -->
 {#if packs.length === 0}
@@ -152,6 +155,13 @@
     font-size: 0.78rem;
     color: var(--color-text-muted);
     opacity: 0.6;
+    margin-bottom: 0.75rem;
+  }
+
+  .collection__footnote {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    opacity: 0.7;
     margin-bottom: 0.75rem;
   }
 

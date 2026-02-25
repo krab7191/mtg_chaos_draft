@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../tests/svelte';
 import PackRow from './PackRow.svelte';
 
-const pack = { id: 1, productType: 'Draft Booster', marketPrice: 5.00, quantity: 3 };
+const pack = { id: 1, productType: 'Draft Booster', marketPrice: 5.00, quantity: 3, cardsPerPack: 15 };
 
 describe('PackRow', () => {
   it('renders productType', () => {
@@ -37,6 +37,14 @@ describe('PackRow', () => {
     const { container } = render(PackRow, {
       props: { pack, odds: 25.5, multiplier: 0, onMultChange: vi.fn() },
     });
-    expect(container.querySelector('.pack-row__qty')?.textContent).toBe('3 packs');
+    expect(container.querySelector('.pack-row__qty')?.textContent).toBe('3 slots');
+  });
+
+  it('shows effective slots with * for non-standard cardsPerPack', () => {
+    const nonStandard = { ...pack, quantity: 7, cardsPerPack: 5 };
+    const { container } = render(PackRow, {
+      props: { pack: nonStandard, odds: 25.5, multiplier: 0, onMultChange: vi.fn() },
+    });
+    expect(container.querySelector('.pack-row__qty')?.textContent).toBe('2* slots');
   });
 });

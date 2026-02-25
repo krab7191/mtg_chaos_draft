@@ -56,7 +56,7 @@ func TestUpdateWeightSettings_PackWeights(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs", "pack_weight_overrides")
 	ctx := context.Background()
 
-	pack, _ := db.AddPack(ctx, pool, 99901, "Pack A", "Pack A", "draft_booster", 1, 1.0, nil)
+	pack, _ := db.AddPack(ctx, pool, 99901, "Pack A", "Pack A", "draft_booster", 1, 1.0, nil, 15)
 
 	settings, _ := db.GetWeightSettings(ctx, pool)
 	settings.PackWeights = map[int]float64{pack.ID: 2.5}

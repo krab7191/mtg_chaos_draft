@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../tests/svelte';
 import CollectionRow from './CollectionRow.svelte';
 
-const basePack = { id: 1, productType: 'Draft Booster', marketPrice: 4.99, quantity: 3 };
+const basePack = { id: 1, productType: 'Draft Booster', marketPrice: 4.99, quantity: 3, cardsPerPack: 15 };
 
 describe('CollectionRow', () => {
   it('renders productType', () => {
@@ -37,5 +37,16 @@ describe('CollectionRow', () => {
     const { container } = render(CollectionRow, { props: { pack: basePack, onQtyChange: vi.fn(), onDelete: vi.fn() } });
     const decBtn = container.querySelector('.qty__btn--dec') as HTMLButtonElement;
     expect(decBtn.disabled).toBe(false);
+  });
+
+  it('appends * to qty when cardsPerPack is non-standard', () => {
+    const pack = { ...basePack, cardsPerPack: 5 };
+    const { container } = render(CollectionRow, { props: { pack, onQtyChange: vi.fn(), onDelete: vi.fn() } });
+    expect(container.querySelector('.qty__val')?.textContent).toBe('3 *');
+  });
+
+  it('does not append * when cardsPerPack is 15', () => {
+    const { container } = render(CollectionRow, { props: { pack: basePack, onQtyChange: vi.fn(), onDelete: vi.fn() } });
+    expect(container.querySelector('.qty__val')?.textContent).toBe('3');
   });
 });

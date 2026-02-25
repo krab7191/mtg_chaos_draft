@@ -4,6 +4,7 @@
     productType: string;
     marketPrice: number | null;
     quantity: number;
+    cardsPerPack: number;
   }
 
   let { pack, onQtyChange, onDelete }: {
@@ -20,8 +21,8 @@
       class="qty__btn qty__btn--dec"
       onclick={() => onQtyChange(pack.id, -1)}
       disabled={pack.quantity === 0}
-    >−</button>
-    <span class="qty__val">{pack.quantity}</span>
+    >-</button>
+    <span class="qty__val">{pack.quantity}{pack.cardsPerPack < 12 ? ' *' : ''}</span>
     <button
       class="qty__btn qty__btn--inc"
       onclick={() => onQtyChange(pack.id, +1)}

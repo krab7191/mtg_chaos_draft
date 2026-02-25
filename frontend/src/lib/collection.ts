@@ -4,6 +4,7 @@ export interface Pack {
   productType: string;
   marketPrice: number | null;
   quantity: number;
+  cardsPerPack: number;
 }
 
 export function computeSortedSets(

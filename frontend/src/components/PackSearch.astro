@@ -121,7 +121,8 @@
       &:focus { outline: none; border-color: var(--color-accent); }
     }
 
-    &__add-btn {
+
+&__add-btn {
       background: var(--color-surface-2);
       border: 1px solid var(--color-border);
       color: var(--color-text);
@@ -233,6 +234,7 @@
         btn.dataset.id = String(product.mtgstocksId);
         btn.dataset.name = product.name;
         btn.dataset.setName = product.setName;
+        btn.dataset.setCode = product.setCode ?? '';
         btn.dataset.productType = product.productType;
         btn.dataset.price = String(product.marketPrice ?? '');
         btn.textContent = '+ Add';
@@ -262,6 +264,7 @@
             mtgstocksId: parseInt(btn.dataset.id!),
             name: btn.dataset.name,
             setName: btn.dataset.setName,
+            setCode: btn.dataset.setCode,
             productType: btn.dataset.productType,
             quantity,
             weight: 1.0,

@@ -36,6 +36,7 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 		MTGStocksID int      `json:"mtgstocksId"`
 		Name        string   `json:"name"`
 		SetName     string   `json:"setName"`
+		SetCode     string   `json:"setCode"`
 		ProductType string   `json:"productType"`
 		Quantity    int      `json:"quantity"`
 		Weight      float64  `json:"weight"`
@@ -55,7 +56,8 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	if body.Weight == 0 {
 		body.Weight = 1.0
 	}
-	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.ProductType, body.Quantity, body.Weight, body.MarketPrice)
+	cardsPerPack := lookupCardsPerPack(body.SetCode, body.ProductType)
+	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -81,7 +83,7 @@ func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	pack, err := db.UpdatePack(r.Context(), h.pool, id, body.Quantity, body.Weight, body.Notes, nil, body.MarketPrice)
+	pack, err := db.UpdatePack(r.Context(), h.pool, id, body.Quantity, body.Weight, body.Notes, nil, body.MarketPrice, nil)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
@@ -110,7 +112,7 @@ func (h *CollectionHandler) LinkPrice(w http.ResponseWriter, r *http.Request) {
 		pricePtr = &price
 	}
 
-	pack, err := db.UpdatePack(r.Context(), h.pool, id, nil, nil, nil, &body.MTGStocksID, pricePtr)
+	pack, err := db.UpdatePack(r.Context(), h.pool, id, nil, nil, nil, &body.MTGStocksID, pricePtr, nil)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return

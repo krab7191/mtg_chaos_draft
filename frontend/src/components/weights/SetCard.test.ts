@@ -3,7 +3,7 @@ import { render } from '../../tests/svelte';
 import SetCard from './SetCard.svelte';
 
 const packs = [
-  { id: 1, productType: 'Draft Booster', marketPrice: 5.00, quantity: 3, setName: 'Zendikar' },
+  { id: 1, productType: 'Draft Booster', marketPrice: 5.00, quantity: 3, setName: 'Zendikar', cardsPerPack: 15 },
 ];
 
 describe('SetCard', () => {
@@ -36,7 +36,7 @@ describe('SetCard', () => {
   it('renders multiple PackRows', () => {
     const twoPacks = [
       ...packs,
-      { id: 2, productType: 'Set Booster', marketPrice: 8.00, quantity: 1, setName: 'Zendikar' },
+      { id: 2, productType: 'Set Booster', marketPrice: 8.00, quantity: 1, setName: 'Zendikar', cardsPerPack: 15 },
     ];
     const { container } = render(SetCard, {
       props: {

@@ -3,8 +3,8 @@ import { render } from '../../tests/svelte';
 import CollectionList from './CollectionList.svelte';
 
 const packs = [
-  { id: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 10.00, quantity: 2 },
-  { id: 2, setName: 'Beta', productType: 'Draft Booster', marketPrice: 5.00, quantity: 1 },
+  { id: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 10.00, quantity: 2, cardsPerPack: 15 },
+  { id: 2, setName: 'Beta', productType: 'Draft Booster', marketPrice: 5.00, quantity: 1, cardsPerPack: 15 },
 ];
 
 describe('CollectionList', () => {
@@ -28,5 +28,16 @@ describe('CollectionList', () => {
   it('renders CollectionCard components for each set', () => {
     const { container } = render(CollectionList, { props: { packs } });
     expect(container.querySelectorAll('.set-group')).toHaveLength(2);
+  });
+
+  it('shows footnote when any pack has non-standard cardsPerPack', () => {
+    const nonStandardPacks = [{ ...packs[0], cardsPerPack: 5 }, packs[1]];
+    const { container } = render(CollectionList, { props: { packs: nonStandardPacks } });
+    expect(container.querySelector('.collection__footnote')).not.toBeNull();
+  });
+
+  it('does not show footnote when all packs are standard', () => {
+    const { container } = render(CollectionList, { props: { packs } });
+    expect(container.querySelector('.collection__footnote')).toBeNull();
   });
 });

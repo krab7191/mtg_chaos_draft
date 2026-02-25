@@ -43,7 +43,7 @@ describe('admin/weights page', () => {
 
   it('renders Weights heading with packs', async () => {
     const packs = [
-      { id: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 10, quantity: 2 },
+      { id: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 10, quantity: 2, cardsPerPack: 15 },
     ];
     mockFetch([
       { ok: true, json: async () => ({ role: 'admin', name: 'Alice', email: 'a@b.com' }) },
