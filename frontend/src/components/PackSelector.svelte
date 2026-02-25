@@ -87,7 +87,9 @@
   const checkedPacks = $derived(packs.filter(p => checked.has(String(p.id))));
 
   function packsPerSlot(p: Pack): number {
-    return p.cardsPerPack < 12 ? Math.ceil(15 / p.cardsPerPack) : 1;
+    if (p.cardsPerPack <= 5) return 3;
+    if (p.cardsPerPack <= 8) return 2;
+    return 1;
   }
 
   function effectiveQty(p: Pack): number {
@@ -290,7 +292,7 @@
           />
           <span class="pack-item__info">
             <span class="pack-item__name">{pack.setName}</span>
-            <span class="pack-item__meta">{pack.productType} ({effectiveQty(pack)}{pack.cardsPerPack < 12 ? ' *' : ''})</span>
+            <span class="pack-item__meta">{pack.productType} ({effectiveQty(pack)}{pack.cardsPerPack <= 8 ? ' *' : ''})</span>
           </span>
           <span class="pack-item__price">
             {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
@@ -304,11 +306,11 @@
   </ul>
 
   <!-- Non-standard pack size footnote -->
-  {#if checkedPacks.some(p => p.cardsPerPack < 12)}
+  {#if checkedPacks.some(p => p.cardsPerPack <= 8)}
     <ul class="pack-footnote">
-      {#each checkedPacks.filter(p => p.cardsPerPack < 12) as p}
+      {#each checkedPacks.filter(p => p.cardsPerPack <= 8) as p}
         {@const slots = packsPerSlot(p)}
-        <li>⁎ {p.setName} {p.productType}: {p.cardsPerPack} cards/pack ({slots}× per slot)</li>
+        <li>* {p.setName} {p.productType}: {p.cardsPerPack} cards/pack ({slots}x per slot)</li>
       {/each}
     </ul>
   {/if}

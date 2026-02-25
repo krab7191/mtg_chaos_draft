@@ -15,7 +15,8 @@
   } = $props();
 
   const fmt = (n: number) => n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
-  const slots = (pack.cardsPerPack ?? 15) < 12 ? Math.ceil(15 / pack.cardsPerPack) : 1;
+  const cpp = pack.cardsPerPack ?? 15;
+  const slots = cpp <= 5 ? 3 : cpp <= 8 ? 2 : 1;
   const effectiveSlots = Math.floor(pack.quantity / slots);
 </script>
 
@@ -24,8 +25,8 @@
   <div class="pack-row__stats">
     <span
       class="pack-row__qty"
-      title={pack.cardsPerPack < 12 ? `${pack.cardsPerPack} cards/pack, ${slots}x per slot` : undefined}
-    >{effectiveSlots}{pack.cardsPerPack < 12 ? '*' : ''} slots</span>
+      title={pack.cardsPerPack <= 8 ? `${pack.cardsPerPack} cards/pack, ${slots}x per slot` : undefined}
+    >{effectiveSlots}{pack.cardsPerPack <= 8 ? '*' : ''} slots</span>
     <span class="pack-row__price">
       {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
     </span>

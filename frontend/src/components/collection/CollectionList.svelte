@@ -95,7 +95,7 @@
 </div>
 
 <p class="collection__disclaimer">Prices update automatically once a day.</p>
-{#if packs.some(p => p.cardsPerPack < 12)}
+{#if packs.some(p => p.cardsPerPack <= 8)}
   <p class="collection__footnote">* Non-standard pack size; multiples needed.</p>
 {/if}
 

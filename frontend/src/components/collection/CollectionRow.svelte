@@ -23,7 +23,7 @@
       onclick={() => onQtyChange(pack.id, -1)}
       disabled={pack.quantity === 0}
     >-</button>
-    <span class="qty__val">{pack.quantity}{pack.cardsPerPack < 12 ? ' *' : ''}</span>
+    <span class="qty__val">{pack.quantity}{pack.cardsPerPack <= 8 ? ' *' : ''}</span>
     <button
       class="qty__btn qty__btn--inc"
       onclick={() => onQtyChange(pack.id, +1)}

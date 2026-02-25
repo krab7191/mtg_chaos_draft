@@ -163,7 +163,7 @@ func ApproveDraft(ctx context.Context, pool *pgxpool.Pool, draftID, userID int) 
 		JOIN collection_packs cp ON cp.id = dp.pack_id
 		WHERE dp.draft_id = $1 AND dp.pack_id IS NOT NULL
 		GROUP BY cp.id, cp.set_name, cp.quantity, cp.cards_per_pack
-		HAVING cp.quantity < COUNT(*) * CASE WHEN cp.cards_per_pack < 12 THEN CEIL(15.0 / cp.cards_per_pack) ELSE 1 END
+		HAVING cp.quantity < COUNT(*) * CASE WHEN cp.cards_per_pack <= 5 THEN 3 WHEN cp.cards_per_pack <= 8 THEN 2 ELSE 1 END
 	`, draftID)
 	if err != nil {
 		return err
@@ -188,7 +188,7 @@ func ApproveDraft(ctx context.Context, pool *pgxpool.Pool, draftID, userID int) 
 	// Decrement each pack by the number of physical packs consumed (slots × packs-per-slot).
 	_, err = tx.Exec(ctx, `
 		UPDATE collection_packs
-		SET quantity = quantity - sub.cnt * CASE WHEN collection_packs.cards_per_pack < 12 THEN CEIL(15.0 / collection_packs.cards_per_pack) ELSE 1 END
+		SET quantity = quantity - sub.cnt * CASE WHEN collection_packs.cards_per_pack <= 5 THEN 3 WHEN collection_packs.cards_per_pack <= 8 THEN 2 ELSE 1 END
 		FROM (
 			SELECT pack_id, COUNT(*)::int AS cnt
 			FROM draft_picks

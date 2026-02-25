@@ -73,7 +73,8 @@
     // weight = qty / price: more copies and cheaper both increase odds.
     // For non-standard pack sizes, quantity is adjusted to effective draft slots.
     const weights = allPacks.map((p, i) => {
-      const slots = (p.cardsPerPack ?? 15) < 12 ? Math.ceil(15 / p.cardsPerPack) : 1;
+      const cpp = p.cardsPerPack ?? 15;
+      const slots = cpp <= 5 ? 3 : cpp <= 8 ? 2 : 1;
       const qty = capQty(Math.floor(p.quantity / slots));
       if (qty === 0) return 0;
       const price = rawPrices[i] ?? avgPrice;
