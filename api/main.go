@@ -113,6 +113,7 @@ func main() {
 			r.Use(mw.RequireAdminOrViewer)
 
 			r.Get("/api/search", handlers.Search)
+			r.Get("/api/cheapest", handlers.CheapestPacks)
 			r.Get("/api/price/{mtgstocksId}", handlers.Price)
 			r.Get("/api/drafts", draftHandler.List)
 		})

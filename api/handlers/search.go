@@ -181,6 +181,51 @@ func getMTGStocksProducts() ([]SearchResult, error) {
 	return products, nil
 }
 
+func CheapestPacks(w http.ResponseWriter, r *http.Request) {
+	products, err := getMTGStocksProducts()
+	if err != nil {
+		http.Error(w, "fetch error", http.StatusBadGateway)
+		return
+	}
+
+	before := strings.TrimSpace(r.URL.Query().Get("before")) // YYYY-MM-DD or empty
+	var beforeTime time.Time
+	if before != "" {
+		var err error
+		beforeTime, err = time.Parse("2006-01-02", before)
+		if err != nil {
+			http.Error(w, "invalid before date, expected YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var priced []SearchResult
+	for _, p := range products {
+		if p.MarketPrice == nil || *p.MarketPrice <= 0 {
+			continue
+		}
+		if !beforeTime.IsZero() {
+			released, err := time.Parse("2006-01-02", p.ReleasedAt)
+			if err != nil || !released.Before(beforeTime) {
+				continue
+			}
+		}
+		priced = append(priced, p)
+	}
+	sort.Slice(priced, func(i, j int) bool {
+		return *priced[i].MarketPrice < *priced[j].MarketPrice
+	})
+	if len(priced) > 10 {
+		priced = priced[:10]
+	}
+	if priced == nil {
+		priced = []SearchResult{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(priced)
+}
+
 func Search(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if len(q) < 2 {

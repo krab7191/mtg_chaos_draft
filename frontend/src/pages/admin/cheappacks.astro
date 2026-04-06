@@ -1,0 +1,169 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+let meRes: Response;
+try {
+  meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+} catch {
+  return Astro.redirect('/login');
+}
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+const ADMIN_ROLES = ['admin', 'viewer'];
+if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
+
+const before = Astro.url.searchParams.get('before') ?? '';
+const apiQuery = before ? `?before=${encodeURIComponent(before)}` : '';
+const cheapestRes = await fetch(`${apiUrl}/api/cheapest${apiQuery}`, { headers: { cookie } });
+const cheapest: any[] = cheapestRes.ok ? await cheapestRes.json() : [];
+---
+
+<Layout title="Cheap Packs" user={user}>
+  <div class="page">
+    <h1 class="page__title">Cheap Packs</h1>
+    <p class="page__sub">Top 10 cheapest MTG packs by current market price.</p>
+
+    <form class="filter" method="get">
+      <label class="filter__label" for="before">Released before</label>
+      <input class="filter__input" type="date" id="before" name="before" value={before} />
+      <button class="filter__btn" type="submit">Apply</button>
+      {before && <a class="filter__clear" href="/admin/cheappacks">Clear</a>}
+    </form>
+
+    {cheapest.length === 0 ? (
+      <p class="empty">No packs found.</p>
+    ) : (
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="table__rank">#</th>
+            <th>Pack</th>
+            <th>Type</th>
+            <th class="table__price">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cheapest.map((p, i) => (
+            <tr>
+              <td class="table__rank table__rank--num">{i + 1}</td>
+              <td>
+                <span class="pack-name">{p.name}</span>
+                <span class="pack-set">{p.setName}</span>
+              </td>
+              <td class="pack-type">{p.productType}</td>
+              <td class="table__price table__price--val">${p.marketPrice.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    &__sub   { color: var(--color-text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+  }
+
+  .filter {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+
+    &__label {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    &__input {
+      padding: 0.3rem 0.5rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-size: 0.9rem;
+      &:focus { outline: none; border-color: var(--color-accent); }
+    }
+
+    &__btn {
+      padding: 0.3rem 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-size: 0.85rem;
+      cursor: pointer;
+      &:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    }
+
+    &__clear {
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      &:hover { color: var(--color-text); }
+    }
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+
+    th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 2px solid var(--color-border);
+      color: var(--color-text-muted);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    &__rank {
+      width: 2.5rem;
+      text-align: center;
+      &--num { color: var(--color-text-muted); font-size: 0.85rem; }
+    }
+
+    &__price {
+      text-align: right;
+      white-space: nowrap;
+      &--val { font-weight: 600; color: var(--color-accent); }
+    }
+  }
+
+  .pack-name {
+    display: block;
+    font-weight: 500;
+  }
+
+  .pack-set {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+  }
+
+  .pack-type {
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+  }
+</style>

@@ -21,4 +21,21 @@ describe('CollectionCard', () => {
     });
     expect(container.querySelectorAll('.pack-row')).toHaveLength(2);
   });
+
+  it('shows set code when provided', () => {
+    const packsWithCode = packs.map(p => ({ ...p, setCode: 'ZNR' }));
+    const { container } = render(CollectionCard, {
+      props: { setName: 'Zendikar', packs: packsWithCode, onQtyChange: vi.fn(), onDelete: vi.fn() },
+    });
+    const codeEl = container.querySelector('.set-group__code');
+    expect(codeEl).not.toBeNull();
+    expect(codeEl?.textContent).toContain('ZNR');
+  });
+
+  it('hides set code when not provided', () => {
+    const { container } = render(CollectionCard, {
+      props: { setName: 'Zendikar', packs, onQtyChange: vi.fn(), onDelete: vi.fn() },
+    });
+    expect(container.querySelector('.set-group__code')).toBeNull();
+  });
 });

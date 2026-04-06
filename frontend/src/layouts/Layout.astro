@@ -43,6 +43,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
         <div class="nav-menu" id="nav-menu" aria-hidden="true">
           <a href="/select" class="nav-menu__item">Pick a Pack</a>
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/collection" class="nav-menu__item">Manage Collection</a>}
+          {['admin', 'viewer'].includes(user.role) && <a href="/admin/cheappacks" class="nav-menu__item">Cheap Packs</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/weights" class="nav-menu__item">Weights</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/drafts" class="nav-menu__item">Drafts</a>}
           <div class="nav-menu__footer">

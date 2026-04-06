@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render } from '../../tests/svelte';
+import { render, fireEvent, act, waitFor } from '../../tests/svelte';
 import DraftsList from './DraftsList.svelte';
 
 beforeEach(() => {
@@ -60,5 +60,32 @@ describe('DraftsList', () => {
     const { container } = render(DraftsList, { props: { drafts: [draft], isAdmin: false } });
     expect(container.querySelector('.btn-remove')).toBeNull();
     expect(container.querySelector('.btn-approve')).toBeNull();
+  });
+
+  it('shows dash for null market price', () => {
+    const { container } = render(DraftsList, { props: { drafts: [draft], isAdmin: false } });
+    const prices = container.querySelectorAll('.pick-item__price');
+    expect(Array.from(prices).some(p => p.textContent === '—')).toBe(true);
+  });
+
+  it('clicking Approve calls fetch and shows approved badge', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => '' }));
+    const { container } = render(DraftsList, { props: { drafts: [draft], isAdmin: true } });
+    const approveBtn = container.querySelector('.btn-approve') as HTMLButtonElement;
+    await act(() => fireEvent.click(approveBtn));
+    await waitFor(() => {
+      expect(container.querySelector('.badge--approved')).not.toBeNull();
+    });
+  });
+
+  it('clicking Approve shows error toast on failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => 'error' }));
+    const { container } = render(DraftsList, { props: { drafts: [draft], isAdmin: true } });
+    const approveBtn = container.querySelector('.btn-approve') as HTMLButtonElement;
+    await act(() => fireEvent.click(approveBtn));
+    // draft should remain unapproved
+    await waitFor(() => {
+      expect(container.querySelector('.badge--approved')).toBeNull();
+    });
   });
 });

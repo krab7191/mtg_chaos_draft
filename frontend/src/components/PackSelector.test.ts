@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render } from '../tests/svelte';
+import { render, fireEvent, act } from '../tests/svelte';
 import PackSelector from './PackSelector.svelte';
 
 const settings = { priceFloor: 0, priceCap: 0, quantityCap: 0, packWeights: {} };
@@ -61,5 +61,34 @@ describe('PackSelector', () => {
     const buttons = Array.from(container.querySelectorAll('button')).map((b) => b.textContent);
     expect(buttons.some((t) => t?.includes('Select all'))).toBe(true);
     expect(buttons.some((t) => t?.includes('Deselect all'))).toBe(true);
+  });
+
+  it('shows result toast after picking', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container } = render(PackSelector, { props: { packs, settings } });
+    const btn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent?.includes('Pick a Pack'),
+    ) as HTMLButtonElement;
+    await act(() => fireEvent.click(btn));
+    expect(container.querySelector('.toast')).not.toBeNull();
+    vi.restoreAllMocks();
+  });
+
+  it('shows history after picking with recordDraft enabled', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { container } = render(PackSelector, { props: { packs, settings } });
+    const btn = Array.from(container.querySelectorAll('button')).find(
+      b => b.textContent?.includes('Pick a Pack'),
+    ) as HTMLButtonElement;
+    await act(() => fireEvent.click(btn));
+    expect(container.querySelector('.history')).not.toBeNull();
+    vi.restoreAllMocks();
+  });
+
+  it('clicking Price sort activates price sort', async () => {
+    const { container } = render(PackSelector, { props: { packs, settings } });
+    const sortBtns = container.querySelectorAll('.sort-btn');
+    await act(() => fireEvent.click(sortBtns[1])); // Price is second
+    expect(sortBtns[1].classList.contains('sort-btn--active')).toBe(true);
   });
 });
