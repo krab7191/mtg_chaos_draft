@@ -1,3 +1,7 @@
+# Cloudflare origin certificates (never commit)
+cf_origin_cert.pem
+cf_origin_key.pem
+
 # Environment — keep only the example file
 .env
 .env.*

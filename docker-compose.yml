@@ -93,6 +93,8 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./cf_origin_cert.pem:/certs/origin.pem:ro
+      - ./cf_origin_key.pem:/certs/origin.key:ro
       - caddy_data:/data
       - caddy_config:/config
     environment:

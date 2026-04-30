@@ -1,8 +1,8 @@
 # Production Deployment Guide
 
 This deploys to **Hetzner Cloud** with:
-- Caddy as reverse proxy (auto HTTPS via Let's Encrypt)
-- A domain pointing to your server IP (e.g. DuckDNS subdomain or your own)
+- Caddy as reverse proxy with a Cloudflare Origin CA certificate
+- Cloudflare proxy (orange cloud) for DDoS protection and CDN
 - Docker running api + postgres + Caddy
 
 ---
@@ -11,8 +11,8 @@ This deploys to **Hetzner Cloud** with:
 
 | Service | What for | Cost |
 |---|---|---|
-| Hetzner Cloud | VM to run everything | ~€4/month (cx22) |
-| Domain / DuckDNS | HTTPS requires a real domain | Free (DuckDNS) |
+| Hetzner Cloud | VM to run everything | ~€4/month (cax11) |
+| Cloudflare | DNS + proxy + origin cert | Free |
 | Google Cloud | OAuth2 for login | Free |
 | GitHub | Source + Actions CI/CD | Free |
 
@@ -28,15 +28,20 @@ This deploys to **Hetzner Cloud** with:
 
 ---
 
-## Step 2: Domain — point a name at your server IP
+## Step 2: Cloudflare — DNS and origin certificate
 
-You can use [DuckDNS](https://www.duckdns.org) for a free subdomain:
+1. Add your domain to [Cloudflare](https://dash.cloudflare.com) (e.g. `karstenrabe.dev`)
+2. Create a DNS **A record**: `chaosdraft` → your server IP (proxied/orange cloud)
+3. Go to **SSL/TLS → Origin Server → Create Certificate**
+   - Hostnames: `*.karstenrabe.dev, karstenrabe.dev` (or just `chaosdraft.karstenrabe.dev`)
+   - Validity: 15 years
+   - Save both the **Origin Certificate** (`cf_origin_cert.pem`) and **Private Key** (`cf_origin_key.pem`)
+4. Set SSL/TLS encryption mode to **Full (Strict)**
+5. Place both files in the repo root alongside `docker-compose.yml`
 
-1. Sign in at duckdns.org
-2. Create a subdomain, e.g. `mtg-chaos.duckdns.org`
-3. After Terraform runs (Step 3), copy the server IP from the output and paste it into DuckDNS
+> **Important:** The private key is only shown once by Cloudflare. If lost, you must generate a new certificate.
 
-Or use any domain registrar and create an A record pointing to the server IP.
+After Terraform runs (Step 3), update the A record to point to the server IP.
 
 ---
 
@@ -71,7 +76,7 @@ terraform plan
 terraform apply
 ```
 
-Note the `server_ip` output — update your DuckDNS subdomain (or DNS A record) to point to it.
+Note the `server_ip` output — update your Cloudflare A record to point to it.
 
 ---
 
@@ -81,7 +86,7 @@ Note the `server_ip` output — update your DuckDNS subdomain (or DNS A record) 
 2. Edit your OAuth client (or create a new one)
 3. Under **Authorized redirect URIs**, add:
    ```
-   https://mtg-chaos.duckdns.org/api/auth/callback
+   https://chaosdraft.karstenrabe.dev/api/auth/callback
    ```
 4. Copy the **Client ID** and **Client Secret**
 
@@ -97,7 +102,7 @@ Go to your repo → **Settings → Secrets and variables → Actions → New rep
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `ADMIN_EMAIL` | Your Google account email |
 | `VIEWER_EMAILS` | Optional comma-separated viewer emails |
-| `DOMAIN` | Your domain, e.g. `mtg-chaos.duckdns.org` |
+| `DOMAIN` | `chaosdraft.karstenrabe.dev` |
 | `DATABASE_URL` | `postgres://mtg:mtg@postgres:5432/mtg_chaos_draft` |
 | `SERVER_HOST` | Server IP from Terraform output |
 | `SERVER_USER` | `root` |
@@ -120,11 +125,15 @@ cd ~/app
 cat > .env << 'EOF'
 GOOGLE_CLIENT_ID=<your prod client id>
 GOOGLE_CLIENT_SECRET=<your prod client secret>
-GOOGLE_REDIRECT_URL=https://mtg-chaos.duckdns.org/api/auth/callback
+GOOGLE_REDIRECT_URL=https://chaosdraft.karstenrabe.dev/api/auth/callback
 ADMIN_EMAIL=<your email>
 VIEWER_EMAILS=<optional comma-separated emails>
-DOMAIN=mtg-chaos.duckdns.org
+DOMAIN=chaosdraft.karstenrabe.dev
 EOF
+
+# Copy origin cert files to repo root
+# (scp them from your local machine, or paste directly)
+# cf_origin_cert.pem and cf_origin_key.pem must be in ~/app/
 
 # Start everything
 docker compose up -d
@@ -137,23 +146,21 @@ docker compose up -d
 ## Step 7: First deploy
 
 Push to `main` — GitHub Actions will:
-1. Build the frontend static files
-2. Build and push the API Docker image to GHCR
-3. SCP static files to `/srv` on the server
-4. SSH in and pull + restart the API container
+1. Run checks and tests
+2. Build and push Docker images to GHCR
+3. SSH in and pull + restart containers
 
 Or trigger manually: GitHub → Actions → Deploy → Run workflow.
 
 ---
 
-## Caddy + HTTPS
+## Caddy + TLS
 
-Caddy handles TLS automatically via Let's Encrypt as long as:
-- Ports 80 and 443 are open (Terraform firewall does this)
-- Your domain's A record points to the server IP
-- `DOMAIN` in `.env` matches exactly
+Caddy uses a **Cloudflare Origin CA certificate** for TLS termination. The cert and key are mounted into the Caddy container from `cf_origin_cert.pem` and `cf_origin_key.pem` in the repo root.
 
-No cert config needed — Caddy handles renewal too.
+Since Cloudflare proxies all traffic (orange cloud / Full Strict mode), Caddy does not use Let's Encrypt — the origin cert is what Cloudflare verifies when connecting to the server.
+
+The origin certificate is valid for up to 15 years. When it expires, generate a new one from the Cloudflare dashboard and replace the files.
 
 ---
 
