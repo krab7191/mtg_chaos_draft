@@ -15,9 +15,9 @@
   } = $props();
 
   const fmt = (n: number) => n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
-  const cpp = pack.cardsPerPack ?? 15;
-  const slots = cpp <= 5 ? 3 : cpp <= 8 ? 2 : 1;
-  const effectiveSlots = Math.floor(pack.quantity / slots);
+  const cpp = $derived(pack.cardsPerPack ?? 15);
+  const slots = $derived(cpp <= 5 ? 3 : cpp <= 8 ? 2 : 1);
+  const effectiveSlots = $derived(Math.floor(pack.quantity / slots));
 </script>
 
 <div class="pack-row">

@@ -14,21 +14,21 @@
     "node": ">=24.13.1"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.6",
-    "@astrojs/node": "^9.5.4",
-    "@astrojs/svelte": "^7.2.5",
-    "astro": "^5.17.3",
-    "sass": "^1.97.3",
-    "svelte": "^5.53.3"
+    "@astrojs/check": "^0.9.12",
+    "@astrojs/node": "^11.1.11",
+    "@astrojs/svelte": "^9.1.4",
+    "astro": "^7.4.9",
+    "sass": "^1.108.1",
+    "svelte": "^5.57.3"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/svelte": "^5.3.1",
-    "@types/node": "^25.3.0",
-    "@vitest/coverage-v8": "^4.0.18",
-    "jsdom": "^28.1.0",
-    "svelte-check": "^4.4.3",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/svelte": "^5.4.2",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^5.1.0",
+    "jsdom": "^31.0.0",
+    "svelte-check": "^4.7.8",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.0"
   }
 }

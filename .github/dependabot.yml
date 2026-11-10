@@ -1,0 +1,36 @@
+# Keep dependencies current so security fixes don't pile up behind major
+# version jumps. Minor/patch updates are grouped into one PR per ecosystem;
+# major updates get their own PRs since they may need code changes.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /api
+    schedule:
+      interval: weekly
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories: [/api, /frontend]
+    schedule:
+      interval: weekly
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch, major]

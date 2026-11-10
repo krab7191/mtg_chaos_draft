@@ -16,6 +16,7 @@
     picks: DraftPick[];
   }
 
+  import { untrack } from 'svelte';
   import { toast } from '../../lib/toast.svelte';
 
   let { drafts: initialDrafts, isAdmin }: {
@@ -23,7 +24,8 @@
     isAdmin: boolean;
   } = $props();
 
-  let drafts = $state<Draft[]>(initialDrafts);
+  // Seeded once from the server; afterwards this list is updated locally.
+  let drafts = $state<Draft[]>(untrack(() => initialDrafts));
   let approving = $state<Record<number, boolean>>({});
 
   function removeDraft(draftId: number) {

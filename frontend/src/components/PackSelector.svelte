@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { toast } from '../lib/toast.svelte';
 
   interface Pack {
@@ -62,7 +63,8 @@
   const _init = readHistory();
 
   // ── State ───────────────────────────────────────────────────
-  let checked         = $state(new Set(packs.map(p => String(p.id))));
+  // Start with every pack selected; players adjust from there.
+  let checked         = $state(untrack(() => new Set(packs.map(p => String(p.id)))));
   let sortKey         = $state<'name' | 'price'>('name');
   let sortDir         = $state<'asc' | 'desc'>('asc');
   let result          = $state<{ setName: string; productType: string } | null>(null);
@@ -519,11 +521,14 @@
   </div>
 
   <!-- Result toast -->
-  {#if result}
-    <div class="toast" role="status" onclick={dismissResult}>
-      <span class="toast__text">{result.setName}{result.productType ? ` · ${result.productType}` : ''}</span>
-    </div>
-  {/if}
+  <!-- Always-present live region so screen readers announce each pick. -->
+  <div role="status">
+    {#if result}
+      <button type="button" class="toast" title="Dismiss" onclick={dismissResult}>
+        <span class="toast__text">{result.setName}{result.productType ? ` · ${result.productType}` : ''}</span>
+      </button>
+    {/if}
+  </div>
 
   <!-- History -->
   {#if recordDraft && history.length > 0}
@@ -837,6 +842,9 @@
 
   /* ── Toast ─────────────────────────────────────────────────── */
   .toast {
+    font: inherit;
+    text-align: left;
+    width: auto;
     position: fixed;
     top: 1rem;
     left: 1rem;

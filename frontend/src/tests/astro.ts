@@ -1,5 +1,5 @@
 import { experimental_AstroContainer as AstroContainer } from 'astro/container';
-import { getContainerRenderer } from '@astrojs/svelte';
+import { getContainerRenderer } from '@astrojs/svelte/container-renderer';
 import svelteServerRenderer from '@astrojs/svelte/server.js';
 
 /** Create an AstroContainer with the Svelte renderer (ssr module) pre-loaded. */
