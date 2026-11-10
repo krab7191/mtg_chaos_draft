@@ -1,4 +1,4 @@
-FROM node:24.13.1-alpine AS builder
+FROM node:26.13.0-alpine AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ ENV PUBLIC_APP_VERSION=$PUBLIC_APP_VERSION
 COPY . .
 RUN npm run build
 
-FROM node:24.13.1-alpine
+FROM node:26.13.0-alpine
 
 RUN addgroup -S app && adduser -S app -G app
 
