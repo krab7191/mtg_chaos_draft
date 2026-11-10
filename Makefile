@@ -6,7 +6,7 @@ DATABASE_TEST_URL ?= postgres://mtg:mtg@localhost:5432/mtg_chaos_draft_test
 HIVEMIND := $(HOME)/go/bin/hivemind
 AIR      := $(HOME)/go/bin/air
 
-COVERAGE_THRESHOLD := 60
+COVERAGE_THRESHOLD := 80
 
 .PHONY: dev db db-test api frontend check install test test-api test-frontend
 
@@ -38,8 +38,8 @@ install: ## Install all dev dependencies and git hooks
 check: ## Run pre-commit checks (fmt, vet, astro check) and tests
 	pre-commit run --all-files
 
-test-api: ## Run Go tests with coverage (40% threshold)
-	@cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -p 1 ./... -coverprofile=coverage.out -covermode=atomic \
+test-api: ## Run Go tests with coverage (80% threshold)
+	@cd api && DATABASE_URL=$(DATABASE_TEST_URL) go test -count=1 -p 1 ./... -coverprofile=coverage.out -covermode=atomic \
 		-coverpkg=mtg-chaos-draft,mtg-chaos-draft/db,mtg-chaos-draft/handlers,mtg-chaos-draft/middleware \
 		| grep -E "^(ok|FAIL)\b|^--- (FAIL|PASS):|panic:" | sed 's/ of statements in.*//' \
 		| sed -E 's/^(ok|FAIL)(\s+)mtg-chaos-draft(\s)/\1\2mtg-chaos-draft\/main.go\3/' \

@@ -37,6 +37,11 @@ const settings = settingsRes.ok
   .page {
     padding-bottom: 6rem;
 
+    // Room for the fixed pick bar on phones.
+    @media (max-width: 639px) {
+      padding-bottom: 9rem;
+    }
+
     &__title {
       font-size: 1.6rem;
       margin-bottom: 0.4rem;

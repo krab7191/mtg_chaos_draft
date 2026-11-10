@@ -52,7 +52,15 @@ func fetchSealedPrice(mtgstocksID int) (float64, bool) {
 	}
 
 	lp := data.LatestPrice
-	for _, v := range []*float64{lp.Average, lp.Market, lp.Low} {
+	return pickPrice(lp.Low, lp.Market, lp.Average)
+}
+
+// pickPrice returns the first positive price in order of preference. We use
+// TCGplayer's MARKET price (recent completed sales) — it matches what
+// TCGplayer shows and what it costs to restock. Average listing price, then
+// the single lowest listing, are fallbacks only.
+func pickPrice(low, market, average *float64) (float64, bool) {
+	for _, v := range []*float64{market, average, low} {
 		if v != nil && *v > 0 {
 			return *v, true
 		}

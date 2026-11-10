@@ -9,6 +9,7 @@
 
   interface Draft {
     id: number;
+    podSize?: number;
     draftedAt: string;
     approvedAt: string | null;
     approvedBy: number | null;
@@ -42,6 +43,14 @@
 
   function formatPrice(p: number | null): string {
     return p != null ? `$${p.toFixed(2)}` : '—';
+  }
+
+  function draftTotal(d: Draft): number {
+    return d.picks.reduce((sum, p) => sum + (p.marketPrice ?? 0), 0);
+  }
+
+  function podSizeOf(d: Draft): number {
+    return d.podSize && d.podSize > 0 ? d.podSize : 4;
   }
 
   async function approve(draftId: number) {
@@ -97,12 +106,29 @@
             </li>
           {/each}
         </ol>
+        <div class="draft-cost">
+          <span>{podSizeOf(draft)} players · {draft.picks.length} packs · {formatPrice(draftTotal(draft))}</span>
+          <span class="draft-cost__per">{formatPrice(draftTotal(draft) / podSizeOf(draft))} / player</span>
+        </div>
       </div>
     {/each}
   </div>
 {/if}
 
 <style>
+  .draft-cost {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.55rem 0.85rem;
+    border-top: 1px solid var(--color-border);
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .draft-cost__per { color: var(--color-accent); font-weight: 600; }
+
   .empty {
     color: var(--color-text-muted);
     text-align: center;

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,14 @@ import (
 	mw "mtg-chaos-draft/middleware"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Draft sizing: each player opens PacksPerPlayer packs.
+const (
+	PacksPerPlayer = 3
+	DefaultPodSize = 4
+	MinPodSize     = 2
+	MaxPodSize     = 16
 )
 
 type DraftHandler struct {
@@ -22,7 +31,8 @@ func NewDraftHandler(pool *pgxpool.Pool) *DraftHandler {
 
 func (h *DraftHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Picks []struct {
+		PodSize int `json:"podSize"`
+		Picks   []struct {
 			PackID      *int     `json:"packId"`
 			SetName     string   `json:"setName"`
 			ProductType string   `json:"productType"`
@@ -33,8 +43,15 @@ func (h *DraftHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if len(body.Picks) != 12 {
-		http.Error(w, "picks must contain exactly 12 entries", http.StatusBadRequest)
+	if body.PodSize == 0 {
+		body.PodSize = DefaultPodSize
+	}
+	if body.PodSize < MinPodSize || body.PodSize > MaxPodSize {
+		http.Error(w, fmt.Sprintf("podSize must be between %d and %d", MinPodSize, MaxPodSize), http.StatusBadRequest)
+		return
+	}
+	if want := body.PodSize * PacksPerPlayer; len(body.Picks) != want {
+		http.Error(w, fmt.Sprintf("picks must contain exactly %d entries for a pod of %d", want, body.PodSize), http.StatusBadRequest)
 		return
 	}
 
@@ -48,7 +65,7 @@ func (h *DraftHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	draft, err := db.CreateDraft(r.Context(), h.pool, picks)
+	draft, err := db.CreateDraft(r.Context(), h.pool, body.PodSize, picks)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return

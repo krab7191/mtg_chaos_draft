@@ -32,6 +32,7 @@ type DraftPick struct {
 
 type Draft struct {
 	ID         int         `json:"id"`
+	PodSize    int         `json:"podSize"`
 	DraftedAt  time.Time   `json:"draftedAt"`
 	ApprovedAt *time.Time  `json:"approvedAt"`
 	ApprovedBy *int        `json:"approvedBy"`
@@ -43,7 +44,7 @@ func DeleteDraft(ctx context.Context, pool *pgxpool.Pool, draftID int) error {
 	return err
 }
 
-func CreateDraft(ctx context.Context, pool *pgxpool.Pool, picks []DraftPick) (*Draft, error) {
+func CreateDraft(ctx context.Context, pool *pgxpool.Pool, podSize int, picks []DraftPick) (*Draft, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -52,8 +53,9 @@ func CreateDraft(ctx context.Context, pool *pgxpool.Pool, picks []DraftPick) (*D
 
 	var draft Draft
 	err = tx.QueryRow(ctx,
-		`INSERT INTO drafts DEFAULT VALUES RETURNING id, drafted_at, approved_at, approved_by`,
-	).Scan(&draft.ID, &draft.DraftedAt, &draft.ApprovedAt, &draft.ApprovedBy)
+		`INSERT INTO drafts (pod_size) VALUES ($1) RETURNING id, pod_size, drafted_at, approved_at, approved_by`,
+		podSize,
+	).Scan(&draft.ID, &draft.PodSize, &draft.DraftedAt, &draft.ApprovedAt, &draft.ApprovedBy)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +83,7 @@ func CreateDraft(ctx context.Context, pool *pgxpool.Pool, picks []DraftPick) (*D
 
 func ListDrafts(ctx context.Context, pool *pgxpool.Pool) ([]Draft, error) {
 	rows, err := pool.Query(ctx,
-		`SELECT id, drafted_at, approved_at, approved_by FROM drafts ORDER BY drafted_at DESC`,
+		`SELECT id, pod_size, drafted_at, approved_at, approved_by FROM drafts ORDER BY drafted_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -92,7 +94,7 @@ func ListDrafts(ctx context.Context, pool *pgxpool.Pool) ([]Draft, error) {
 	draftIndex := map[int]int{}
 	for rows.Next() {
 		var d Draft
-		if err := rows.Scan(&d.ID, &d.DraftedAt, &d.ApprovedAt, &d.ApprovedBy); err != nil {
+		if err := rows.Scan(&d.ID, &d.PodSize, &d.DraftedAt, &d.ApprovedAt, &d.ApprovedBy); err != nil {
 			return nil, err
 		}
 		d.Picks = []DraftPick{}

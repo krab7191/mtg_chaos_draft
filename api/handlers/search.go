@@ -17,8 +17,9 @@ type msProduct struct {
 	Name        string  `json:"name"`
 	Type        *string `json:"type"`
 	LatestPrice *struct {
-		Average *float64 `json:"average"`
+		Low     *float64 `json:"low"`
 		Market  *float64 `json:"market"`
+		Average *float64 `json:"average"`
 	} `json:"latestPrice"`
 }
 
@@ -139,11 +140,8 @@ func getMTGStocksProducts() ([]SearchResult, error) {
 			ProductType: productType,
 		}
 		if p.LatestPrice != nil {
-			// Prefer average price — matches what MTGStocks UI displays
-			if p.LatestPrice.Average != nil && *p.LatestPrice.Average > 0 {
-				result.MarketPrice = p.LatestPrice.Average
-			} else if p.LatestPrice.Market != nil && *p.LatestPrice.Market > 0 {
-				result.MarketPrice = p.LatestPrice.Market
+			if price, ok := pickPrice(p.LatestPrice.Low, p.LatestPrice.Market, p.LatestPrice.Average); ok {
+				result.MarketPrice = &price
 			}
 		}
 		products = append(products, result)

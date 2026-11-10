@@ -87,8 +87,21 @@ func TestProxyMTGStocks_NetworkError(t *testing.T) {
 
 // ── fetchSealedPrice ───────────────────────────────────────────────────────────
 
-func TestFetchSealedPrice_Average(t *testing.T) {
-	withMockClient(200, `{"latestPrice":{"average":12.34,"market":10.00}}`, func() {
+func TestFetchSealedPrice_PrefersMarket(t *testing.T) {
+	// Real Core Set 2020 snapshot: TCGplayer showed $6.55 market.
+	withMockClient(200, `{"latestPrice":{"low":4.50,"average":6.74,"market":6.62}}`, func() {
+		price, ok := fetchSealedPrice(1)
+		if !ok {
+			t.Fatal("want ok=true")
+		}
+		if price != 6.62 {
+			t.Errorf("want market 6.62, got %v", price)
+		}
+	})
+}
+
+func TestFetchSealedPrice_FallsBackToAverage(t *testing.T) {
+	withMockClient(200, `{"latestPrice":{"low":4.50,"market":0,"average":12.34}}`, func() {
 		price, ok := fetchSealedPrice(1)
 		if !ok {
 			t.Fatal("want ok=true")
@@ -99,14 +112,14 @@ func TestFetchSealedPrice_Average(t *testing.T) {
 	})
 }
 
-func TestFetchSealedPrice_FallsBackToMarket(t *testing.T) {
-	withMockClient(200, `{"latestPrice":{"average":null,"market":9.99}}`, func() {
+func TestFetchSealedPrice_FallsBackToLow(t *testing.T) {
+	withMockClient(200, `{"latestPrice":{"low":4.50,"market":null,"average":null}}`, func() {
 		price, ok := fetchSealedPrice(1)
 		if !ok {
 			t.Fatal("want ok=true")
 		}
-		if price != 9.99 {
-			t.Errorf("want 9.99, got %v", price)
+		if price != 4.50 {
+			t.Errorf("want 4.50, got %v", price)
 		}
 	})
 }

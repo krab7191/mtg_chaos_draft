@@ -121,6 +121,39 @@ func (h *CollectionHandler) LinkPrice(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(pack)
 }
 
+// RefreshPrice fetches the current MTGStocks price for a single pack, stores it,
+// and returns the updated pack. If the live fetch fails, the stored pack is
+// returned unchanged so callers can fall back to the last known price.
+func (h *CollectionHandler) RefreshPrice(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	packs, err := db.GetPacksByIDs(r.Context(), h.pool, []int{id})
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if len(packs) == 0 {
+		http.Error(w, "pack not found", http.StatusNotFound)
+		return
+	}
+	pack := &packs[0]
+	if pack.MTGStocksID != nil {
+		if price, ok := fetchSealedPrice(*pack.MTGStocksID); ok {
+			updated, err := db.UpdatePack(r.Context(), h.pool, id, nil, nil, nil, nil, &price, nil)
+			if err != nil {
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
+			}
+			pack = updated
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(pack)
+}
+
 func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {

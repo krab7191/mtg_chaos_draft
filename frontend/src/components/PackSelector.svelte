@@ -12,11 +12,18 @@
   }
 
   interface HistoryEntry {
+    key?: string;
     packId: number | null;
     setName: string;
     productType: string;
+    /** Price of one physical pack at pick time (live MTGStocks price when available). */
+    unitPrice?: number | null;
+    /** Physical packs consumed by this slot (small packs fill a slot with 2–3). */
+    packCount?: number;
+    /** Total cost of the slot: unitPrice × packCount. */
     marketPrice: number | null;
-    price: string;
+    /** True while the live price is being fetched. */
+    pricing?: boolean;
   }
 
   let { packs, settings }: {
@@ -31,13 +38,26 @@
 
   const packWeights = $derived(settings.packWeights ?? {});
 
-  const HISTORY_KEY = 'draft-history';
-  const MAX_HISTORY = 12;
+  const HISTORY_KEY  = 'draft-history';
+  const POD_SIZE_KEY = 'draft-pod-size';
+  const PACKS_PER_PLAYER = 3;
+  const MIN_POD_SIZE = 2;
+  const MAX_POD_SIZE = 16;
+  const DEFAULT_POD_SIZE = 4;
 
   // ── Initialize from localStorage (SSR-safe) ─────────────────
   function readHistory(): HistoryEntry[] {
-    if (typeof localStorage === 'undefined') return [];
-    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); } catch { return []; }
+    try {
+      const raw: HistoryEntry[] = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]');
+      // Entries restored after a reload can't still be fetching.
+      return raw.map(e => ({ ...e, pricing: false }));
+    } catch { return []; }
+  }
+  function readPodSize(): number {
+    try {
+      const n = Number(localStorage.getItem(POD_SIZE_KEY));
+      return Number.isInteger(n) && n >= MIN_POD_SIZE && n <= MAX_POD_SIZE ? n : DEFAULT_POD_SIZE;
+    } catch { return DEFAULT_POD_SIZE; }
   }
   const _init = readHistory();
 
@@ -50,13 +70,43 @@
   let recordDraft     = $state(true);
   let hideDeselected  = $state(true);
   let pickedCounts    = $state<Record<string, number>>({});
+  let podSize         = $state(readPodSize());
+  let livePrices      = $state<Record<string, number>>({});
+  let draftSaved      = $state(false);
+  let historyEl       = $state<HTMLElement | null>(null);
 
-  // ── Persist history whenever it changes ─────────────────────
+  const maxPicks   = $derived(podSize * PACKS_PER_PLAYER);
+  const minPodSize = $derived(Math.max(MIN_POD_SIZE, Math.ceil(history.length / PACKS_PER_PLAYER)));
+  const draftFull  = $derived(history.length >= maxPicks);
+
+
+  const draftTotal   = $derived(history.reduce((sum, e) => sum + (e.marketPrice ?? 0), 0));
+  const perPlayer    = $derived(podSize > 0 ? draftTotal / podSize : 0);
+  const unpricedPicks = $derived(history.filter(e => e.marketPrice == null).length);
+  const pricingPending = $derived(history.some(e => e.pricing));
+
+  // ── Persist history / pod size whenever they change ─────────
   $effect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    }
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch { /* storage unavailable */ }
   });
+  $effect(() => {
+    try { localStorage.setItem(POD_SIZE_KEY, String(podSize)); } catch { /* storage unavailable */ }
+  });
+
+  function setPodSize(n: number) {
+    if (!Number.isFinite(n)) return;
+    podSize = Math.min(MAX_POD_SIZE, Math.max(minPodSize, Math.round(n)));
+  }
+
+  function clearHistory() {
+    history = [];
+    pickedCounts = {};
+    draftSaved = false;
+  }
+
+  function formatPrice(p: number | null | undefined): string {
+    return p != null ? `$${p.toFixed(2)}` : '—';
+  }
 
   // ── Toggle recording ────────────────────────────────────────
   function setRecordDraft(on: boolean) {
@@ -67,12 +117,16 @@
   }
 
   // ── Derived ─────────────────────────────────────────────────
+  function priceOf(p: Pack): number | null {
+    return livePrices[String(p.id)] ?? p.marketPrice ?? null;
+  }
+
   const sortedPacks = $derived.by(() => {
     const copy = hideDeselected ? packs.filter(p => checked.has(String(p.id))) : [...packs];
     if (sortKey === 'price') {
       copy.sort((a, b) => {
-        const pa = a.marketPrice ?? 0;
-        const pb = b.marketPrice ?? 0;
+        const pa = priceOf(a) ?? 0;
+        const pb = priceOf(b) ?? 0;
         return sortDir === 'asc' ? pa - pb : pb - pa;
       });
     } else {
@@ -85,6 +139,14 @@
   });
 
   const checkedPacks = $derived(packs.filter(p => checked.has(String(p.id))));
+
+  // ── Stock guard ─────────────────────────────────────────────
+  // A draft can only be saved with exactly podSize × 3 picks, so block picking
+  // when the selected pool can't fill the remaining slots.
+  const remainingPicks  = $derived(Math.max(0, maxPicks - history.length));
+  const selectedSlots   = $derived(checkedPacks.reduce((n, p) => n + effectiveQty(p), 0));
+  const totalSlots      = $derived(packs.reduce((n, p) => n + effectiveQty(p), 0));
+  const shortOfPacks    = $derived(recordDraft && !draftFull && selectedSlots < remainingPicks);
 
   function packsPerSlot(p: Pack): number {
     if (p.cardsPerPack <= 5) return 3;
@@ -109,7 +171,7 @@
     };
 
     const rawPrices = activePacks.map(p => {
-      const mp = p.marketPrice;
+      const mp = priceOf(p);
       return mp && mp > 0 ? capPrice(mp) : null;
     });
     const validPrices = rawPrices.filter((p): p is number => p !== null);
@@ -174,10 +236,12 @@
 
   // ── Draft save ──────────────────────────────────────────────
   function saveDraft(entries: HistoryEntry[]) {
+    draftSaved = true;
     fetch('/api/drafts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        podSize,
         picks: entries.map(e => ({
           packId: e.packId ?? null,
           setName: e.setName,
@@ -189,11 +253,65 @@
       if (res.ok) {
         toast.show('Draft saved', 'success');
       } else {
+        draftSaved = false;
         toast.show('Failed to save draft', 'error');
       }
     }).catch(() => {
+      draftSaved = false;
       toast.show('Failed to save draft', 'error');
     });
+  }
+
+  // ── Live pricing ────────────────────────────────────────────
+  // Fetch the current MTGStocks price for a picked pack so players are
+  // charged today's market price, not the last daily refresh.
+  // In-flight lookups, so rolling the same pack several times at once
+  // only asks MTGStocks once.
+  const inflightPrices = new Map<number, Promise<number | null>>();
+
+  function fetchLivePrice(packId: number): Promise<number | null> {
+    let p = inflightPrices.get(packId);
+    if (!p) {
+      p = requestLivePrice(packId).finally(() => inflightPrices.delete(packId));
+      inflightPrices.set(packId, p);
+    }
+    return p;
+  }
+
+  async function requestLivePrice(packId: number): Promise<number | null> {
+    try {
+      const res = await fetch(`/api/collection/${packId}/refresh-price`, { method: 'POST' });
+      if (!res.ok) return null;
+      const pack = await res.json();
+      const price = typeof pack?.marketPrice === 'number' ? pack.marketPrice : null;
+      if (price != null) livePrices[String(packId)] = price;
+      return price;
+    } catch {
+      return null;
+    }
+  }
+
+  async function priceEntry(key: string, packId: number) {
+    const live = await fetchLivePrice(packId);
+    const idx = history.findIndex(e => e.key === key);
+    if (idx === -1) return; // history was cleared meanwhile
+    const entry = history[idx];
+    const unitPrice = live ?? entry.unitPrice ?? null;
+    const packCount = entry.packCount ?? 1;
+    history[idx] = {
+      ...entry,
+      unitPrice,
+      marketPrice: unitPrice != null ? unitPrice * packCount : null,
+      pricing: false,
+    };
+    maybeSaveDraft();
+  }
+
+  // Save once the draft is full and every pick has its live price.
+  function maybeSaveDraft() {
+    if (!recordDraft || draftSaved) return;
+    if (history.length < maxPicks || history.some(e => e.pricing)) return;
+    saveDraft(history);
   }
 
   // ── Pick ────────────────────────────────────────────────────
@@ -209,26 +327,30 @@
     toastTimer = setTimeout(() => { result = null; toastTimer = null; }, 3000);
   }
 
-  function pick() {
+  // Draw one pack from the checked pool, recording it in the draft history
+  // when recording is on. Returns null when nothing can be drawn.
+  function drawOne(): Pack | null {
     const active = checkedPacks;
-    if (active.length === 0) return;
+    if (active.length === 0) return null;
 
     const weights = computeWeights(active);
+    if (weights.reduce((a, b) => a + b, 0) <= 0) return null;
     const selectedPack = weightedRandom(active, weights);
 
-    result = { setName: selectedPack.setName, productType: selectedPack.productType };
-    scheduleToastDismiss();
-
-    if (recordDraft && history.length < MAX_HISTORY) {
-      const price = selectedPack.marketPrice != null ? `$${selectedPack.marketPrice.toFixed(2)}` : '—';
-      const newHistory = [...history, {
+    if (recordDraft && history.length < maxPicks) {
+      const unitPrice = priceOf(selectedPack);
+      const packCount = packsPerSlot(selectedPack);
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      history = [...history, {
+        key,
         packId: selectedPack.id,
         setName: selectedPack.setName,
         productType: selectedPack.productType,
-        marketPrice: selectedPack.marketPrice ?? null,
-        price,
+        unitPrice,
+        packCount,
+        marketPrice: unitPrice != null ? unitPrice * packCount : null,
+        pricing: true,
       }];
-      history = newHistory;
 
       const id = String(selectedPack.id);
       pickedCounts[id] = (pickedCounts[id] ?? 0) + 1;
@@ -238,10 +360,35 @@
         checked = next;
       }
 
-      if (newHistory.length >= MAX_HISTORY) {
-        saveDraft(newHistory);
-      }
+      void priceEntry(key, selectedPack.id);
     }
+    return selectedPack;
+  }
+
+  function pick() {
+    const selectedPack = drawOne();
+    if (!selectedPack) return;
+    result = { setName: selectedPack.setName, productType: selectedPack.productType };
+    scheduleToastDismiss();
+  }
+
+  // Roll every remaining slot of the draft in one go.
+  function pickAll() {
+    if (!recordDraft || shortOfPacks) return;
+    const remaining = maxPicks - history.length;
+    let drawn = 0;
+    for (let i = 0; i < remaining; i++) {
+      if (!drawOne()) break;
+      drawn++;
+    }
+    if (drawn === 0) return;
+    if (drawn < remaining) {
+      toast.show(`Only ${drawn} of ${remaining} packs could be rolled — the pool ran out`, 'error');
+    }
+    result = { setName: `Rolled ${drawn} pack${drawn === 1 ? '' : 's'}`, productType: '' };
+    scheduleToastDismiss();
+    // Jump to the history so the total and per-player cost are in view.
+    requestAnimationFrame(() => historyEl?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }));
   }
 </script>
 
@@ -250,6 +397,39 @@
 {:else}
   <!-- Floating count pill -->
   <div class="count-pill">{checked.size} selected</div>
+
+  <!-- Pod size -->
+  <div class="pod">
+    <label class="pod__label" for="pod-size">Players</label>
+    <input
+      id="pod-size"
+      class="pod__input"
+      type="number"
+      inputmode="numeric"
+      min={minPodSize}
+      max={MAX_POD_SIZE}
+      value={podSize}
+      disabled={draftSaved}
+      onchange={(e) => {
+        const el = e.target as HTMLInputElement;
+        setPodSize(el.valueAsNumber);
+        el.value = String(podSize);
+      }}
+    />
+    <span class="pod__meta">× {PACKS_PER_PLAYER} packs = <strong>{maxPicks}</strong> packs</span>
+  </div>
+
+  {#if shortOfPacks}
+    <div class="stock-warning" role="alert">
+      <strong>Not enough packs.</strong>
+      The selected packs fill {selectedSlots} of the {remainingPicks} remaining slots.
+      {#if totalSlots >= remainingPicks}
+        Select more packs or lower the player count.
+      {:else}
+        Your whole collection only fills {totalSlots}: lower the player count or add packs.
+      {/if}
+    </div>
+  {/if}
 
   <!-- Controls -->
   <div class="controls">
@@ -294,9 +474,7 @@
             <span class="pack-item__name">{pack.setName}</span>
             <span class="pack-item__meta">{pack.productType} ({effectiveQty(pack)}{pack.cardsPerPack <= 8 ? ' *' : ''})</span>
           </span>
-          <span class="pack-item__price">
-            {pack.marketPrice != null ? `$${pack.marketPrice.toFixed(2)}` : '—'}
-          </span>
+          <span class="pack-item__price">{formatPrice(priceOf(pack))}</span>
           <span class="pack-item__odds">
             {packOdds != null ? `${packOdds.toFixed(1)}%` : '—'}
           </span>
@@ -310,7 +488,8 @@
     <ul class="pack-footnote">
       {#each checkedPacks.filter(p => p.cardsPerPack <= 8) as p}
         {@const slots = packsPerSlot(p)}
-        <li>* {p.setName} {p.productType}: {p.cardsPerPack} cards/pack ({slots}x per slot)</li>
+        {@const unit = priceOf(p)}
+        <li>* {p.setName} {p.productType}: {p.cardsPerPack} cards/pack, {slots} packs per slot{unit != null ? ` (${slots} × ${formatPrice(unit)} = ${formatPrice(unit * slots)} per slot)` : ''}</li>
       {/each}
     </ul>
   {/if}
@@ -319,15 +498,23 @@
   <div class="pick-row">
     <button
       class="btn btn--primary btn--large"
-      disabled={noneChecked || history.length >= MAX_HISTORY}
+      disabled={noneChecked || draftFull || shortOfPacks}
       onclick={pick}
     >🎲 Pick a Pack</button>
+    <button
+      class="btn btn--secondary btn--large"
+      disabled={noneChecked || draftFull || !recordDraft || shortOfPacks}
+      title={recordDraft ? `Roll the remaining ${maxPicks - history.length} packs` : 'Turn on "Record draft" to roll all'}
+      onclick={pickAll}
+    >🎲 Roll all ({maxPicks - history.length})</button>
     <label class="history-toggle">
-      <input type="checkbox" checked={recordDraft} disabled={history.length >= MAX_HISTORY} onchange={(e) => setRecordDraft((e.target as HTMLInputElement).checked)} />
+      <input type="checkbox" checked={recordDraft} disabled={draftFull} onchange={(e) => setRecordDraft((e.target as HTMLInputElement).checked)} />
       Record draft
     </label>
-    {#if history.length >= MAX_HISTORY}
-      <span class="draft-full">Draft complete ({MAX_HISTORY}/{MAX_HISTORY})</span>
+    {#if draftFull}
+      <span class="draft-full">Draft complete ({history.length}/{maxPicks})</span>
+    {:else if recordDraft && history.length > 0}
+      <span class="draft-full">{history.length}/{maxPicks}</span>
     {/if}
   </div>
 
@@ -340,10 +527,25 @@
 
   <!-- History -->
   {#if recordDraft && history.length > 0}
-    <div class="history">
+    <div class="history" bind:this={historyEl}>
       <div class="history__header">
-        <span class="history__title">Draft history</span>
-        <button class="history__clear" onclick={() => { history = []; pickedCounts = {}; }}>Clear</button>
+        <span class="history__title">Draft history ({history.length}/{maxPicks})</span>
+        <button class="history__clear" onclick={clearHistory}>Clear</button>
+      </div>
+      <div class="cost">
+        <div class="cost__row">
+          <span>Pack total{draftFull ? '' : ' so far'}</span>
+          <span class="cost__value">{formatPrice(draftTotal)}</span>
+        </div>
+        <div class="cost__row cost__row--main">
+          <span>Per player ({podSize})</span>
+          <span class="cost__value">{formatPrice(perPlayer)}</span>
+        </div>
+        {#if pricingPending}
+          <div class="cost__note">Fetching current prices…</div>
+        {:else if unpricedPicks > 0}
+          <div class="cost__note">{unpricedPicks} pick{unpricedPicks === 1 ? '' : 's'} without a price — not included</div>
+        {/if}
       </div>
       <ol class="history__list">
         {#each history as entry, i}
@@ -353,7 +555,12 @@
               <span class="history__pack-name">{entry.setName}</span>
               <span class="history__pack-set">{entry.productType}</span>
             </span>
-            <span class="history__pack-price">{entry.price}</span>
+            <span class="history__pack-price" class:history__pack-price--pending={entry.pricing}>
+              {#if (entry.packCount ?? 1) > 1 && entry.unitPrice != null}
+                <span class="history__pack-mult">{entry.packCount}× {formatPrice(entry.unitPrice)} =</span>
+              {/if}
+              {formatPrice(entry.marketPrice)}
+            </span>
           </li>
         {/each}
       </ol>
@@ -367,6 +574,61 @@
     text-align: center;
     padding: 3rem 0;
   }
+
+  /* ── Pod size ──────────────────────────────────────────────── */
+  .pod {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.9rem;
+  }
+  .pod__label { font-size: 0.88rem; font-weight: 500; }
+  .pod__input {
+    width: 4.5rem;
+    padding: 0.35rem 0.5rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .pod__input:focus { outline: none; border-color: var(--color-accent); }
+  .pod__input:disabled { opacity: 0.6; }
+  .pod__meta { font-size: 0.82rem; color: var(--color-text-muted); }
+  .pod__meta strong { color: var(--color-text); }
+
+  /* ── Cost summary ──────────────────────────────────────────── */
+  .cost {
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.88rem;
+  }
+  .cost__row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--color-text-muted);
+  }
+  .cost__row--main { color: var(--color-text); font-weight: 600; font-size: 1rem; }
+  .cost__row--main .cost__value { color: var(--color-accent); }
+  .cost__value { font-variant-numeric: tabular-nums; }
+  .cost__note { font-size: 0.75rem; color: var(--color-text-muted); opacity: 0.85; }
+
+  /* ── Stock warning ─────────────────────────────────────────── */
+  .stock-warning {
+    margin-bottom: 0.9rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  .stock-warning strong { color: var(--color-danger); }
 
   /* ── Controls ──────────────────────────────────────────────── */
   .controls {
@@ -523,6 +785,28 @@
     z-index: 100;
   }
 
+  /* Phones: a solid full-width bar so the buttons never sit on top of the list. */
+  @media (max-width: 639px) {
+    .pick-row {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 0.6rem;
+      padding: 0.65rem 1rem calc(0.65rem + env(safe-area-inset-bottom));
+      background: var(--color-bg);
+      border-top: 1px solid var(--color-border);
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+    }
+    .pick-row .btn--large {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.98rem;
+      white-space: nowrap;
+    }
+    .pick-row .draft-full { justify-self: end; }
+  }
+
   .toggle-label {
     display: flex;
     align-items: center;
@@ -586,6 +870,8 @@
   /* ── History ───────────────────────────────────────────────── */
   .history {
     margin-top: 1.5rem;
+    /* Land below the result toast and the floating count pill when scrolled to. */
+    scroll-margin-top: 8rem;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     overflow: hidden;
@@ -660,6 +946,9 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
+
+  .history__pack-price--pending { opacity: 0.5; }
+  .history__pack-mult { font-size: 0.7rem; opacity: 0.8; margin-right: 0.15rem; }
 
   .history__pack-price {
     color: var(--color-text-muted);

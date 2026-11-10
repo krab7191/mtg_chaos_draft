@@ -55,6 +55,50 @@ func TestDraftHandler_Create_Valid(t *testing.T) {
 	}
 }
 
+func TestDraftHandler_Create_PodOf8(t *testing.T) {
+	testhelper.Truncate(t, testhelper.Pool(t), "drafts")
+	h := newDraftHandler(t)
+
+	picks := append(make12Picks(), make12Picks()...)
+	body, _ := json.Marshal(map[string]any{"podSize": 8, "picks": picks})
+	req := httptest.NewRequest(http.MethodPost, "/api/drafts", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("want %d, got %d — %s", http.StatusCreated, rr.Code, rr.Body)
+	}
+	var draft db.Draft
+	if err := json.NewDecoder(rr.Body).Decode(&draft); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if draft.PodSize != 8 || len(draft.Picks) != 24 {
+		t.Errorf("want podSize 8 / 24 picks, got %d / %d", draft.PodSize, len(draft.Picks))
+	}
+}
+
+func TestDraftHandler_Create_PickCountMismatchesPod(t *testing.T) {
+	h := newDraftHandler(t)
+	body, _ := json.Marshal(map[string]any{"podSize": 8, "picks": make12Picks()})
+	req := httptest.NewRequest(http.MethodPost, "/api/drafts", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("want %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestDraftHandler_Create_PodSizeOutOfRange(t *testing.T) {
+	h := newDraftHandler(t)
+	body, _ := json.Marshal(map[string]any{"podSize": 1, "picks": make12Picks()[:3]})
+	req := httptest.NewRequest(http.MethodPost, "/api/drafts", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.Create(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("want %d, got %d", http.StatusBadRequest, rr.Code)
+	}
+}
+
 func TestDraftHandler_Create_BadJSON(t *testing.T) {
 	h := newDraftHandler(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/drafts", bytes.NewReader([]byte("bad")))
@@ -117,7 +161,7 @@ func TestDraftHandler_Delete_Valid(t *testing.T) {
 	pool := testhelper.Pool(t)
 	testhelper.Truncate(t, pool, "drafts")
 
-	draft, err := db.CreateDraft(context.Background(), pool, []db.DraftPick{
+	draft, err := db.CreateDraft(context.Background(), pool, 4, []db.DraftPick{
 		{SetName: "Zendikar Rising", ProductType: "draft_booster"},
 	})
 	if err != nil {
@@ -160,7 +204,7 @@ func TestDraftHandler_Approve_Valid(t *testing.T) {
 	picks := []db.DraftPick{
 		{SetName: "Zendikar Rising", ProductType: "draft_booster"},
 	}
-	draft, err := db.CreateDraft(context.Background(), pool, picks)
+	draft, err := db.CreateDraft(context.Background(), pool, 4, picks)
 	if err != nil {
 		t.Fatalf("seed draft: %v", err)
 	}

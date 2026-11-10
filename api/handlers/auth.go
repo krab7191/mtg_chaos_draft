@@ -15,6 +15,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// googleUserInfoURL is a variable so tests can point it at a fake server.
+var googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
 type AuthHandler struct {
 	pool         *pgxpool.Pool
 	oauthConfig  *oauth2.Config
@@ -69,7 +72,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := h.oauthConfig.Client(r.Context(), token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	resp, err := client.Get(googleUserInfoURL)
 	if err != nil {
 		http.Error(w, "userinfo failed", http.StatusInternalServerError)
 		return
