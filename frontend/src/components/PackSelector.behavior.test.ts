@@ -143,7 +143,7 @@ describe('PackSelector selection and sorting', () => {
   it('sorts by name both ways and by price both ways', async () => {
     const packs = [pack(1, 'Bravo', { marketPrice: 9 }), pack(2, 'Alpha', { marketPrice: 3 }), pack(3, 'Charlie', { marketPrice: null })];
     const { container } = render(PackSelector, { props: { packs, settings: baseSettings } });
-    const [nameBtn, priceBtn] = Array.from(container.querySelectorAll('.sort-btn')) as HTMLButtonElement[];
+    const [nameBtn, , priceBtn] = Array.from(container.querySelectorAll('.sort-btn')) as HTMLButtonElement[];
 
     expect(names(container)).toEqual(['Alpha', 'Bravo', 'Charlie']);
     expect(nameBtn.textContent).toContain('↑');
@@ -182,6 +182,87 @@ describe('PackSelector selection and sorting', () => {
   it('shows a dash for packs without a price', () => {
     const { container } = render(PackSelector, { props: { packs: [pack(1, 'A', { marketPrice: null })], settings: baseSettings } });
     expect(container.querySelector('.pack-item__price')?.textContent).toBe('—');
+  });
+});
+
+// ── Quantity sort ─────────────────────────────────────────────────────────────
+
+describe('PackSelector quantity sort', () => {
+  it('sorts by available slots, most first, then least first; ties by name', async () => {
+    const packs = [
+      pack(1, 'Few', { quantity: 2 }),
+      pack(2, 'Many', { quantity: 9 }),
+      pack(3, 'Small', { quantity: 9, cardsPerPack: 5 }), // 3 slots
+      pack(4, 'Also Few', { quantity: 2 }),
+    ];
+    const { container } = render(PackSelector, { props: { packs, settings: baseSettings } });
+    const qtyBtn = container.querySelectorAll('.sort-btn')[1] as HTMLButtonElement;
+    expect(qtyBtn.textContent).toBe('Qty');
+
+    await act(() => fireEvent.click(qtyBtn));
+    expect(names(container)).toEqual(['Many', 'Small', 'Also Few', 'Few']);
+    expect(qtyBtn.textContent).toContain('↓');
+
+    await act(() => fireEvent.click(qtyBtn));
+    expect(names(container)).toEqual(['Also Few', 'Few', 'Small', 'Many']);
+  });
+});
+
+// ── Persistence across reloads ────────────────────────────────────────────────
+
+describe('PackSelector remembers state across reloads', () => {
+  it('keeps unchecked packs, sort, and toggles after a reload', async () => {
+    const packs = [pack(1, 'A'), pack(2, 'B'), pack(3, 'C')];
+    const first = render(PackSelector, { props: { packs, settings: baseSettings } });
+    const c = first.container;
+    await act(() => fireEvent.click(c.querySelector('label.toggle-label input')!)); // show deselected
+    await act(() => fireEvent.change(c.querySelectorAll('.pack-checkbox')[1])); // uncheck B
+    await act(() => fireEvent.click(c.querySelectorAll('.sort-btn')[2]));       // price sort
+    first.unmount();
+
+    const { container } = render(PackSelector, { props: { packs, settings: baseSettings } });
+    expect(container.querySelector('.count-pill')?.textContent).toContain('2 selected');
+    expect((container.querySelectorAll('.sort-btn')[2] as HTMLElement).classList.contains('sort-btn--active')).toBe(true);
+    expect((container.querySelector('label.toggle-label input') as HTMLInputElement).checked).toBe(false);
+    const bBox = Array.from(container.querySelectorAll('.pack-item')).find(li => li.querySelector('.pack-item__name')?.textContent === 'B')!
+      .querySelector('.pack-checkbox') as HTMLInputElement;
+    expect(bBox.checked).toBe(false);
+  });
+
+  it('new packs start selected, and choices for packs not shown are kept', () => {
+    localStorage.setItem('pack-selector-prefs', JSON.stringify({ unchecked: ['2', '99'] }));
+    const { container, unmount } = render(PackSelector, {
+      props: { packs: [pack(1, 'A'), pack(2, 'B'), pack(3, 'New')], settings: baseSettings },
+    });
+    expect(names(container)).toEqual(['A', 'New']);
+    unmount();
+    const saved = JSON.parse(localStorage.getItem('pack-selector-prefs')!);
+    expect(saved.unchecked.sort()).toEqual(['2', '99']);
+  });
+
+  it('stock stays correct after a reload mid-draft', () => {
+    localStorage.setItem('draft-history', JSON.stringify([
+      { key: 'a', packId: 1, setName: 'Last', productType: 'Draft Booster', marketPrice: 5 },
+      { key: 'b', packId: 1, setName: 'Last', productType: 'Draft Booster', marketPrice: 5 },
+    ]));
+    const { container } = render(PackSelector, {
+      props: { packs: [pack(1, 'Last', { quantity: 3 }), pack(2, 'Other')], settings: baseSettings },
+    });
+    const meta = Array.from(container.querySelectorAll('.pack-item__meta')).map(m => m.textContent);
+    expect(meta[0]).toContain('(1)'); // 3 in stock − 2 already picked
+  });
+
+  it('a saved draft stays locked after a reload', () => {
+    localStorage.setItem('draft-history', JSON.stringify([{ key: 'a', packId: 1, setName: 'A', productType: 'X', marketPrice: 5 }]));
+    localStorage.setItem('pack-selector-prefs', JSON.stringify({ draftSaved: true }));
+    const { container } = render(PackSelector, { props: { packs: [pack(1, 'A')], settings: baseSettings } });
+    expect((container.querySelector('#pod-size') as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('ignores corrupt saved preferences', () => {
+    localStorage.setItem('pack-selector-prefs', 'nope');
+    const { container } = render(PackSelector, { props: { packs: [pack(1, 'A')], settings: baseSettings } });
+    expect(container.querySelector('.count-pill')?.textContent).toContain('1 selected');
   });
 });
 

@@ -18,6 +18,7 @@
 
   import { untrack } from 'svelte';
   import { toast } from '../../lib/toast.svelte';
+  import { groupPicks } from '../../lib/draft';
 
   let { drafts: initialDrafts, isAdmin }: {
     drafts: Draft[];
@@ -97,14 +98,16 @@
           {/if}
         </div>
         <ol class="pick-list">
-          {#each draft.picks as pick, i}
+          {#each groupPicks(draft.picks) as g (g.key)}
             <li class="pick-item">
-              <span class="pick-item__num">{i + 1}.</span>
+              <span class="pick-item__num">{g.slots}×</span>
               <span class="pick-item__info">
-                <span class="pick-item__name">{pick.setName}</span>
-                <span class="pick-item__type">{pick.productType}</span>
+                <span class="pick-item__name">{g.setName}</span>
+                <span class="pick-item__type">{g.productType}</span>
               </span>
-              <span class="pick-item__price">{formatPrice(pick.marketPrice)}</span>
+              <span class="pick-item__price">
+                {#if g.qty > 1 && g.each != null}{g.qty}× {formatPrice(g.each)} = {/if}{formatPrice(g.total)}
+              </span>
             </li>
           {/each}
         </ol>

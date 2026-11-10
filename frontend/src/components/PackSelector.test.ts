@@ -88,8 +88,8 @@ describe('PackSelector', () => {
   it('clicking Price sort activates price sort', async () => {
     const { container } = render(PackSelector, { props: { packs, settings } });
     const sortBtns = container.querySelectorAll('.sort-btn');
-    await act(() => fireEvent.click(sortBtns[1])); // Price is second
-    expect(sortBtns[1].classList.contains('sort-btn--active')).toBe(true);
+    await act(() => fireEvent.click(sortBtns[2])); // Name, Qty, Price
+    expect(sortBtns[2].classList.contains('sort-btn--active')).toBe(true);
   });
 
   describe('pod size & pricing', () => {
@@ -184,7 +184,12 @@ describe('PackSelector', () => {
       await act(() => fireEvent.click(rollAllBtn(container)));
       await act(flush);
 
-      expect(container.querySelectorAll('.history__item')).toHaveLength(24);
+      // Repeated packs share one line; the per-line counts still add up to 24.
+      const items = Array.from(container.querySelectorAll('.history__item'));
+      expect(items.length).toBeLessThanOrEqual(2);
+      const counts = items.map(li => parseInt(li.querySelector('.history__num')!.textContent!, 10));
+      expect(counts.reduce((a, b) => a + b, 0)).toBe(24);
+      expect(container.querySelector('.history__title')?.textContent).toContain('24/24');
       const priceCalls = fetchMock.mock.calls.filter(c => String(c[0]).includes('refresh-price'));
       expect(priceCalls.length).toBeLessThanOrEqual(2); // de-duplicated per pack
       const save = fetchMock.mock.calls.find(c => c[0] === '/api/drafts');

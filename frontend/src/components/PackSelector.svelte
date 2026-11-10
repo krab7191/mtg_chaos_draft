@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { toast } from '../lib/toast.svelte';
+  import { groupPicks } from '../lib/draft';
 
   interface Pack {
     id: number;
@@ -41,6 +42,7 @@
 
   const HISTORY_KEY  = 'draft-history';
   const POD_SIZE_KEY = 'draft-pod-size';
+  const PREFS_KEY    = 'pack-selector-prefs';
   const PACKS_PER_PLAYER = 3;
   const MIN_POD_SIZE = 2;
   const MAX_POD_SIZE = 16;
@@ -60,22 +62,52 @@
       return Number.isInteger(n) && n >= MIN_POD_SIZE && n <= MAX_POD_SIZE ? n : DEFAULT_POD_SIZE;
     } catch { return DEFAULT_POD_SIZE; }
   }
-  const _init = readHistory();
+  interface Prefs {
+    unchecked?: string[];
+    sortKey?: string;
+    sortDir?: string;
+    hideDeselected?: boolean;
+    recordDraft?: boolean;
+    draftSaved?: boolean;
+  }
+  function readPrefs(): Prefs {
+    try {
+      const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
+      return p && typeof p === 'object' ? p : {};
+    } catch { return {}; }
+  }
+  const _init  = readHistory();
+  const _prefs = readPrefs();
+  // Remember what was UNchecked, so packs added to the collection later start selected.
+  const _unchecked = new Set(Array.isArray(_prefs.unchecked) ? _prefs.unchecked.map(String) : []);
 
   // ── State ───────────────────────────────────────────────────
-  // Start with every pack selected; players adjust from there.
-  let checked         = $state(untrack(() => new Set(packs.map(p => String(p.id)))));
-  let sortKey         = $state<'name' | 'price'>('name');
-  let sortDir         = $state<'asc' | 'desc'>('asc');
+  // Every pack starts selected except the ones unchecked before a reload.
+  let checked         = $state(untrack(() => new Set(packs.map(p => String(p.id)).filter(id => !_unchecked.has(id)))));
+  type SortKey = 'name' | 'qty' | 'price';
+  let sortKey         = $state<SortKey>(
+    _prefs.sortKey === 'price' || _prefs.sortKey === 'qty' ? _prefs.sortKey : 'name',
+  );
+  let sortDir         = $state<'asc' | 'desc'>(_prefs.sortDir === 'desc' ? 'desc' : 'asc');
   let result          = $state<{ setName: string; productType: string } | null>(null);
   let history         = $state<HistoryEntry[]>(_init);
-  let recordDraft     = $state(true);
-  let hideDeselected  = $state(true);
-  let pickedCounts    = $state<Record<string, number>>({});
+  let recordDraft     = $state(_prefs.recordDraft !== false);
+  let hideDeselected  = $state(_prefs.hideDeselected !== false);
   let podSize         = $state(readPodSize());
   let livePrices      = $state<Record<string, number>>({});
-  let draftSaved      = $state(false);
+  let draftSaved      = $state(_prefs.draftSaved === true && _init.length > 0);
   let historyEl       = $state<HTMLElement | null>(null);
+
+  // Picks per pack, worked out from the (persisted) history so stock stays
+  // correct after a reload. Unrecorded picks don't use up stock.
+  const pickedCounts = $derived.by(() => {
+    const counts: Record<string, number> = {};
+    if (!recordDraft) return counts;
+    for (const e of history) {
+      if (e.packId != null) counts[String(e.packId)] = (counts[String(e.packId)] ?? 0) + 1;
+    }
+    return counts;
+  });
 
   const maxPicks   = $derived(podSize * PACKS_PER_PLAYER);
   const minPodSize = $derived(Math.max(MIN_POD_SIZE, Math.ceil(history.length / PACKS_PER_PLAYER)));
@@ -86,6 +118,7 @@
   const perPlayer    = $derived(podSize > 0 ? draftTotal / podSize : 0);
   const unpricedPicks = $derived(history.filter(e => e.marketPrice == null).length);
   const pricingPending = $derived(history.some(e => e.pricing));
+  const historyGroups  = $derived(groupPicks(history));
 
   // ── Persist history / pod size whenever they change ─────────
   $effect(() => {
@@ -93,6 +126,16 @@
   });
   $effect(() => {
     try { localStorage.setItem(POD_SIZE_KEY, String(podSize)); } catch { /* storage unavailable */ }
+  });
+  $effect(() => {
+    const ids = new Set(packs.map(p => String(p.id)));
+    const unchecked = [
+      ...[...ids].filter(id => !checked.has(id)),
+      // Keep choices for packs not on the page right now (e.g. out of stock).
+      ...[..._unchecked].filter(id => !ids.has(id)),
+    ];
+    const prefs: Prefs = { unchecked, sortKey, sortDir, hideDeselected, recordDraft, draftSaved };
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* storage unavailable */ }
   });
 
   function setPodSize(n: number) {
@@ -102,7 +145,6 @@
 
   function clearHistory() {
     history = [];
-    pickedCounts = {};
     draftSaved = false;
   }
 
@@ -113,9 +155,6 @@
   // ── Toggle recording ────────────────────────────────────────
   function setRecordDraft(on: boolean) {
     recordDraft = on;
-    if (!on) {
-      for (const key in pickedCounts) delete pickedCounts[key];
-    }
   }
 
   // ── Derived ─────────────────────────────────────────────────
@@ -125,11 +164,19 @@
 
   const sortedPacks = $derived.by(() => {
     const copy = hideDeselected ? packs.filter(p => checked.has(String(p.id))) : [...packs];
+    const byName = (a: Pack, b: Pack) =>
+      a.setName.localeCompare(b.setName) || a.productType.localeCompare(b.productType);
     if (sortKey === 'price') {
       copy.sort((a, b) => {
         const pa = priceOf(a) ?? 0;
         const pb = priceOf(b) ?? 0;
         return sortDir === 'asc' ? pa - pb : pb - pa;
+      });
+    } else if (sortKey === 'qty') {
+      // The number shown on each pack: draft slots still available.
+      copy.sort((a, b) => {
+        const diff = effectiveQty(a) - effectiveQty(b);
+        return (sortDir === 'asc' ? diff : -diff) || byName(a, b);
       });
     } else {
       copy.sort((a, b) => {
@@ -355,7 +402,6 @@
       }];
 
       const id = String(selectedPack.id);
-      pickedCounts[id] = (pickedCounts[id] ?? 0) + 1;
       if (effectiveQty(selectedPack) === 0) {
         const next = new Set(checked);
         next.delete(id);
@@ -451,6 +497,11 @@
       class:sort-btn--active={sortKey === 'name'}
       onclick={() => onSortClick('name')}
     >{sortLabel('name', 'Name')}</button>
+    <button
+      class="sort-btn"
+      class:sort-btn--active={sortKey === 'qty'}
+      onclick={() => onSortClick('qty')}
+    >{sortLabel('qty', 'Qty')}</button>
     <button
       class="sort-btn"
       class:sort-btn--active={sortKey === 'price'}
@@ -553,18 +604,18 @@
         {/if}
       </div>
       <ol class="history__list">
-        {#each history as entry, i}
+        {#each historyGroups as g (g.key)}
           <li class="history__item">
-            <span class="history__num">{i + 1}.</span>
+            <span class="history__num">{g.packs}×</span>
             <span class="history__pack-info">
-              <span class="history__pack-name">{entry.setName}</span>
-              <span class="history__pack-set">{entry.productType}</span>
+              <span class="history__pack-name">{g.setName}</span>
+              <span class="history__pack-set">{g.productType}{g.packs !== g.slots ? ` · ${g.slots} slot${g.slots === 1 ? '' : 's'}` : ''}</span>
             </span>
-            <span class="history__pack-price" class:history__pack-price--pending={entry.pricing}>
-              {#if (entry.packCount ?? 1) > 1 && entry.unitPrice != null}
-                <span class="history__pack-mult">{entry.packCount}× {formatPrice(entry.unitPrice)} =</span>
+            <span class="history__pack-price" class:history__pack-price--pending={g.pricing}>
+              {#if g.qty > 1 && g.each != null}
+                <span class="history__pack-mult">{g.qty}× {formatPrice(g.each)} =</span>
               {/if}
-              {formatPrice(entry.marketPrice)}
+              {formatPrice(g.total)}
             </span>
           </li>
         {/each}
