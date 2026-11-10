@@ -252,6 +252,19 @@ describe('PackSelector remembers state across reloads', () => {
     expect(meta[0]).toContain('(1)'); // 3 in stock − 2 already picked
   });
 
+  it('after a saved draft is approved, a reload shows real stock (no double subtraction)', () => {
+    // 3 Unfinity picked and saved; approval took stock from 5 to 2.
+    const pick = { packId: 1, setName: 'Unfinity', productType: 'Draft Booster', marketPrice: 6.65 };
+    localStorage.setItem('draft-history', JSON.stringify([
+      { ...pick, key: 'a' }, { ...pick, key: 'b' }, { ...pick, key: 'c' },
+    ]));
+    localStorage.setItem('pack-selector-prefs', JSON.stringify({ draftSaved: true }));
+    const { container } = render(PackSelector, {
+      props: { packs: [pack(1, 'Unfinity', { quantity: 2 })], settings: baseSettings },
+    });
+    expect(container.querySelector('.pack-item__meta')?.textContent).toContain('(2)');
+  });
+
   it('a saved draft stays locked after a reload', () => {
     localStorage.setItem('draft-history', JSON.stringify([{ key: 'a', packId: 1, setName: 'A', productType: 'X', marketPrice: 5 }]));
     localStorage.setItem('pack-selector-prefs', JSON.stringify({ draftSaved: true }));

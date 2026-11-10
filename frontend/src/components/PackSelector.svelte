@@ -98,11 +98,13 @@
   let draftSaved      = $state(_prefs.draftSaved === true && _init.length > 0);
   let historyEl       = $state<HTMLElement | null>(null);
 
-  // Picks per pack, worked out from the (persisted) history so stock stays
-  // correct after a reload. Unrecorded picks don't use up stock.
+  // Picks per pack in the draft being built, worked out from the (persisted)
+  // history so stock stays correct after a reload. Once the draft is saved,
+  // its packs come out of the collection when an admin approves it, so they
+  // must not be subtracted here as well. Unrecorded picks don't use up stock.
   const pickedCounts = $derived.by(() => {
     const counts: Record<string, number> = {};
-    if (!recordDraft) return counts;
+    if (!recordDraft || draftSaved) return counts;
     for (const e of history) {
       if (e.packId != null) counts[String(e.packId)] = (counts[String(e.packId)] ?? 0) + 1;
     }
