@@ -1,7 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { toast } from '../lib/toast.svelte';
-  import { groupPicks } from '../lib/draft';
 
   interface Pack {
     id: number;
@@ -120,7 +119,6 @@
   const perPlayer    = $derived(podSize > 0 ? draftTotal / podSize : 0);
   const unpricedPicks = $derived(history.filter(e => e.marketPrice == null).length);
   const pricingPending = $derived(history.some(e => e.pricing));
-  const historyGroups  = $derived(groupPicks(history));
 
   // ── Persist history / pod size whenever they change ─────────
   $effect(() => {
@@ -373,9 +371,12 @@
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
   }
 
+  // Long enough for someone to walk to the table and find the pack; tap to dismiss sooner.
+  const RESULT_TOAST_MS = 12000;
+
   function scheduleToastDismiss() {
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { result = null; toastTimer = null; }, 3000);
+    toastTimer = setTimeout(() => { result = null; toastTimer = null; }, RESULT_TOAST_MS);
   }
 
   // Draw one pack from the checked pool, recording it in the draft history
@@ -606,18 +607,20 @@
         {/if}
       </div>
       <ol class="history__list">
-        {#each historyGroups as g (g.key)}
+        <!-- One line per pick, in the order they were rolled, so the table can follow along. -->
+        {#each history as e, i}
+          {@const count = e.packCount ?? 1}
           <li class="history__item">
-            <span class="history__num">{g.packs}×</span>
+            <span class="history__num">{i + 1}.</span>
             <span class="history__pack-info">
-              <span class="history__pack-name">{g.setName}</span>
-              <span class="history__pack-set">{g.productType}{g.packs !== g.slots ? ` · ${g.slots} slot${g.slots === 1 ? '' : 's'}` : ''}</span>
+              <span class="history__pack-name">{e.setName}</span>
+              <span class="history__pack-set">{e.productType}{count > 1 ? ` · ${count} packs` : ''}</span>
             </span>
-            <span class="history__pack-price" class:history__pack-price--pending={g.pricing}>
-              {#if g.qty > 1 && g.each != null}
-                <span class="history__pack-mult">{g.qty}× {formatPrice(g.each)} =</span>
+            <span class="history__pack-price" class:history__pack-price--pending={e.pricing}>
+              {#if count > 1 && e.unitPrice != null}
+                <span class="history__pack-mult">{count}× {formatPrice(e.unitPrice)} =</span>
               {/if}
-              {formatPrice(g.total)}
+              {formatPrice(e.marketPrice)}
             </span>
           </li>
         {/each}

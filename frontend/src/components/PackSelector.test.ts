@@ -184,11 +184,12 @@ describe('PackSelector', () => {
       await act(() => fireEvent.click(rollAllBtn(container)));
       await act(flush);
 
-      // Repeated packs share one line; the per-line counts still add up to 24.
+      // One numbered line per pick, in pick order.
       const items = Array.from(container.querySelectorAll('.history__item'));
-      expect(items.length).toBeLessThanOrEqual(2);
-      const counts = items.map(li => parseInt(li.querySelector('.history__num')!.textContent!, 10));
-      expect(counts.reduce((a, b) => a + b, 0)).toBe(24);
+      expect(items).toHaveLength(24);
+      const nums = items.map(li => li.querySelector('.history__num')!.textContent);
+      expect(nums[0]).toBe('1.');
+      expect(nums[23]).toBe('24.');
       expect(container.querySelector('.history__title')?.textContent).toContain('24/24');
       const priceCalls = fetchMock.mock.calls.filter(c => String(c[0]).includes('refresh-price'));
       expect(priceCalls.length).toBeLessThanOrEqual(2); // de-duplicated per pack

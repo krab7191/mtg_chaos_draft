@@ -324,7 +324,9 @@ describe('PackSelector picking', () => {
 
       await act(() => fireEvent.click(button(container, 'Pick a Pack')));
       await act(() => fireEvent.click(button(container, 'Pick a Pack'))); // restarts the timer
-      await act(() => vi.advanceTimersByTime(3100));
+      await act(() => vi.advanceTimersByTime(11000));
+      expect(container.querySelector('.toast')).not.toBeNull(); // stays up long enough to read at the table
+      await act(() => vi.advanceTimersByTime(1100));
       expect(container.querySelector('.toast')).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -500,6 +502,18 @@ describe('PackSelector pod size and restore', () => {
     expect(items[1].textContent).toContain('3× $2.00');
     expect(container.querySelector('.cost')?.textContent).toContain('$10.00');
     expect(container.querySelector('.cost__note')).toBeNull(); // nothing still "fetching" after reload
+  });
+
+  it('lists every pick on its own numbered line, newest at the bottom', () => {
+    localStorage.setItem('draft-history', JSON.stringify([
+      { key: 'a', packId: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 4 },
+      { key: 'b', packId: 2, setName: 'Beta',  productType: 'Draft Booster', marketPrice: 5 },
+      { key: 'c', packId: 1, setName: 'Alpha', productType: 'Draft Booster', marketPrice: 4 },
+    ]));
+    const { container } = render(PackSelector, { props: { packs: [pack(1, 'A')], settings: baseSettings } });
+    const items = Array.from(container.querySelectorAll('.history__item'));
+    expect(items.map(li => li.querySelector('.history__num')!.textContent)).toEqual(['1.', '2.', '3.']);
+    expect(items.map(li => li.querySelector('.history__pack-name')!.textContent)).toEqual(['Alpha', 'Beta', 'Alpha']);
   });
 
   it('survives corrupt stored history', () => {
