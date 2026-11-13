@@ -209,14 +209,20 @@ describe('PackSelector', () => {
       expect(container.querySelectorAll('.history__item')).toHaveLength(0);
     });
 
-    it('blocks picking and warns when the pool cannot fill the draft', async () => {
+    it('warns and blocks Roll all, but still allows single picks, when the pool cannot fill the draft', async () => {
       localStorage.setItem('draft-pod-size', '8'); // 24 slots needed
       const few = [{ ...packs[0], quantity: 5 }, { ...packs[1], quantity: 3 }]; // 8 slots
       const { container } = render(PackSelector, { props: { packs: few, settings } });
       const warning = container.querySelector('.stock-warning');
       expect(warning?.textContent).toContain('8 of the 24');
-      expect(pickBtn(container).disabled).toBe(true);
+      expect(pickBtn(container).disabled).toBe(false);
       expect(rollAllBtn(container).disabled).toBe(true);
+    });
+
+    it('disables picking when every selected pack is used up', async () => {
+      const gone = [{ ...packs[0], quantity: 0 }];
+      const { container } = render(PackSelector, { props: { packs: gone, settings } });
+      expect(pickBtn(container).disabled).toBe(true);
     });
 
     it('small packs use several packs per slot when counting stock', async () => {

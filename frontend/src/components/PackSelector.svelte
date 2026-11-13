@@ -190,8 +190,9 @@
   const checkedPacks = $derived(packs.filter(p => checked.has(String(p.id))));
 
   // ── Stock guard ─────────────────────────────────────────────
-  // A draft can only be saved with exactly podSize × 3 picks, so block picking
-  // when the selected pool can't fill the remaining slots.
+  // A draft can only be saved with exactly podSize × 3 picks. When the selected
+  // pool can't fill the remaining slots, warn and block Roll all (it would run
+  // dry partway), but still allow single picks: the selection can change later.
   const remainingPicks  = $derived(Math.max(0, maxPicks - history.length));
   const selectedSlots   = $derived(checkedPacks.reduce((n, p) => n + effectiveQty(p), 0));
   const totalSlots      = $derived(packs.reduce((n, p) => n + effectiveQty(p), 0));
@@ -554,7 +555,7 @@
   <div class="pick-row">
     <button
       class="btn btn--primary btn--large"
-      disabled={noneChecked || draftFull || shortOfPacks}
+      disabled={noneChecked || draftFull || selectedSlots === 0}
       onclick={pick}
     >🎲 Pick a Pack</button>
     <button
