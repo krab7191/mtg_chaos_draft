@@ -1,4 +1,4 @@
-FROM golang:1.26.11-alpine AS builder
+FROM golang:1.27.0-alpine AS builder
 ARG VERSION
 
 WORKDIR /app
@@ -9,7 +9,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-X main.Version=${VERSION}" -o server .
 
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk --no-cache add ca-certificates && \
     addgroup -S app && adduser -S app -G app
