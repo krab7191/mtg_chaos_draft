@@ -15,6 +15,7 @@
     setName: string;
     productType: string;
     quantity: number;
+    marketPrice: number | null;
   }
 
   let { purchases: initialPurchases, disposals: initialDisposals, packs: initialPacks, canEdit = false }: {
@@ -28,8 +29,7 @@
   let disposals = $state<Disposal[]>(untrack(() => initialDisposals.map(d => ({ ...d }))));
   let packs     = $state<Pack[]>(untrack(() => initialPacks.map(p => ({ ...p }))));
 
-  const pf      = $derived(portfolio(purchases, disposals));
-  const total   = $derived(pf.realized + pf.unrealized);
+  const pf      = $derived(portfolio(purchases, disposals, packs));
   const rows    = $derived(activity(purchases, disposals));
   const loggedIds = $derived(new Set(purchases.map(p => p.packId)));
   const packOptions = $derived(
@@ -105,32 +105,37 @@
 
 <div class="finance">
   <!-- ── Overview ─────────────────────────────────────────── -->
+  {#if pf.boughtPacks > 0}
+    <p class="invested">
+      Invested <strong>{money(pf.invested)}</strong> in {packsLabel(pf.boughtPacks)} logged{#if pf.purchaseFees > 0}&nbsp;(incl. {money(pf.purchaseFees)} tax & shipping){/if}
+    </p>
+  {/if}
   <div class="summary">
     <div class="card">
       <span class="card__label">Holdings</span>
       <span class="card__value">{money(pf.value)}</span>
-      <span class="card__sub">{packsLabel(pf.heldPacks)} at today's market · cost {money(pf.cost)}</span>
+      <span class="card__sub">
+        {packsLabel(pf.stockPacks)} in stock at today's market{#if pf.uncostedPacks > 0}&nbsp;· {pf.uncostedPacks} with no logged cost{/if}
+      </span>
     </div>
     <div class="card">
       <span class="card__label">Unrealized</span>
       <span class="card__value tone--{tone(pf.unrealized)}">
         {signed(pf.unrealized)}<span class="card__pct">{formatReturn(pf.unrealizedPct)}</span>
       </span>
-      <span class="card__sub">on packs still held</span>
+      <span class="card__sub">packs in stock with a logged cost of {money(pf.cost)}</span>
     </div>
     <div class="card">
       <span class="card__label">Realized</span>
       <span class="card__value tone--{tone(pf.realized)}">{signed(pf.realized)}</span>
       <span class="card__sub">
-        drafts & sales · {money(pf.proceeds)} collected{#if pf.unknownPacks > 0}&nbsp;· {packsLabel(pf.unknownPacks)} with no cost{/if}
+        recorded sales & drafts · {money(pf.proceeds)} collected{#if pf.unknownPacks > 0}&nbsp;· {packsLabel(pf.unknownPacks)} with no logged cost{/if}
       </span>
     </div>
     <div class="card">
-      <span class="card__label">Total return</span>
-      <span class="card__value tone--{tone(total)}">{signed(total)}</span>
-      <span class="card__sub">
-        {money(pf.invested)} invested{#if pf.purchaseFees > 0}&nbsp;· {signed(total - pf.purchaseFees)} after {money(pf.purchaseFees)} tax & shipping{/if}
-      </span>
+      <span class="card__label">Opened & kept</span>
+      <span class="card__value">{money(pf.openedCost)}</span>
+      <span class="card__sub">cost of {packsLabel(pf.openedPacks)} logged but no longer in stock · not a loss</span>
     </div>
   </div>
 
@@ -143,7 +148,7 @@
           <thead>
             <tr>
               <th>Pack</th>
-              <th class="num">Held</th>
+              <th class="num">In stock</th>
               <th class="num">Avg cost</th>
               <th class="num">Market</th>
               <th class="num">Value</th>
@@ -153,10 +158,22 @@
           </thead>
           <tbody>
             {#each pf.positions as h (h.packId)}
-              <tr class:closed={h.held === 0}>
-                <td class="holdings__name">{h.setName} <span class="muted">{h.productType}</span></td>
-                <td class="num">{h.held}<span class="muted">&nbsp;/ {h.bought}</span></td>
-                <td class="num">{h.held > 0 ? money(h.avgCost) : '—'}</td>
+              <tr class:closed={h.stock === 0}>
+                <td class="holdings__name">
+                  {h.setName} <span class="muted">{h.productType}</span>
+                  {#if h.bought > 0 || h.uncosted > 0}
+                    <span class="holdings__detail">
+                      {[
+                        h.bought > 0 ? `${h.bought} bought` : '',
+                        h.disposed > 0 ? `${h.disposed} sold/drafted` : '',
+                        h.opened > 0 ? `${h.opened} opened` : '',
+                        h.uncosted > 0 && h.bought > 0 ? `${h.uncosted} with no logged cost` : '',
+                      ].filter(Boolean).join(' · ')}
+                    </span>
+                  {/if}
+                </td>
+                <td class="num">{h.stock}</td>
+                <td class="num">{h.costed > 0 ? money(h.avgCost) : '—'}</td>
                 <td class="num">{money(h.currentPrice)}</td>
                 <td class="num">{money(h.value)}</td>
                 <td class="num tone--{tone(h.unrealized)}">
@@ -170,8 +187,9 @@
         </table>
       </div>
       <p class="note">
-        Held / bought counts logged purchases only. Costs are the average cost per pack, without tax & shipping
-        (market prices don't include them either). Packs leaving use up the logged packs first.
+        In stock is what Manage Collection shows. Avg cost and unrealized cover packs with a logged purchase,
+        without tax & shipping (market prices don't include them). Logged packs that are no longer in stock and
+        weren't recorded as sold or drafted count as opened.
       </p>
     </section>
   {/if}
@@ -381,6 +399,9 @@
   .holdings .num { text-align: right; }
   .holdings .num .muted { margin-left: 0.25rem; }
   .holdings__name { white-space: normal !important; min-width: 10rem; }
+  .holdings__detail { display: block; font-size: 0.7rem; color: var(--color-text-muted); }
+  .invested { font-size: 0.85rem; color: var(--color-text-muted); margin: 0 0 0.6rem; }
+  .invested strong { color: var(--color-text); }
   .holdings tr.closed td { opacity: 0.55; }
 
   /* ── Activity ─────────────────────────────────────────────── */

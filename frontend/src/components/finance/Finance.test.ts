@@ -5,8 +5,8 @@ import { toast } from '../../lib/toast.svelte';
 import { localToday } from '../../lib/purchases';
 
 const packs = [
-  { id: 1, setName: 'Bloomburrow', productType: 'Play Booster', quantity: 12 },
-  { id: 2, setName: 'Aetherdrift', productType: 'Play Booster', quantity: 0 },
+  { id: 1, setName: 'Bloomburrow', productType: 'Play Booster', quantity: 12, marketPrice: 5 },
+  { id: 2, setName: 'Aetherdrift', productType: 'Play Booster', quantity: 0, marketPrice: 4 },
 ];
 const display = {
   id: 10, packId: 1, setName: 'Bloomburrow', productType: 'Play Booster', quantity: 30,
@@ -36,40 +36,55 @@ const rowOf = (container: HTMLElement, tag: string) =>
   Array.from(container.querySelectorAll('.log__item')).find(li => li.querySelector('.tag')?.textContent === tag)!;
 
 describe('Finance overview', () => {
-  it('splits gains into realized and unrealized', () => {
+  it('values stock and splits gains into realized and unrealized', () => {
     const { container } = setup();
+    // 30 bought at $4.05 (121.50 without fees); 18 drafted, 2 sold → 10 logged left; 12 in stock.
+    expect(text(container.querySelector('.invested'))).toContain('Invested $132.18 in 30 packs logged (incl. $10.68 tax & shipping)');
     const cards = Array.from(container.querySelectorAll('.card')).map(text);
-    // 30 bought at $4.05 (121.50 without fees); 18 drafted, 2 sold → 10 held.
-    expect(cards[0]).toContain('$50.00');            // 10 × $5
-    expect(cards[0]).toContain('10 packs');
-    expect(cards[0]).toContain('cost $40.50');
-    expect(cards[1]).toContain('+$9.50');
+    expect(cards[0]).toContain('$60.00');            // all 12 in stock × $5
+    expect(cards[0]).toContain('12 packs in stock');
+    expect(cards[0]).toContain('2 with no logged cost');
+    expect(cards[1]).toContain('+$9.50');            // 10 × $5 − $40.50
     expect(cards[1]).toContain('+23.5%');
+    expect(cards[1]).toContain('logged cost of $40.50');
     // Draft: 60 − 72.90 = −12.90. Sale: 11 − 8.10 = +2.90.
     expect(cards[2]).toContain('−$10.00');
     expect(cards[2]).toContain('$71.00 collected');
-    expect(cards[3]).toContain('−$0.50');
-    expect(cards[3]).toContain('$132.18 invested');
-    expect(cards[3]).toContain('−$11.18 after $10.68 tax & shipping');
+    expect(cards[3]).toContain('$0.00');
   });
 
-  it('shows holdings with held / bought and realized per pack', () => {
+  it('counts logged packs missing from stock as opened', () => {
+    const { container } = setup({ disposals: [], packs: [{ ...packs[0], quantity: 8 }] });
+    const cards = Array.from(container.querySelectorAll('.card')).map(text);
+    expect(cards[3]).toContain('$89.10');            // 22 × $4.05
+    expect(cards[3]).toContain('cost of 22 packs logged but no longer in stock');
+    expect(cards[2]).toContain('+$0.00');            // opening isn't a loss
+    expect(text(container.querySelector('.holdings tbody tr'))).toContain('30 bought · 22 opened');
+  });
+
+  it('shows holdings per pack from stock', () => {
     const { container } = setup();
     const row = container.querySelector('.holdings tbody tr')!;
-    expect(text(row)).toContain('10 / 30');
+    expect(text(row)).toContain('30 bought · 20 sold/drafted · 2 with no logged cost');
+    expect(text(row)).toContain('12');
     expect(text(row)).toContain('$4.05');
+    expect(text(row)).toContain('$60.00');
     expect(text(row)).toContain('−$10.00');
   });
 
-  it('dims a closed position', () => {
-    const { container } = setup({ disposals: [{ ...draft, quantity: 30 }] });
+  it('dims a pack that is no longer in stock', () => {
+    const { container } = setup({ packs: [{ ...packs[0], quantity: 0 }] });
     expect(container.querySelector('.holdings tr.closed')).not.toBeNull();
   });
 
   it('explains how to start when there is nothing yet, read-only for viewers', () => {
     const { container } = setup({ purchases: [], disposals: [], canEdit: false });
     expect(container.querySelector('.empty')).not.toBeNull();
-    expect(container.querySelector('.holdings')).toBeNull();
+    expect(container.querySelector('.invested')).toBeNull();
+    // Stock still shows, valued at market, with no cost.
+    const row = container.querySelector('.holdings tbody tr')!;
+    expect(text(row)).toContain('$60.00');
+    expect(text(row).match(/—/g)?.length).toBeGreaterThanOrEqual(3);
     expect(button(container, 'Log a purchase')).toBeUndefined();
   });
 });

@@ -31,21 +31,43 @@ export interface DisposalResult {
   gain: number | null;
 }
 
-/** One pack type, like a stock position. Costs leave out tax & shipping. */
+/** A pack in the collection right now (what Manage Collection shows). */
+export interface StockPack {
+  id: number;
+  setName: string;
+  productType: string;
+  quantity: number;
+  marketPrice: number | null;
+}
+
+/**
+ * One pack type, like a stock position. Stock is the truth for what's held;
+ * costs come from logged purchases and leave out tax & shipping.
+ */
 export interface Position {
   packId: number;
   setName: string;
   productType: string;
+  /** Packs logged as bought. */
   bought: number;
-  /** Packs gone through drafts and sales. */
+  /** Packs gone through recorded drafts and sales. */
   disposed: number;
-  /** Logged packs still held. */
-  held: number;
-  /** Cost of the packs still held. */
+  /** Packs in stock now. */
+  stock: number;
+  /** Packs in stock with a logged cost. */
+  costed: number;
+  /** Packs in stock beyond the logged ones: no known cost. */
+  uncosted: number;
+  /** Logged packs no longer in stock and not sold or drafted: opened or given away. */
+  opened: number;
+  openedCost: number;
+  /** Cost of the costed packs in stock. */
   cost: number;
   avgCost: number;
   currentPrice: number | null;
+  /** All packs in stock at today's market price. */
   value: number | null;
+  /** Costed packs at today's market price, minus their cost. */
   unrealized: number | null;
   unrealizedPct: number | null;
   realized: number;
@@ -56,23 +78,27 @@ export interface Position {
 export interface Portfolio {
   positions: Position[];
   results: Map<number, DisposalResult>;
-  /** Everything spent on purchases, tax & shipping included. */
+  /** Everything spent on logged purchases, tax & shipping included. */
   invested: number;
   purchaseFees: number;
-  heldPacks: number;
-  /** Cost of the packs still held. */
+  boughtPacks: number;
+  stockPacks: number;
+  uncostedPacks: number;
+  /** Cost of the costed packs in stock. */
   cost: number;
-  /** Value of the packs still held, where the market price is known. */
+  /** All stock at today's market price, where known. */
   value: number;
-  /** Cost of the held packs that have a market price (what value compares to). */
+  /** Cost of costed packs that have a market price (what unrealized compares to). */
   pricedCost: number;
   unrealized: number;
   unrealizedPct: number | null;
   realized: number;
   /** Money in from drafts and sales, after selling fees. */
   proceeds: number;
-  /** Packs that left with no logged purchase behind them. */
+  /** Packs sold or drafted with no logged purchase behind them. */
   unknownPacks: number;
+  openedPacks: number;
+  openedCost: number;
 }
 
 type Event =
@@ -81,11 +107,15 @@ type Event =
 
 /**
  * Work out positions and gains with the average-cost method, replaying each
- * pack's purchases and disposals in date order (purchases first on the same
- * day). Packs leaving use the average cost of the logged packs held at the
- * time; any beyond those have no known cost and are left out of gains.
+ * pack's purchases and recorded drafts/sales in date order (purchases first on
+ * the same day). Packs leaving use the average cost at the time; any beyond
+ * the logged ones have no known cost and are left out of gains.
+ *
+ * Current stock then decides what's held. Logged packs that are no longer in
+ * stock were opened or given away: they leave at average cost, and aren't a
+ * gain or a loss.
  */
-export function portfolio(purchases: Purchase[], disposals: Disposal[]): Portfolio {
+export function portfolio(purchases: Purchase[], disposals: Disposal[], stock: StockPack[]): Portfolio {
   const events = new Map<number, Event[]>();
   const add = (packId: number, e: Event) => {
     const list = events.get(packId);
@@ -93,62 +123,88 @@ export function portfolio(purchases: Purchase[], disposals: Disposal[]): Portfol
   };
   for (const p of purchases) add(p.packId, { kind: 'buy', date: p.purchasedOn, id: p.id, p });
   for (const d of disposals) add(d.packId, { kind: 'out', date: d.disposedOn, id: d.id, d });
+  const stockById = new Map(stock.map(s => [s.id, s]));
 
   const positions: Position[] = [];
   const results = new Map<number, DisposalResult>();
+  const ids = new Set([...events.keys(), ...stock.filter(s => s.quantity > 0).map(s => s.id)]);
 
-  for (const [packId, list] of events) {
+  for (const packId of ids) {
+    const list = events.get(packId) ?? [];
     list.sort((a, b) =>
       a.date.localeCompare(b.date) || (a.kind === b.kind ? a.id - b.id : a.kind === 'buy' ? -1 : 1));
 
-    const first = list[0].kind === 'buy' ? list[0].p : list[0].d;
+    const sp = stockById.get(packId);
+    const named = sp ?? (list[0].kind === 'buy' ? list[0].p : list[0].d);
+    let held = 0, cost = 0, lastPrice: number | null = null;
     const pos: Position = {
-      packId, setName: first.setName, productType: first.productType,
-      bought: 0, disposed: 0, held: 0, cost: 0, avgCost: 0,
-      currentPrice: null, value: null, unrealized: null, unrealizedPct: null,
+      packId, setName: named.setName, productType: named.productType,
+      bought: 0, disposed: 0, stock: sp?.quantity ?? 0, costed: 0, uncosted: 0, opened: 0, openedCost: 0,
+      cost: 0, avgCost: 0, currentPrice: null, value: null, unrealized: null, unrealizedPct: null,
       realized: 0, purchaseFees: 0,
     };
 
     for (const e of list) {
       if (e.kind === 'buy') {
         pos.bought += e.p.quantity;
-        pos.held += e.p.quantity;
-        pos.cost += packCost(e.p);
         pos.purchaseFees += e.p.fees ?? 0;
-        pos.currentPrice = e.p.currentPrice;
+        held += e.p.quantity;
+        cost += packCost(e.p);
+        lastPrice = e.p.currentPrice;
         continue;
       }
       const d = e.d;
       pos.disposed += d.quantity;
-      const basisPacks = Math.min(d.quantity, pos.held);
-      const cost = basisPacks > 0 ? (pos.cost * basisPacks) / pos.held : 0;
-      pos.held -= basisPacks;
-      pos.cost -= cost;
-      if (pos.held === 0) pos.cost = 0; // no rounding dust on a closed position
+      const basisPacks = Math.min(d.quantity, held);
+      const out = basisPacks > 0 ? (cost * basisPacks) / held : 0;
+      held -= basisPacks;
+      cost = held > 0 ? cost - out : 0; // no rounding dust on a closed position
       const net = d.proceeds - (d.fees ?? 0);
-      const gain = basisPacks > 0 ? (net * basisPacks) / d.quantity - cost : null;
+      const gain = basisPacks > 0 ? (net * basisPacks) / d.quantity - out : null;
       if (gain != null) pos.realized += gain;
-      results.set(d.id, { basisPacks, unknownPacks: d.quantity - basisPacks, cost, gain });
+      results.set(d.id, { basisPacks, unknownPacks: d.quantity - basisPacks, cost: out, gain });
     }
 
-    pos.avgCost = pos.held > 0 ? pos.cost / pos.held : 0;
-    if (pos.held > 0 && pos.currentPrice != null) {
-      pos.value = pos.currentPrice * pos.held;
-      pos.unrealized = pos.value - pos.cost;
-      pos.unrealizedPct = returnPct(pos.value, pos.cost);
+    // Stock decides what's held now.
+    pos.costed = Math.min(pos.stock, held);
+    pos.uncosted = pos.stock - pos.costed;
+    pos.opened = held - pos.costed;
+    pos.openedCost = held > 0 ? (cost * pos.opened) / held : 0;
+    pos.cost = cost - pos.openedCost;
+    if (pos.costed === 0) pos.cost = 0;
+    pos.avgCost = pos.costed > 0 ? pos.cost / pos.costed : 0;
+
+    pos.currentPrice = sp?.marketPrice ?? lastPrice;
+    if (pos.currentPrice != null) {
+      if (pos.stock > 0) pos.value = pos.currentPrice * pos.stock;
+      if (pos.costed > 0) {
+        pos.unrealized = pos.currentPrice * pos.costed - pos.cost;
+        pos.unrealizedPct = returnPct(pos.currentPrice * pos.costed, pos.cost);
+      }
     }
     positions.push(pos);
   }
 
-  // Open positions by cost, then closed ones by realized gain.
-  positions.sort((a, b) => (b.held > 0 ? 1 : 0) - (a.held > 0 ? 1 : 0) || b.cost - a.cost || b.realized - a.realized);
+  // Biggest holdings first; then what's left (sold out, opened) by realized gain.
+  positions.sort((a, b) => (b.value ?? 0) - (a.value ?? 0) || b.cost - a.cost || b.realized - a.realized);
 
-  let value = 0, pricedCost = 0, cost = 0, heldPacks = 0, realized = 0;
+  const t = {
+    boughtPacks: 0, stockPacks: 0, uncostedPacks: 0, cost: 0, value: 0, pricedCost: 0,
+    costedValue: 0, realized: 0, openedPacks: 0, openedCost: 0,
+  };
   for (const p of positions) {
-    heldPacks += p.held;
-    cost += p.cost;
-    realized += p.realized;
-    if (p.value != null) { value += p.value; pricedCost += p.cost; }
+    t.boughtPacks += p.bought;
+    t.stockPacks += p.stock;
+    t.uncostedPacks += p.uncosted;
+    t.cost += p.cost;
+    t.realized += p.realized;
+    t.openedPacks += p.opened;
+    t.openedCost += p.openedCost;
+    if (p.value != null) t.value += p.value;
+    if (p.unrealized != null) {
+      t.pricedCost += p.cost;
+      t.costedValue += p.unrealized + p.cost;
+    }
   }
   let unknownPacks = 0;
   for (const r of results.values()) unknownPacks += r.unknownPacks;
@@ -158,15 +214,19 @@ export function portfolio(purchases: Purchase[], disposals: Disposal[]): Portfol
     results,
     invested: purchases.reduce((s, p) => s + p.totalPrice, 0),
     purchaseFees: purchases.reduce((s, p) => s + (p.fees ?? 0), 0),
-    heldPacks,
-    cost,
-    value,
-    pricedCost,
-    unrealized: value - pricedCost,
-    unrealizedPct: returnPct(value, pricedCost),
-    realized,
+    boughtPacks: t.boughtPacks,
+    stockPacks: t.stockPacks,
+    uncostedPacks: t.uncostedPacks,
+    cost: t.cost,
+    value: t.value,
+    pricedCost: t.pricedCost,
+    unrealized: t.costedValue - t.pricedCost,
+    unrealizedPct: returnPct(t.costedValue, t.pricedCost),
+    realized: t.realized,
     proceeds: disposals.reduce((s, d) => s + d.proceeds - (d.fees ?? 0), 0),
     unknownPacks,
+    openedPacks: t.openedPacks,
+    openedCost: t.openedCost,
   };
 }
 
