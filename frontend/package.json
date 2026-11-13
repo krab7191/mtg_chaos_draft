@@ -11,7 +11,7 @@
     "test": "vitest run --coverage && node -e \"const s=JSON.parse(require('fs').readFileSync('./coverage/coverage-summary.json','utf8'));console.log('Coverage: '+s.total.statements.pct+'%')\""
   },
   "engines": {
-    "node": ">=24.13.1"
+    "node": ">=24.15.0"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.12",
