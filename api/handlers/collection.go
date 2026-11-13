@@ -41,6 +41,11 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 		Quantity    int      `json:"quantity"`
 		Weight      float64  `json:"weight"`
 		MarketPrice *float64 `json:"marketPrice"`
+		// Optional: what was paid, per pack or in total, and when (YYYY-MM-DD, default today).
+		PaidPrice   *float64 `json:"paidPrice"`
+		PaidTotal   *float64 `json:"paidTotal"`
+		Fees        *float64 `json:"fees"` // tax & shipping within the price paid
+		PurchasedOn string   `json:"purchasedOn"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -53,11 +58,29 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	if body.Quantity == 0 {
 		body.Quantity = 1
 	}
+	total, msg := paidTotal(body.PaidPrice, body.PaidTotal, body.Quantity)
+	if msg == "" {
+		msg = validateDate(body.PurchasedOn)
+	}
+	var fees float64
+	if msg == "" && total != nil {
+		fees, msg = checkFees(body.Fees, *total)
+	}
+	if msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
 	if body.Weight == 0 {
 		body.Weight = 1.0
 	}
 	cardsPerPack := lookupCardsPerPack(body.SetCode, body.ProductType)
-	pack, err := db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack)
+	var pack *db.CollectionPack
+	var err error
+	if total != nil {
+		pack, _, err = db.AddPackWithPurchase(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack, *total, fees, body.PurchasedOn)
+	} else {
+		pack, err = db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack)
+	}
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return

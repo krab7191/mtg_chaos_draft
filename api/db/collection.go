@@ -50,7 +50,7 @@ func ListCollection(ctx context.Context, pool *pgxpool.Pool) ([]CollectionPack, 
 	return packs, rows.Err()
 }
 
-func AddPack(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, setName, setCode, productType string, quantity int, weight float64, marketPrice *float64, cardsPerPack int) (*CollectionPack, error) {
+func AddPack(ctx context.Context, pool Querier, mtgstocksID int, name, setName, setCode, productType string, quantity int, weight float64, marketPrice *float64, cardsPerPack int) (*CollectionPack, error) {
 	return scanPack(pool.QueryRow(ctx, `
 		INSERT INTO collection_packs (name, set_name, set_code, product_type, mtgstocks_id, quantity, weight, market_price, cards_per_pack)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

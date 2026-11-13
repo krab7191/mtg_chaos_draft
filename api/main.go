@@ -145,6 +145,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 	collectionHandler := handlers.NewCollectionHandler(pool)
 	settingsHandler := handlers.NewSettingsHandler(pool)
 	draftHandler := handlers.NewDraftHandler(pool)
+	purchaseHandler := handlers.NewPurchaseHandler(pool)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -182,6 +183,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Get("/api/cheapest", handlers.CheapestPacks)
 			r.Get("/api/price/{mtgstocksId}", handlers.Price)
 			r.Get("/api/drafts", draftHandler.List)
+			r.Get("/api/purchases", purchaseHandler.List)
 		})
 
 		// Admin-only mutation routes (nested)
@@ -192,6 +194,9 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Put("/api/collection/{id}", collectionHandler.Update)
 			r.Post("/api/collection/{id}/link-price", collectionHandler.LinkPrice)
 			r.Delete("/api/collection/{id}", collectionHandler.Delete)
+			r.Post("/api/purchases", purchaseHandler.Create)
+			r.Put("/api/purchases/{id}", purchaseHandler.Update)
+			r.Delete("/api/purchases/{id}", purchaseHandler.Delete)
 			r.Put("/api/settings", settingsHandler.Update)
 			r.Post("/api/drafts", draftHandler.Create)
 			r.Delete("/api/drafts/{id}", draftHandler.Delete)

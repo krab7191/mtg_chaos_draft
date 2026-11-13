@@ -102,6 +102,12 @@ func TestRouter_Permissions(t *testing.T) {
 		{"create draft forbidden for viewer", http.MethodPost, "/api/drafts", viewer, http.StatusForbidden},
 		{"create draft validates for admin", http.MethodPost, "/api/drafts", admin, http.StatusBadRequest},
 		{"delete pack forbidden for user", http.MethodDelete, "/api/collection/1", user, http.StatusForbidden},
+		{"purchases forbidden for user", http.MethodGet, "/api/purchases", user, http.StatusForbidden},
+		{"purchases for viewer", http.MethodGet, "/api/purchases", viewer, http.StatusOK},
+		{"log purchase forbidden for viewer", http.MethodPost, "/api/purchases", viewer, http.StatusForbidden},
+		{"log purchase validates for admin", http.MethodPost, "/api/purchases", admin, http.StatusBadRequest},
+		{"edit purchase forbidden for viewer", http.MethodPut, "/api/purchases/1", viewer, http.StatusForbidden},
+		{"edit purchase validates for admin", http.MethodPut, "/api/purchases/1", admin, http.StatusBadRequest},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

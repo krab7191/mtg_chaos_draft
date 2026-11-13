@@ -3,6 +3,20 @@
 ---
 
 <div class="search" id="pack-search">
+  <div class="search__purchase">
+    <label class="search__date">
+      Bought on
+      <input type="date" id="purchase-date" />
+    </label>
+    <label class="search__date">
+      Paid is
+      <select id="paid-mode">
+        <option value="total">the total</option>
+        <option value="each">per pack</option>
+      </select>
+    </label>
+    <span class="search__hint">Optional: type what you paid next to + Add (tax & shipping can be added on Finance).</span>
+  </div>
   <input
     type="text"
     id="search-input"
@@ -43,6 +57,34 @@
       overflow-y: auto;
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
+
+    &__purchase {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem 0.9rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+    }
+
+    &__date {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+
+      input, select {
+        padding: 0.25rem 0.4rem;
+        background: var(--color-surface);
+        color: var(--color-text);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius);
+        font-size: 0.82rem;
+        &:focus { outline: none; border-color: var(--color-accent); }
+      }
+    }
+
+    &__hint { font-size: 0.75rem; opacity: 0.8; }
 
     &__empty {
       padding: 1rem;
@@ -108,6 +150,19 @@
       flex-shrink: 0;
     }
 
+    &__paid {
+      width: 4.2rem;
+      padding: 0.2rem 0.3rem;
+      margin-right: 0.35rem;
+      font-size: 0.73rem;
+      text-align: right;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      background: var(--color-surface);
+      color: var(--color-text);
+      &:focus { outline: none; border-color: var(--color-accent); }
+    }
+
     &__qty {
       width: 2.8rem;
       padding: 0.2rem 0.25rem;
@@ -143,6 +198,14 @@
 
 <script>
   let debounceTimer: ReturnType<typeof setTimeout>;
+
+  // Purchase date for packs added this visit; defaults to today (local time).
+  const dateInput = document.getElementById('purchase-date') as HTMLInputElement;
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  dateInput.value = today;
+  dateInput.max = today;
+  const paidMode = document.getElementById('paid-mode') as HTMLSelectElement;
 
   const input = document.getElementById('search-input') as HTMLInputElement;
   const results = document.getElementById('search-results') as HTMLDivElement;
@@ -220,6 +283,16 @@
         const addGroup = document.createElement('div');
         addGroup.className = 'set-result__add-group';
 
+        const paid = document.createElement('input');
+        paid.className = 'set-result__paid';
+        paid.type = 'number';
+        paid.min = '0';
+        paid.step = '0.01';
+        paid.inputMode = 'decimal';
+        paid.placeholder = 'Paid $';
+        paid.title = 'Price you paid (optional): the total, or per pack, as chosen above';
+        addGroup.appendChild(paid);
+
         const input = document.createElement('input');
         input.className = 'set-result__qty';
         input.type = 'number';
@@ -256,6 +329,10 @@
         const qtyInput = btn.closest('.set-result__add-group')?.querySelector<HTMLInputElement>('.set-result__qty');
         const quantity = parseInt(qtyInput?.value ?? '1') || 1;
         const marketPrice = btn.dataset.price ? parseFloat(btn.dataset.price) : null;
+        const paidRaw = btn.closest('.set-result__add-group')?.querySelector<HTMLInputElement>('.set-result__paid')?.value ?? '';
+        const paid = paidRaw !== '' && Number.isFinite(parseFloat(paidRaw)) ? parseFloat(paidRaw) : null;
+        const paidField = paidMode.value === 'each' ? 'paidPrice' : 'paidTotal';
+        const purchasedOn = dateInput.value || today;
 
         const res = await fetch('/api/collection', {
           method: 'POST',
@@ -269,6 +346,7 @@
             quantity,
             weight: 1.0,
             marketPrice,
+            ...(paid != null ? { [paidField]: paid, purchasedOn } : {}),
           }),
         });
 

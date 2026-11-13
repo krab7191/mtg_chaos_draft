@@ -47,6 +47,16 @@ describe('admin/collection page', () => {
     expect(html).toContain('Manage Collection');
   });
 
+  it('links to the finance page and shows purchase inputs', async () => {
+    mockFetch([
+      { ok: true, json: async () => ({ role: 'admin', name: 'Alice', email: 'a@b.com' }) },
+      { ok: true, json: async () => [] },
+    ]);
+    const html = await (await renderPage(CollectionPage, '/admin/collection')).text();
+    expect(html).toContain('href="/admin/finance"');
+    expect(html).toContain('id="purchase-date"');
+  });
+
   it('renders 200 for viewer', async () => {
     mockFetch([
       { ok: true, json: async () => ({ role: 'viewer', name: 'View', email: 'v@b.com' }) },

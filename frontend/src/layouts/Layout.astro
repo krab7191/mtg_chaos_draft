@@ -46,6 +46,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/cheappacks" class="nav-menu__item">Cheap Packs</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/weights" class="nav-menu__item">Weights</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/drafts" class="nav-menu__item">Drafts</a>}
+          {['admin', 'viewer'].includes(user.role) && <a href="/admin/finance" class="nav-menu__item">Finance</a>}
           <div class="nav-menu__footer">
             <div class="nav-menu__footer-row">
               <span class="nav-menu__user">{user.name}</span>

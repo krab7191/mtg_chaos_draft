@@ -1,0 +1,43 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Finance from '../../components/finance/Finance.svelte';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+let meRes: Response;
+try {
+  meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+} catch {
+  return Astro.redirect('/login');
+}
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+const ADMIN_ROLES = ['admin', 'viewer'];
+if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
+
+async function getJSON(path: string): Promise<any[]> {
+  try {
+    const res = await fetch(`${apiUrl}${path}`, { headers: { cookie } });
+    return res.ok ? await res.json() : [];
+  } catch {
+    return [];
+  }
+}
+const [purchases, packs] = await Promise.all([getJSON('/api/purchases'), getJSON('/api/collection')]);
+---
+
+<Layout title="Finance" user={user}>
+  <div class="page">
+    <h1 class="page__title">Finance</h1>
+    <p class="page__sub">What you've spent on packs, and what they're worth at today's market prices.</p>
+    <Finance client:load {purchases} {packs} canEdit={user.role === 'admin'} />
+  </div>
+</Layout>
+
+<style>
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    &__sub   { color: var(--color-text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+  }
+</style>

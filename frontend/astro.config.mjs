@@ -6,6 +6,9 @@ import svelte from '@astrojs/svelte';
 export default defineConfig({
   output: 'server',
 
+  // No dev toolbar along the bottom of the page in `astro dev`.
+  devToolbar: { enabled: false },
+
   adapter: node({
     mode: 'standalone',
   }),
