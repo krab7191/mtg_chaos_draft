@@ -1,314 +1,296 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { toast } from '../../lib/toast.svelte';
-  import PriceInput from './PriceInput.svelte';
-  import {
-    packCost, discount, verdict, formatDiscount, returnPct, formatReturn,
-    totals, holdings, priceFields, byNewest, localToday,
-    type Purchase, type PriceMode,
-  } from '../../lib/purchases';
+  import { send } from '../../lib/send';
+  import PurchaseForm from './PurchaseForm.svelte';
+  import SaleForm from './SaleForm.svelte';
+  import PurchaseEdit from './PurchaseEdit.svelte';
+  import SaleEdit from './SaleEdit.svelte';
+  import DraftEdit from './DraftEdit.svelte';
+  import { packCost, discount, verdict, formatDiscount, formatReturn, byNewest, type Purchase } from '../../lib/purchases';
+  import { portfolio, activity, type Disposal } from '../../lib/portfolio';
 
-  interface PackOption {
+  interface Pack {
     id: number;
     setName: string;
     productType: string;
+    quantity: number;
   }
 
-  let { purchases: initial, packs, canEdit = false }: {
+  let { purchases: initialPurchases, disposals: initialDisposals, packs: initialPacks, canEdit = false }: {
     purchases: Purchase[];
-    packs: PackOption[];
+    disposals: Disposal[];
+    packs: Pack[];
     canEdit?: boolean;
   } = $props();
 
-  let purchases = $state<Purchase[]>(untrack(() => initial.map(p => ({ ...p }))));
+  let purchases = $state<Purchase[]>(untrack(() => initialPurchases.map(p => ({ ...p }))));
+  let disposals = $state<Disposal[]>(untrack(() => initialDisposals.map(d => ({ ...d }))));
+  let packs     = $state<Pack[]>(untrack(() => initialPacks.map(p => ({ ...p }))));
 
-  // ── Overview ───────────────────────────────────────────────
-  const sum      = $derived(totals(purchases));
-  const gain     = $derived(sum.valueNow != null ? sum.valueNow - sum.costWithValueNow : null);
-  const gainPct  = $derived(sum.valueNow != null ? returnPct(sum.valueNow, sum.costWithValueNow) : null);
-  const netGain  = $derived(sum.valueNow != null ? sum.valueNow - sum.paidWithValueNow : null);
-  const positions = $derived(holdings(purchases));
-
-  // Packs with nothing logged yet: what's left to back-fill from receipts.
-  const loggedIds     = $derived(new Set(purchases.map(p => p.packId)));
-  const unloggedCount = $derived(packs.filter(p => !loggedIds.has(p.id)).length);
-  const packOptions   = $derived(
+  const pf      = $derived(portfolio(purchases, disposals));
+  const total   = $derived(pf.realized + pf.unrealized);
+  const rows    = $derived(activity(purchases, disposals));
+  const loggedIds = $derived(new Set(purchases.map(p => p.packId)));
+  const packOptions = $derived(
     [...packs].sort((a, b) => a.setName.localeCompare(b.setName) || a.productType.localeCompare(b.productType)),
   );
 
-  // ── Log a purchase ─────────────────────────────────────────
-  let formOpen   = $state(false);
-  let packId     = $state<number | ''>('');
-  let quantity   = $state(1);
-  let paid       = $state<number | null>(null);
-  let priceMode  = $state<PriceMode>('total');
-  let fees       = $state<number | null>(null);
-  let date       = $state(localToday());
-  let addToStock = $state(false);
-  let saving     = $state(false);
+  let openForm = $state<'buy' | 'sale' | null>(null);
+  let editing  = $state<string | null>(null); // activity row key
 
-  const canSubmit = $derived(
-    packId !== '' && quantity >= 1 && paid != null && paid >= 0 && (fees == null || fees >= 0) && !!date && !saving,
-  );
-
-  async function submit(e: SubmitEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-    saving = true;
-    try {
-      const res = await fetch('/api/purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          packId, quantity, ...priceFields(priceMode, paid!), fees: fees ?? 0, purchasedOn: date, addToStock,
-        }),
-      });
-      if (!res.ok) {
-        toast.show(`Failed to log purchase: ${(await res.text()).trim() || res.status}`, 'error');
-        return;
-      }
-      const created: Purchase = await res.json();
-      purchases = [created, ...purchases].sort(byNewest);
-      toast.show('Purchase logged', 'success');
-      // Keep the date for the next line of the same receipt.
-      packId = '';
-      paid = null;
-      fees = null;
-      quantity = 1;
-    } catch {
-      toast.show('Failed to log purchase', 'error');
-    } finally {
-      saving = false;
-    }
+  // ── Keep stock in step with sales (for the sale form's limits) ──
+  function moveStock(packId: number, delta: number) {
+    const p = packs.find(x => x.id === packId);
+    if (p) p.quantity = Math.max(0, p.quantity + delta);
   }
 
-  // ── Edit in place ──────────────────────────────────────────
-  let editingId = $state<number | null>(null);
-  let eQty      = $state(1);
-  let ePaid     = $state<number | null>(null);
-  let eMode     = $state<PriceMode>('total');
-  let eFees     = $state<number | null>(null);
-  let eDate     = $state('');
-  let eSaving   = $state(false);
-
-  const canSaveEdit = $derived(
-    eQty >= 1 && ePaid != null && ePaid >= 0 && (eFees == null || eFees >= 0) && !!eDate && !eSaving,
-  );
-
-  function startEdit(p: Purchase) {
-    editingId = p.id;
-    eQty  = p.quantity;
-    ePaid = p.totalPrice;
-    eMode = 'total';
-    eFees = p.fees || null;
-    eDate = p.purchasedOn;
+  function onPurchase(p: Purchase, addedToStock: boolean) {
+    purchases = [p, ...purchases].sort(byNewest);
+    if (addedToStock) moveStock(p.packId, p.quantity);
+  }
+  function onPurchaseSaved(p: Purchase) {
+    purchases = purchases.map(x => (x.id === p.id ? p : x)).sort(byNewest);
+    editing = null;
+  }
+  function onSale(d: Disposal) {
+    disposals = [d, ...disposals];
+    moveStock(d.packId, -d.quantity);
+  }
+  function onSaleSaved(d: Disposal) {
+    const before = disposals.find(x => x.id === d.id);
+    if (before) moveStock(d.packId, before.quantity - d.quantity);
+    disposals = disposals.map(x => (x.id === d.id ? d : x));
+    editing = null;
+  }
+  function onDraftSaved(records: Disposal[]) {
+    const byId = new Map(records.map(r => [r.id, r]));
+    disposals = disposals.map(x => byId.get(x.id) ?? x);
+    editing = null;
   }
 
-  async function saveEdit(e: SubmitEvent) {
-    e.preventDefault();
-    if (editingId == null || !canSaveEdit) return;
-    eSaving = true;
-    try {
-      const res = await fetch(`/api/purchases/${editingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: eQty, ...priceFields(eMode, ePaid!), fees: eFees ?? 0, purchasedOn: eDate }),
-      });
-      if (!res.ok) {
-        toast.show(`Failed to save: ${(await res.text()).trim() || res.status}`, 'error');
-        return;
-      }
-      const updated: Purchase = await res.json();
-      purchases = purchases.map(x => (x.id === updated.id ? updated : x)).sort(byNewest);
-      editingId = null;
-    } catch {
-      toast.show('Failed to save purchase', 'error');
-    } finally {
-      eSaving = false;
-    }
-  }
-
-  function onDelete(p: Purchase) {
+  function deletePurchase(p: Purchase) {
     toast.confirm(`Delete the ${p.purchasedOn} purchase of ${p.setName} ${p.productType}? Stock is not changed.`, async () => {
-      const res = await fetch(`/api/purchases/${p.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        toast.show(`Failed to delete: ${res.status} ${res.statusText}`, 'error');
-        return;
+      if (await send(`/api/purchases/${p.id}`, 'DELETE', null, 'Failed to delete')) {
+        purchases = purchases.filter(x => x.id !== p.id);
       }
-      purchases = purchases.filter(x => x.id !== p.id);
+    });
+  }
+  function undoSale(d: Disposal) {
+    toast.confirm(`Undo the ${d.disposedOn} sale of ${d.quantity} ${d.setName} ${d.productType}? The packs go back into stock.`, async () => {
+      if (await send(`/api/sales/${d.id}`, 'DELETE', null, 'Failed to undo sale')) {
+        disposals = disposals.filter(x => x.id !== d.id);
+        moveStock(d.packId, d.quantity);
+      }
     });
   }
 
-  const money = (n: number | null | undefined) => (n != null ? `$${n.toFixed(2)}` : '—');
+  // ── Formatting ─────────────────────────────────────────────
+  const money  = (n: number | null | undefined) => (n != null ? `$${n.toFixed(2)}` : '—');
   const signed = (n: number) => `${n >= 0 ? '+' : '−'}$${Math.abs(n).toFixed(2)}`;
-  const tone = (n: number | null) => (n == null ? 'none' : n > 0.005 ? 'good' : n < -0.005 ? 'bad' : 'fair');
+  const tone   = (n: number | null | undefined) => (n == null ? 'none' : n > 0.005 ? 'good' : n < -0.005 ? 'bad' : 'fair');
+  const packsLabel = (n: number) => `${n} pack${n === 1 ? '' : 's'}`;
+  const sum = (list: Disposal[], f: (d: Disposal) => number) => list.reduce((s, d) => s + f(d), 0);
+
+  function gainOf(list: Disposal[]): number | null {
+    let g: number | null = null;
+    for (const d of list) {
+      const r = pf.results.get(d.id)?.gain;
+      if (r != null) g = (g ?? 0) + r;
+    }
+    return g;
+  }
+  const unknownOf = (list: Disposal[]) => list.reduce((n, d) => n + (pf.results.get(d.id)?.unknownPacks ?? 0), 0);
 </script>
 
-<!-- ── Overview ───────────────────────────────────────────── -->
-<div class="summary">
-  <div class="card">
-    <span class="card__label">Invested</span>
-    <span class="card__value">{money(sum.paid)}</span>
-    <span class="card__sub">
-      {sum.packs} pack{sum.packs === 1 ? '' : 's'}{#if sum.fees > 0}&nbsp;· incl. {money(sum.fees)} tax & shipping{/if}
-    </span>
-  </div>
-  <div class="card">
-    <span class="card__label">Worth now</span>
-    <span class="card__value">{money(sum.valueNow)}</span>
-    <span class="card__sub">at today's market price</span>
-  </div>
-  <div class="card">
-    <span class="card__label">Gain</span>
-    <span class="card__value tone--{tone(gain)}">
-      {gain != null ? signed(gain) : '—'}
-      {#if gainPct != null}<span class="card__pct">{formatReturn(gainPct)}</span>{/if}
-    </span>
-    <span class="card__sub">
-      vs pack prices{#if netGain != null && sum.fees > 0}&nbsp;· {signed(netGain)} after tax & shipping{/if}
-    </span>
-  </div>
-</div>
-
-<!-- ── Holdings ───────────────────────────────────────────── -->
-{#if positions.length > 0}
-  <section class="section">
-    <h2 class="section__title">Holdings</h2>
-    <div class="table-wrap">
-      <table class="holdings">
-        <thead>
-          <tr>
-            <th>Pack</th>
-            <th class="num">Bought</th>
-            <th class="num">Avg cost</th>
-            <th class="num">Market</th>
-            <th class="num">Value</th>
-            <th class="num">Return</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each positions as h (h.packId)}
-            <tr>
-              <td class="holdings__name">{h.setName} <span class="muted">{h.productType}</span></td>
-              <td class="num">{h.packs}</td>
-              <td class="num">{money(h.avgCost)}</td>
-              <td class="num">{money(h.currentPrice)}</td>
-              <td class="num">{money(h.value)}</td>
-              <td class="num tone--{tone(h.ret)}">{formatReturn(h.ret)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+<div class="finance">
+  <!-- ── Overview ─────────────────────────────────────────── -->
+  <div class="summary">
+    <div class="card">
+      <span class="card__label">Holdings</span>
+      <span class="card__value">{money(pf.value)}</span>
+      <span class="card__sub">{packsLabel(pf.heldPacks)} at today's market · cost {money(pf.cost)}</span>
     </div>
-    <p class="note">
-      Costs leave out tax & shipping, since market prices don't include them. Counts are packs bought,
-      including any since opened in drafts.
-    </p>
-  </section>
-{/if}
-
-<!-- ── Purchases ──────────────────────────────────────────── -->
-<section class="section">
-  <div class="section__header">
-    <h2 class="section__title">Purchases</h2>
-    {#if canEdit}
-      <button class="btn-link" onclick={() => (formOpen = !formOpen)}>
-        {formOpen ? 'Close' : '+ Log a purchase'}
-      </button>
-    {/if}
+    <div class="card">
+      <span class="card__label">Unrealized</span>
+      <span class="card__value tone--{tone(pf.unrealized)}">
+        {signed(pf.unrealized)}<span class="card__pct">{formatReturn(pf.unrealizedPct)}</span>
+      </span>
+      <span class="card__sub">on packs still held</span>
+    </div>
+    <div class="card">
+      <span class="card__label">Realized</span>
+      <span class="card__value tone--{tone(pf.realized)}">{signed(pf.realized)}</span>
+      <span class="card__sub">
+        drafts & sales · {money(pf.proceeds)} collected{#if pf.unknownPacks > 0}&nbsp;· {packsLabel(pf.unknownPacks)} with no cost{/if}
+      </span>
+    </div>
+    <div class="card">
+      <span class="card__label">Total return</span>
+      <span class="card__value tone--{tone(total)}">{signed(total)}</span>
+      <span class="card__sub">
+        {money(pf.invested)} invested{#if pf.purchaseFees > 0}&nbsp;· {signed(total - pf.purchaseFees)} after {money(pf.purchaseFees)} tax & shipping{/if}
+      </span>
+    </div>
   </div>
 
-  {#if formOpen && canEdit}
-    <form class="form" onsubmit={submit}>
-      <label class="field field--wide">
-        <span>Pack</span>
-        <select bind:value={packId} required>
-          <option value="" disabled>Choose a pack…</option>
-          {#each packOptions as p (p.id)}
-            <option value={p.id}>{p.setName} — {p.productType}{loggedIds.has(p.id) ? '' : ' · no price yet'}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="field">
-        <span>Qty</span>
-        <input type="number" min="1" max="999" bind:value={quantity} required />
-      </label>
-      <PriceInput bind:value={paid} bind:mode={priceMode} {quantity} />
-      <label class="field">
-        <span>Tax & shipping</span>
-        <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="incl. above" bind:value={fees} />
-      </label>
-      <label class="field">
-        <span>Date</span>
-        <input type="date" max={localToday()} bind:value={date} required />
-      </label>
-      <label class="check">
-        <input type="checkbox" bind:checked={addToStock} />
-        Also add to stock
-      </label>
-      <button class="btn-save" type="submit" disabled={!canSubmit}>{saving ? 'Saving…' : 'Log'}</button>
-      <p class="form__hint">
-        Going through old receipts? Leave "add to stock" off, since those packs are already counted.
-        The date stays set between entries.
-        {#if unloggedCount > 0}<strong>{unloggedCount} pack type{unloggedCount === 1 ? '' : 's'} with no price yet.</strong>{/if}
+  <!-- ── Holdings ─────────────────────────────────────────── -->
+  {#if pf.positions.length > 0}
+    <section class="section">
+      <h2 class="section__title">Holdings</h2>
+      <div class="table-wrap">
+        <table class="holdings">
+          <thead>
+            <tr>
+              <th>Pack</th>
+              <th class="num">Held</th>
+              <th class="num">Avg cost</th>
+              <th class="num">Market</th>
+              <th class="num">Value</th>
+              <th class="num">Unrealized</th>
+              <th class="num">Realized</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each pf.positions as h (h.packId)}
+              <tr class:closed={h.held === 0}>
+                <td class="holdings__name">{h.setName} <span class="muted">{h.productType}</span></td>
+                <td class="num">{h.held}<span class="muted">&nbsp;/ {h.bought}</span></td>
+                <td class="num">{h.held > 0 ? money(h.avgCost) : '—'}</td>
+                <td class="num">{money(h.currentPrice)}</td>
+                <td class="num">{money(h.value)}</td>
+                <td class="num tone--{tone(h.unrealized)}">
+                  {h.unrealized != null ? signed(h.unrealized) : '—'}
+                  {#if h.unrealizedPct != null}<span class="muted">{formatReturn(h.unrealizedPct)}</span>{/if}
+                </td>
+                <td class="num tone--{tone(h.realized)}">{h.disposed > 0 ? signed(h.realized) : '—'}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        Held / bought counts logged purchases only. Costs are the average cost per pack, without tax & shipping
+        (market prices don't include them either). Packs leaving use up the logged packs first.
       </p>
-    </form>
+    </section>
   {/if}
 
-  {#if purchases.length === 0}
-    <p class="empty">
-      No purchases logged yet. Enter what you paid when adding packs on Manage Collection,
-      or log past purchases here.
-    </p>
-  {:else}
-    <ul class="log">
-      {#each purchases as p (p.id)}
-        {@const each = packCost(p) / p.quantity}
-        {@const d = discount(each, p.currentPrice)}
-        <li class="log__item">
-          <div class="log__main">
-            <span class="log__date">{p.purchasedOn}</span>
-            <span class="log__name">{p.setName} <span class="muted">{p.productType}</span></span>
-            {#if canEdit && editingId !== p.id}
-              <button class="btn-row" title="Edit purchase" onclick={() => startEdit(p)}>Edit</button>
-              <button class="btn-row btn-row--danger" title="Delete purchase" onclick={() => onDelete(p)}>✕</button>
-            {/if}
-          </div>
-          {#if editingId === p.id}
-            <form class="form form--inline" onsubmit={saveEdit}>
-              <label class="field">
-                <span>Qty</span>
-                <input type="number" min="1" max="999" bind:value={eQty} required />
-              </label>
-              <PriceInput bind:value={ePaid} bind:mode={eMode} quantity={eQty} />
-              <label class="field">
-                <span>Tax & shipping</span>
-                <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="incl. above" bind:value={eFees} />
-              </label>
-              <label class="field">
-                <span>Date</span>
-                <input type="date" max={localToday()} bind:value={eDate} required />
-              </label>
-              <div class="form__actions">
-                <button class="btn-save" type="submit" disabled={!canSaveEdit}>{eSaving ? 'Saving…' : 'Save'}</button>
-                <button class="btn-row" type="button" onclick={() => (editingId = null)}>Cancel</button>
+  <!-- ── Activity ─────────────────────────────────────────── -->
+  <section class="section">
+    <div class="section__header">
+      <h2 class="section__title">Activity</h2>
+      {#if canEdit}
+        <div class="section__actions">
+          <button class="btn-link" class:btn-link--on={openForm === 'buy'}
+            onclick={() => (openForm = openForm === 'buy' ? null : 'buy')}>+ Log a purchase</button>
+          <button class="btn-link" class:btn-link--on={openForm === 'sale'}
+            onclick={() => (openForm = openForm === 'sale' ? null : 'sale')}>+ Record a sale</button>
+        </div>
+      {/if}
+    </div>
+
+    {#if canEdit && openForm === 'buy'}
+      <PurchaseForm packs={packOptions} {loggedIds} oncreated={onPurchase} />
+    {:else if canEdit && openForm === 'sale'}
+      <SaleForm packs={packOptions} oncreated={onSale} />
+    {/if}
+
+    {#if rows.length === 0}
+      <p class="empty">
+        Nothing yet. Enter what you paid when adding packs on Manage Collection, or log past purchases here.
+        Approved drafts show up here automatically.
+      </p>
+    {:else}
+      <ul class="log">
+        {#each rows as row (row.key)}
+          <li class="log__item">
+            {#if row.type === 'buy'}
+              {@const p = row.purchase}
+              {@const each = packCost(p) / p.quantity}
+              {@const d = discount(each, p.currentPrice)}
+              <div class="log__main">
+                <span class="tag tag--buy">Buy</span>
+                <span class="log__date">{p.purchasedOn}</span>
+                <span class="log__name">{p.setName} <span class="muted">{p.productType}</span></span>
+                {#if canEdit && editing !== row.key}
+                  <button class="btn-row" onclick={() => (editing = row.key)}>Edit</button>
+                  <button class="btn-row btn-row--danger" title="Delete purchase" onclick={() => deletePurchase(p)}>✕</button>
+                {/if}
               </div>
-            </form>
-          {/if}
-          <div class="log__nums">
-            <span>
-              <strong>{money(p.totalPrice)}</strong> for {p.quantity} pack{p.quantity === 1 ? '' : 's'}{#if p.quantity > 1}&nbsp;({money(each)} each){/if}{#if p.fees > 0}&nbsp;· incl. {money(p.fees)} tax & shipping{/if}
-            </span>
-            <span title="Market price per pack today">
-              market {money(p.currentPrice)}
-              {#if d != null}<span class="tone--{verdict(d) ?? 'none'} strong">{formatDiscount(d)}</span>{/if}
-            </span>
-          </div>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</section>
+              {#if editing === row.key}
+                <PurchaseEdit purchase={p} onsaved={onPurchaseSaved} oncancel={() => (editing = null)} />
+              {/if}
+              <div class="log__nums">
+                <span>
+                  <strong>{money(p.totalPrice)}</strong> for {packsLabel(p.quantity)}{#if p.quantity > 1}&nbsp;({money(each)} each){/if}{#if p.fees > 0}&nbsp;· incl. {money(p.fees)} tax & shipping{/if}
+                </span>
+                <span title="Market price per pack today">
+                  market {money(p.currentPrice)}
+                  {#if d != null}<span class="tone--{verdict(d) ?? 'none'} strong">{formatDiscount(d)}</span>{/if}
+                </span>
+              </div>
+            {:else if row.type === 'sale'}
+              {@const s = row.disposal}
+              {@const r = pf.results.get(s.id)}
+              <div class="log__main">
+                <span class="tag tag--sale">Sale</span>
+                <span class="log__date">{s.disposedOn}</span>
+                <span class="log__name">{s.setName} <span class="muted">{s.productType}</span></span>
+                {#if canEdit && editing !== row.key}
+                  <button class="btn-row" onclick={() => (editing = row.key)}>Edit</button>
+                  <button class="btn-row btn-row--danger" title="Undo sale" onclick={() => undoSale(s)}>✕</button>
+                {/if}
+              </div>
+              {#if editing === row.key}
+                <SaleEdit sale={s} onsaved={onSaleSaved} oncancel={() => (editing = null)} />
+              {/if}
+              <div class="log__nums">
+                <span>
+                  <strong>{money(s.proceeds)}</strong> for {packsLabel(s.quantity)}{#if s.quantity > 1}&nbsp;({money(s.proceeds / s.quantity)} each){/if}{#if s.fees > 0}&nbsp;· {money(s.fees)} fees{/if}
+                </span>
+                <span class="tone--{tone(r?.gain)} strong">
+                  {r?.gain != null ? `${signed(r.gain)} gain` : 'no logged cost'}
+                </span>
+              </div>
+            {:else}
+              {@const list = row.disposals}
+              {@const collected = sum(list, d => d.proceeds)}
+              {@const market = sum(list, d => d.marketValue ?? 0)}
+              {@const gain = gainOf(list)}
+              {@const unknown = unknownOf(list)}
+              <div class="log__main">
+                <span class="tag tag--draft">Draft</span>
+                <span class="log__date">{row.date}</span>
+                <span class="log__name">
+                  {packsLabel(sum(list, d => d.quantity))} opened
+                  <span class="muted">{list.map(d => d.setName).join(', ')}</span>
+                </span>
+                {#if canEdit && row.draftId != null && editing !== row.key}
+                  <button class="btn-row" onclick={() => (editing = row.key)}>Edit</button>
+                {/if}
+              </div>
+              {#if editing === row.key && row.draftId != null}
+                <DraftEdit draftId={row.draftId} {collected} onsaved={onDraftSaved} oncancel={() => (editing = null)} />
+              {/if}
+              <div class="log__nums">
+                <span>
+                  <strong>{money(collected)}</strong> collected{#if market > 0}&nbsp;· market {money(market)}{/if}
+                </span>
+                <span class="tone--{tone(gain)} strong">
+                  {gain != null ? `${signed(gain)} gain` : 'no logged cost'}
+                </span>
+                {#if gain != null && unknown > 0}
+                  <span>{packsLabel(unknown)} with no logged cost</span>
+                {/if}
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+</div>
 
 <style>
   .muted { color: var(--color-text-muted); font-size: 0.85em; }
@@ -320,7 +302,7 @@
   /* ── Summary ──────────────────────────────────────────────── */
   .summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.6rem;
     margin-bottom: 1.75rem;
   }
@@ -335,13 +317,12 @@
     min-width: 0;
   }
   .card__label { font-size: 0.75rem; color: var(--color-text-muted); }
-  .card__value { font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .card__pct { font-size: 0.85rem; font-weight: 500; margin-left: 0.3rem; }
+  .card__value { font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .card__pct { font-size: 0.82rem; font-weight: 500; margin-left: 0.35rem; }
   .card__sub { font-size: 0.72rem; color: var(--color-text-muted); }
 
-  @media (max-width: 559px) {
-    .summary { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 799px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 479px) { .summary { grid-template-columns: 1fr; } }
 
   /* ── Sections ─────────────────────────────────────────────── */
   .section { margin-bottom: 2rem; }
@@ -349,7 +330,9 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
   }
   .section__title {
     font-size: 1rem;
@@ -357,6 +340,8 @@
     color: var(--color-text-muted);
     margin: 0 0 0.75rem;
   }
+  .section__header .section__title { margin: 0; }
+  .section__actions { display: flex; gap: 1rem; }
   .note, .empty {
     font-size: 0.75rem;
     color: var(--color-text-muted);
@@ -394,9 +379,11 @@
   }
   .holdings tr:last-child td { border-bottom: none; }
   .holdings .num { text-align: right; }
+  .holdings .num .muted { margin-left: 0.25rem; }
   .holdings__name { white-space: normal !important; min-width: 10rem; }
+  .holdings tr.closed td { opacity: 0.55; }
 
-  /* ── Form ─────────────────────────────────────────────────── */
+  /* ── Activity ─────────────────────────────────────────────── */
   .btn-link {
     background: none;
     border: none;
@@ -405,67 +392,7 @@
     cursor: pointer;
     padding: 0;
   }
-  .form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 0.6rem 0.75rem;
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    background: var(--color-surface);
-  }
-  .form--inline { padding: 0.5rem 0 0.25rem; margin: 0; border: none; background: none; }
-  .form__actions { display: flex; align-items: center; gap: 0.5rem; align-self: center; }
-  .form__hint {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: 0.72rem;
-    color: var(--color-text-muted);
-    opacity: 0.85;
-  }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-  }
-  .field--wide { flex: 1 1 100%; }
-  .field input, .field select {
-    padding: 0.35rem 0.5rem;
-    background: var(--color-bg);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    font-size: 0.9rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .field input[type='number'] { width: 6.5rem; }
-  .field input:focus, .field select:focus { outline: none; border-color: var(--color-accent); }
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.82rem;
-    color: var(--color-text-muted);
-    align-self: center;
-  }
-  .check input { accent-color: var(--color-accent); }
-  .btn-save {
-    background: var(--color-accent);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    padding: 0.45rem 1.1rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-    align-self: center;
-  }
-  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* ── Log ──────────────────────────────────────────────────── */
+  .btn-link--on { text-decoration: underline; }
   .log {
     list-style: none;
     margin: 0;
@@ -506,7 +433,82 @@
     font-variant-numeric: tabular-nums;
   }
   .log__nums strong { color: var(--color-text); font-weight: 600; }
-  .btn-row {
+  .tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.05rem 0.4rem;
+    border-radius: var(--radius);
+    border: 1px solid currentColor;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .tag--buy   { color: var(--color-accent); }
+  .tag--sale  { color: var(--color-success); }
+  .tag--draft { color: var(--color-text-muted); }
+
+  /* ── Forms (shared by the form components) ────────────────── */
+  .finance :global(.form) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.6rem 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+  }
+  .finance :global(.form--inline) { padding: 0.5rem 0 0.25rem; margin: 0; border: none; background: none; }
+  .finance :global(.form__actions) { display: flex; align-items: center; gap: 0.5rem; align-self: center; }
+  .finance :global(.form__hint) {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    opacity: 0.85;
+  }
+  .finance :global(.field) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+  .finance :global(.field--wide) { flex: 1 1 100%; }
+  .finance :global(.field input), .finance :global(.field select) {
+    padding: 0.35rem 0.5rem;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .finance :global(.field input[type='number']) { width: 6.5rem; }
+  .finance :global(.field input:focus), .finance :global(.field select:focus) { outline: none; border-color: var(--color-accent); }
+  .finance :global(.check) {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    align-self: center;
+  }
+  .finance :global(.check input) { accent-color: var(--color-accent); }
+  .finance :global(.btn-save) {
+    background: var(--color-accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    padding: 0.45rem 1.1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    align-self: center;
+  }
+  .finance :global(.btn-save:disabled) { opacity: 0.5; cursor: not-allowed; }
+  .finance :global(.btn-row) {
     background: none;
     border: 1px solid var(--color-border);
     color: var(--color-text-muted);
@@ -516,6 +518,6 @@
     cursor: pointer;
     flex-shrink: 0;
   }
-  .btn-row:hover { border-color: var(--color-accent); color: var(--color-accent); }
-  .btn-row--danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
+  .finance :global(.btn-row:hover) { border-color: var(--color-accent); color: var(--color-accent); }
+  .finance :global(.btn-row--danger:hover) { border-color: var(--color-danger); color: var(--color-danger); }
 </style>

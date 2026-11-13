@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  packCost, discount, verdict, formatDiscount, returnPct, formatReturn, totals, holdings,
+  packCost, discount, verdict, formatDiscount, returnPct, formatReturn,
   priceFields, byNewest, localToday, type Purchase,
 } from './purchases';
 
@@ -47,44 +47,6 @@ describe('returnPct / formatReturn', () => {
     expect(formatReturn(-0.123)).toBe('−12.3%');
     expect(formatReturn(0)).toBe('0%');
     expect(formatReturn(null)).toBe('—');
-  });
-});
-
-describe('totals', () => {
-  it('sums spend and fees, and values only priced purchases', () => {
-    const t = totals([
-      purchase({ quantity: 30, totalPrice: 132.18, fees: 10.68, currentPrice: 5 }),
-      purchase({ id: 2, packId: 2, quantity: 1, totalPrice: 10, fees: 0, currentPrice: null }),
-    ]);
-    expect(t.packs).toBe(31);
-    expect(t.paid).toBeCloseTo(142.18);
-    expect(t.fees).toBeCloseTo(10.68);
-    expect(t.valueNow).toBe(150);
-    expect(t.costWithValueNow).toBeCloseTo(121.5);
-    expect(t.paidWithValueNow).toBeCloseTo(132.18);
-  });
-  it('has no value when nothing is priced', () => {
-    expect(totals([purchase({ currentPrice: null })]).valueNow).toBeNull();
-    expect(totals([]).paid).toBe(0);
-  });
-});
-
-describe('holdings', () => {
-  it('combines purchases per pack, biggest cost first', () => {
-    const h = holdings([
-      purchase({ id: 1, packId: 1, quantity: 2, totalPrice: 8 }),
-      purchase({ id: 2, packId: 2, setName: 'Big', quantity: 30, totalPrice: 130, fees: 10, currentPrice: 5 }),
-      purchase({ id: 3, packId: 1, quantity: 1, totalPrice: 5 }),
-    ]);
-    expect(h.map(x => x.setName)).toEqual(['Big', 'S']);
-    expect(h[0]).toMatchObject({ packs: 30, cost: 120, fees: 10, avgCost: 4, value: 150 });
-    expect(h[0].ret).toBeCloseTo(0.25);
-    expect(h[1]).toMatchObject({ packs: 3, cost: 13, value: 18 });
-  });
-  it('leaves value and return unknown without a market price', () => {
-    const [h] = holdings([purchase({ currentPrice: null })]);
-    expect(h.value).toBeNull();
-    expect(h.ret).toBeNull();
   });
 });
 

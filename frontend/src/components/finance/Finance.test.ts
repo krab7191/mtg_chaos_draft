@@ -5,212 +5,277 @@ import { toast } from '../../lib/toast.svelte';
 import { localToday } from '../../lib/purchases';
 
 const packs = [
-  { id: 1, setName: 'Bloomburrow', productType: 'Play Booster' },
-  { id: 2, setName: 'Aetherdrift', productType: 'Play Booster' },
+  { id: 1, setName: 'Bloomburrow', productType: 'Play Booster', quantity: 12 },
+  { id: 2, setName: 'Aetherdrift', productType: 'Play Booster', quantity: 0 },
 ];
 const display = {
   id: 10, packId: 1, setName: 'Bloomburrow', productType: 'Play Booster', quantity: 30,
-  totalPrice: 132.18, fees: 10.68, unitPrice: 4.406, currentPrice: 5, purchasedOn: '2026-11-01',
+  totalPrice: 132.18, fees: 10.68, unitPrice: 4.406, currentPrice: 5, purchasedOn: '2026-10-01',
 };
-const single = {
-  id: 9, packId: 2, setName: 'Aetherdrift', productType: 'Play Booster', quantity: 1,
-  totalPrice: 5, fees: 0, unitPrice: 5, currentPrice: 4, purchasedOn: '2026-10-01',
+const draft = {
+  id: 20, packId: 1, setName: 'Bloomburrow', productType: 'Play Booster', kind: 'draft' as const, draftId: 7,
+  quantity: 18, proceeds: 60, marketValue: 90, fees: 0, disposedOn: '2026-11-12',
 };
-const purchases = [display, single];
+const sale = {
+  id: 21, packId: 1, setName: 'Bloomburrow', productType: 'Play Booster', kind: 'sale' as const, draftId: null,
+  quantity: 2, proceeds: 12, marketValue: null, fees: 1, disposedOn: '2026-11-13',
+};
 const flush = () => new Promise(r => setTimeout(r, 0));
+const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
 
 afterEach(() => { vi.unstubAllGlobals(); toast.dismiss(); });
 
-function openForm(container: HTMLElement) {
-  return act(() => fireEvent.click(container.querySelector('.btn-link')!));
+function setup(props: Record<string, unknown> = {}) {
+  return render(Finance, { props: { purchases: [display], disposals: [draft, sale], packs, canEdit: true, ...props } });
 }
+const text = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ') ?? '';
+function button(container: HTMLElement, label: string, scope: ParentNode = container) {
+  return Array.from(scope.querySelectorAll('button')).find(b => b.textContent?.includes(label)) as HTMLButtonElement;
+}
+const rowOf = (container: HTMLElement, tag: string) =>
+  Array.from(container.querySelectorAll('.log__item')).find(li => li.querySelector('.tag')?.textContent === tag)!;
 
 describe('Finance overview', () => {
-  it('summarises spend, value, and gain with and without tax & shipping', () => {
-    const { container } = render(Finance, { props: { purchases, packs } });
-    const cards = Array.from(container.querySelectorAll('.card')).map(c => c.textContent!.replace(/\s+/g, ' '));
-    expect(cards[0]).toContain('$137.18');
-    expect(cards[0]).toContain('31 packs');
-    expect(cards[0]).toContain('incl. $10.68 tax & shipping');
-    expect(cards[1]).toContain('$154.00');           // 30×5 + 1×4
-    expect(cards[2]).toContain('+$27.50');           // 154 − (121.50 + 5)
-    expect(cards[2]).toContain('+21.7%');
-    expect(cards[2]).toContain('+$16.82 after tax & shipping');
+  it('splits gains into realized and unrealized', () => {
+    const { container } = setup();
+    const cards = Array.from(container.querySelectorAll('.card')).map(text);
+    // 30 bought at $4.05 (121.50 without fees); 18 drafted, 2 sold → 10 held.
+    expect(cards[0]).toContain('$50.00');            // 10 × $5
+    expect(cards[0]).toContain('10 packs');
+    expect(cards[0]).toContain('cost $40.50');
+    expect(cards[1]).toContain('+$9.50');
+    expect(cards[1]).toContain('+23.5%');
+    // Draft: 60 − 72.90 = −12.90. Sale: 11 − 8.10 = +2.90.
+    expect(cards[2]).toContain('−$10.00');
+    expect(cards[2]).toContain('$71.00 collected');
+    expect(cards[3]).toContain('−$0.50');
+    expect(cards[3]).toContain('$132.18 invested');
+    expect(cards[3]).toContain('−$11.18 after $10.68 tax & shipping');
   });
 
-  it('shows a loss in red', () => {
-    const { container } = render(Finance, { props: { purchases: [single], packs } });
-    const gain = container.querySelectorAll('.card__value')[2];
-    expect(gain.textContent).toContain('−$1.00');
-    expect(gain.classList.contains('tone--bad')).toBe(true);
+  it('shows holdings with held / bought and realized per pack', () => {
+    const { container } = setup();
+    const row = container.querySelector('.holdings tbody tr')!;
+    expect(text(row)).toContain('10 / 30');
+    expect(text(row)).toContain('$4.05');
+    expect(text(row)).toContain('−$10.00');
   });
 
-  it('lists holdings per pack', () => {
-    const { container } = render(Finance, { props: { purchases, packs } });
-    const rows = container.querySelectorAll('.holdings tbody tr');
-    expect(rows).toHaveLength(2);
-    expect(rows[0].textContent).toContain('Bloomburrow');
-    expect(rows[0].textContent).toContain('$4.05'); // 121.50 / 30
-    expect(rows[0].textContent).toContain('+23.5%');
+  it('dims a closed position', () => {
+    const { container } = setup({ disposals: [{ ...draft, quantity: 30 }] });
+    expect(container.querySelector('.holdings tr.closed')).not.toBeNull();
   });
 
-  it('explains how to start when nothing is logged', () => {
-    const { container } = render(Finance, { props: { purchases: [], packs } });
+  it('explains how to start when there is nothing yet, read-only for viewers', () => {
+    const { container } = setup({ purchases: [], disposals: [], canEdit: false });
     expect(container.querySelector('.empty')).not.toBeNull();
     expect(container.querySelector('.holdings')).toBeNull();
-    expect(container.querySelector('.btn-link')).toBeNull(); // read-only without canEdit
+    expect(button(container, 'Log a purchase')).toBeUndefined();
   });
 });
 
-describe('Finance purchase log', () => {
-  it('shows each purchase against today\'s market, judged without tax & shipping', () => {
-    const { container } = render(Finance, { props: { purchases, packs } });
-    const items = container.querySelectorAll('.log__item');
-    expect(items[0].textContent).toContain('$132.18 for 30 packs');
-    expect(items[0].textContent).toContain('($4.05 each)');
-    expect(items[0].textContent).toContain('incl. $10.68 tax & shipping');
-    expect(items[0].textContent).toContain('19% under');
-    expect(items[1].textContent).toContain('25% over');
-    expect(container.querySelector('.btn-row')).toBeNull();
+describe('Finance activity', () => {
+  it('lists buys, drafts and sales with their results', () => {
+    const { container } = setup();
+    expect(Array.from(container.querySelectorAll('.tag')).map(t => t.textContent)).toEqual(['Sale', 'Draft', 'Buy']);
+    expect(text(rowOf(container, 'Sale'))).toContain('$12.00 for 2 packs ($6.00 each) · $1.00 fees');
+    expect(text(rowOf(container, 'Sale'))).toContain('+$2.90 gain');
+    expect(text(rowOf(container, 'Draft'))).toContain('18 packs opened');
+    expect(text(rowOf(container, 'Draft'))).toContain('$60.00 collected · market $90.00');
+    expect(text(rowOf(container, 'Draft'))).toContain('−$12.90 gain');
+    expect(text(rowOf(container, 'Buy'))).toContain('$132.18 for 30 packs ($4.05 each) · incl. $10.68 tax & shipping');
+    expect(text(rowOf(container, 'Buy'))).toContain('19% under');
   });
 
-  it('logs a purchase from a receipt with a total and fees', async () => {
-    const created = { ...single, id: 11, purchasedOn: localToday() };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => created });
-    vi.stubGlobal('fetch', fetchMock);
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-    await openForm(container);
-    expect(container.querySelector('option:not([disabled])')?.textContent).toContain('Aetherdrift');
+  it('says when a draft or sale has no logged cost', () => {
+    const { container } = setup({ purchases: [] });
+    expect(text(rowOf(container, 'Draft'))).toContain('no logged cost');
+    expect(text(rowOf(container, 'Sale'))).toContain('no logged cost');
+  });
 
-    const save = container.querySelector('.form .btn-save') as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
-    await act(() => fireEvent.change(container.querySelector('select')!, { target: { value: '2' } }));
-    const nums = container.querySelectorAll<HTMLInputElement>('.form input[type=number]');
+  it('notes packs without a cost in a partly covered draft', () => {
+    const { container } = setup({ purchases: [{ ...display, quantity: 10, totalPrice: 40, fees: 0 }], disposals: [draft] });
+    expect(text(rowOf(container, 'Draft'))).toContain('8 packs with no logged cost');
+  });
+
+  it('can\'t edit a draft whose draft was deleted', () => {
+    const { container } = setup({ disposals: [{ ...draft, draftId: null }] });
+    expect(button(container, 'Edit', rowOf(container, 'Draft'))).toBeUndefined();
+  });
+});
+
+describe('Finance purchases', () => {
+  it('logs a purchase from a receipt and keeps the date for the next line', async () => {
+    const created = { ...display, id: 11, packId: 2, setName: 'Aetherdrift', purchasedOn: localToday() };
+    const fetchMock = vi.fn().mockResolvedValue(ok(created, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Log a purchase')));
+    const form = container.querySelector('.form')!;
+    expect(text(form)).toContain('Aetherdrift — Play Booster · no price yet');
+    expect(text(form)).toContain('1 pack type with no price yet');
+
+    await act(() => fireEvent.change(form.querySelector('select')!, { target: { value: '2' } }));
+    const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
     await act(() => fireEvent.input(nums[0], { target: { value: '30' } }));
     await act(() => fireEvent.input(nums[1], { target: { value: '132.18' } }));
     await act(() => fireEvent.input(nums[2], { target: { value: '10.68' } }));
-    expect(save.disabled).toBe(false);
-    await act(() => fireEvent.submit(container.querySelector('form')!));
+    await act(() => fireEvent.click(form.querySelector('.check input')!));
+    await act(() => fireEvent.submit(form));
     await act(flush);
 
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/purchases');
-    expect(JSON.parse(init.body)).toEqual({
-      packId: 2, quantity: 30, paidTotal: 132.18, fees: 10.68, purchasedOn: localToday(), addToStock: false,
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      packId: 2, quantity: 30, paidTotal: 132.18, fees: 10.68, purchasedOn: localToday(), addToStock: true,
     });
-    expect(container.querySelectorAll('.log__item')).toHaveLength(3);
-    // Ready for the next receipt line.
-    expect((container.querySelector('select') as HTMLSelectElement).value).toBe('');
-    expect(nums[1].value).toBe('');
+    expect(container.querySelectorAll('.tag--buy')).toHaveLength(2);
+    expect((form.querySelector('select') as HTMLSelectElement).value).toBe('');
+    // Added to stock, so it can now be sold.
+    await act(() => fireEvent.click(button(container, 'Record a sale')));
+    expect(text(container.querySelector('.form'))).toContain('Aetherdrift — Play Booster (30 in stock)');
   });
 
-  it('marks packs with no logged price', async () => {
-    const { container } = render(Finance, { props: { purchases: [display], packs, canEdit: true } });
-    await openForm(container);
-    const options = Array.from(container.querySelectorAll('option')).map(o => o.textContent);
-    expect(options).toContain('Aetherdrift — Play Booster · no price yet');
-    expect(container.querySelector('.form__hint')!.textContent).toContain('1 pack type with no price yet');
-  });
-
-  it('shows the server error when logging fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => "fees can't be more than the total paid\n" }));
-    const { container } = render(Finance, { props: { purchases: [], packs, canEdit: true } });
-    await openForm(container);
-    await act(() => fireEvent.change(container.querySelector('select')!, { target: { value: '1' } }));
-    const nums = container.querySelectorAll<HTMLInputElement>('.form input[type=number]');
-    await act(() => fireEvent.input(nums[1], { target: { value: '4' } }));
-    await act(() => fireEvent.submit(container.querySelector('form')!));
+  it('keeps the form when logging fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => 'bad' }));
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Log a purchase')));
+    const form = container.querySelector('.form')!;
+    await act(() => fireEvent.change(form.querySelector('select')!, { target: { value: '1' } }));
+    await act(() => fireEvent.input(form.querySelectorAll('input[type=number]')[1], { target: { value: '4' } }));
+    await act(() => fireEvent.submit(form));
     await act(flush);
-    expect(toast.msg).toContain("fees can't be more than the total paid");
+    expect(toast.msg).toBe('Failed to log purchase: bad');
+    expect((form.querySelector('select') as HTMLSelectElement).value).toBe('1');
   });
-
-  it('reports a network failure when logging', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-    const { container } = render(Finance, { props: { purchases: [], packs, canEdit: true } });
-    await openForm(container);
-    await act(() => fireEvent.change(container.querySelector('select')!, { target: { value: '1' } }));
-    const nums = container.querySelectorAll<HTMLInputElement>('.form input[type=number]');
-    await act(() => fireEvent.input(nums[1], { target: { value: '4' } }));
-    await act(() => fireEvent.submit(container.querySelector('form')!));
-    await act(flush);
-    expect(toast.msg).toBe('Failed to log purchase');
-  });
-});
-
-describe('Finance editing', () => {
-  function editButton(container: HTMLElement) {
-    return Array.from(container.querySelectorAll('.btn-row')).find(b => b.textContent === 'Edit')!;
-  }
 
   it('edits a purchase in place', async () => {
-    const updated = { ...display, totalPrice: 135, fees: 12 };
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => updated });
+    const fetchMock = vi.fn().mockResolvedValue(ok({ ...display, totalPrice: 135, fees: 12 }));
     vi.stubGlobal('fetch', fetchMock);
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-
-    await act(() => fireEvent.click(editButton(container)));
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Edit', rowOf(container, 'Buy'))));
     const form = container.querySelector('.form--inline')!;
     const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
-    expect(nums[0].value).toBe('30');
-    expect(nums[1].value).toBe('132.18');
-    expect(nums[2].value).toBe('10.68');
+    expect([nums[0].value, nums[1].value, nums[2].value]).toEqual(['30', '132.18', '10.68']);
     await act(() => fireEvent.input(nums[1], { target: { value: '135' } }));
     await act(() => fireEvent.input(nums[2], { target: { value: '12' } }));
     await act(() => fireEvent.submit(form));
     await act(flush);
-
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/purchases/10');
-    expect(init.method).toBe('PUT');
-    expect(JSON.parse(init.body)).toEqual({ quantity: 30, paidTotal: 135, fees: 12, purchasedOn: '2026-11-01' });
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/purchases/10');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ quantity: 30, paidTotal: 135, fees: 12, purchasedOn: '2026-10-01' });
     expect(container.querySelector('.form--inline')).toBeNull();
-    expect(container.querySelector('.log__item')!.textContent).toContain('$135.00 for 30 packs');
+    expect(text(rowOf(container, 'Buy'))).toContain('$135.00 for 30 packs');
   });
 
-  it('can cancel an edit', async () => {
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-    await act(() => fireEvent.click(editButton(container)));
-    const cancel = Array.from(container.querySelectorAll('.btn-row')).find(b => b.textContent === 'Cancel')!;
-    await act(() => fireEvent.click(cancel));
+  it('cancels an edit', async () => {
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Edit', rowOf(container, 'Buy'))));
+    await act(() => fireEvent.click(button(container, 'Cancel')));
+    expect(container.querySelector('.form--inline')).toBeNull();
+  });
+
+  it('deletes a purchase after confirming', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }));
+    const { container } = setup();
+    await act(() => fireEvent.click(rowOf(container, 'Buy').querySelector('.btn-row--danger')!));
+    expect(toast.mode).toBe('confirm');
+    await act(async () => { toast.onConfirm!(); await flush(); });
+    expect(container.querySelector('.tag--buy')).toBeNull();
+  });
+});
+
+describe('Finance sales', () => {
+  it('records a sale and takes the packs out of stock', async () => {
+    const created = { ...sale, id: 22, quantity: 4, proceeds: 30 };
+    const fetchMock = vi.fn().mockResolvedValue(ok(created, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Record a sale')));
+    const form = container.querySelector('.form')!;
+    // Only packs in stock can be sold.
+    expect(Array.from(form.querySelectorAll('option:not([disabled])')).map(o => o.textContent))
+      .toEqual(['Bloomburrow — Play Booster (12 in stock)']);
+
+    await act(() => fireEvent.change(form.querySelector('select')!, { target: { value: '1' } }));
+    const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
+    await act(() => fireEvent.input(nums[0], { target: { value: '13' } }));
+    expect(text(form)).toContain('Only 12 in stock.');
+    expect(button(container, 'Record sale', form).disabled).toBe(true);
+    await act(() => fireEvent.input(nums[0], { target: { value: '4' } }));
+    await act(() => fireEvent.click(button(container, 'Each', form)));
+    await act(() => fireEvent.input(nums[1], { target: { value: '7.5' } }));
+    await act(() => fireEvent.input(nums[2], { target: { value: '2' } }));
+    await act(() => fireEvent.submit(form));
+    await act(flush);
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/sales');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      packId: 1, quantity: 4, salePrice: 7.5, fees: 2, soldOn: localToday(),
+    });
+    expect(container.querySelectorAll('.tag--sale')).toHaveLength(2);
+    expect(text(form.querySelector('select'))).toContain('(8 in stock)');
+  });
+
+  it('edits a sale and adjusts stock by the difference', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ ...sale, quantity: 5, proceeds: 30 })));
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Edit', rowOf(container, 'Sale'))));
+    const form = container.querySelector('.form--inline')!;
+    const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
+    expect([nums[0].value, nums[1].value, nums[2].value]).toEqual(['2', '12', '1']);
+    await act(() => fireEvent.input(nums[0], { target: { value: '5' } }));
+    await act(() => fireEvent.input(nums[1], { target: { value: '30' } }));
+    await act(() => fireEvent.submit(form));
+    await act(flush);
+    expect(text(rowOf(container, 'Sale'))).toContain('$30.00 for 5 packs');
+    await act(() => fireEvent.click(button(container, 'Record a sale')));
+    expect(text(container.querySelector('.form select'))).toContain('(9 in stock)');
+  });
+
+  it('undoes a sale, putting the packs back', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }));
+    const { container } = setup();
+    await act(() => fireEvent.click(rowOf(container, 'Sale').querySelector('.btn-row--danger')!));
+    expect(toast.msg).toContain('The packs go back into stock');
+    await act(async () => { toast.onConfirm!(); await flush(); });
+    expect(container.querySelector('.tag--sale')).toBeNull();
+    await act(() => fireEvent.click(button(container, 'Record a sale')));
+    expect(text(container.querySelector('.form select'))).toContain('(14 in stock)');
+  });
+
+  it('keeps a sale when undoing fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => '' }));
+    const { container } = setup();
+    await act(() => fireEvent.click(rowOf(container, 'Sale').querySelector('.btn-row--danger')!));
+    await act(async () => { toast.onConfirm!(); await flush(); });
+    expect(container.querySelector('.tag--sale')).not.toBeNull();
+    expect(toast.msg).toBe('Failed to undo sale: 500');
+  });
+});
+
+describe('Finance drafts', () => {
+  it('corrects what was collected for a draft', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([{ ...draft, proceeds: 45 }]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Edit', rowOf(container, 'Draft'))));
+    const form = container.querySelector('.form--inline')!;
+    const input = form.querySelector<HTMLInputElement>('input[type=number]')!;
+    expect(input.value).toBe('60');
+    await act(() => fireEvent.input(input, { target: { value: '45' } }));
+    await act(() => fireEvent.submit(form));
+    await act(flush);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/drafts/7/collected');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ amount: 45 });
+    expect(text(rowOf(container, 'Draft'))).toContain('$45.00 collected');
     expect(container.querySelector('.form--inline')).toBeNull();
   });
 
   it('keeps the edit open when saving fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => '' }));
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-    await act(() => fireEvent.click(editButton(container)));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404, text: async () => 'draft not approved' }));
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Edit', rowOf(container, 'Draft'))));
     await act(() => fireEvent.submit(container.querySelector('.form--inline')!));
     await act(flush);
-    expect(toast.msg).toBe('Failed to save: 400');
+    expect(toast.msg).toBe('Failed to save: draft not approved');
     expect(container.querySelector('.form--inline')).not.toBeNull();
-  });
-
-  it('reports a network failure when saving', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-    await act(() => fireEvent.click(editButton(container)));
-    await act(() => fireEvent.submit(container.querySelector('.form--inline')!));
-    await act(flush);
-    expect(toast.msg).toBe('Failed to save purchase');
-  });
-
-  it('deletes a purchase after confirming', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    vi.stubGlobal('fetch', fetchMock);
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-    await act(() => fireEvent.click(container.querySelector('.btn-row--danger')!));
-    expect(toast.mode).toBe('confirm');
-    await act(async () => { toast.onConfirm!(); await flush(); });
-    expect(fetchMock).toHaveBeenCalledWith('/api/purchases/10', { method: 'DELETE' });
-    expect(container.querySelectorAll('.log__item')).toHaveLength(1);
-  });
-
-  it('keeps the purchase when deleting fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'oops' }));
-    const { container } = render(Finance, { props: { purchases, packs, canEdit: true } });
-    await act(() => fireEvent.click(container.querySelector('.btn-row--danger')!));
-    await act(async () => { toast.onConfirm!(); await flush(); });
-    expect(container.querySelectorAll('.log__item')).toHaveLength(2);
-    expect(toast.type).toBe('error');
   });
 });

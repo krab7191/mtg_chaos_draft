@@ -25,17 +25,23 @@ func NewPurchaseHandler(pool *pgxpool.Pool) *PurchaseHandler {
 // total (a display bought for one price). It returns nil when neither is set,
 // and a message for the client when the input is invalid.
 func paidTotal(perPack, total *float64, quantity int) (*float64, string) {
+	return resolveTotal(perPack, total, quantity, "paidPrice", "paidTotal")
+}
+
+// resolveTotal turns a per-pack price or a total (named perName / totalName
+// in the request) into the total for quantity packs.
+func resolveTotal(perPack, total *float64, quantity int, perName, totalName string) (*float64, string) {
 	switch {
 	case perPack != nil && total != nil:
-		return nil, "send paidPrice or paidTotal, not both"
+		return nil, "send " + perName + " or " + totalName + ", not both"
 	case total != nil:
 		if *total < 0 {
-			return nil, "paidTotal must not be negative"
+			return nil, totalName + " must not be negative"
 		}
 		return total, ""
 	case perPack != nil:
 		if *perPack < 0 {
-			return nil, "paidPrice must not be negative"
+			return nil, perName + " must not be negative"
 		}
 		t := *perPack * float64(quantity)
 		return &t, ""

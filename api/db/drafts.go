@@ -203,5 +203,10 @@ func ApproveDraft(ctx context.Context, pool *pgxpool.Pool, draftID, userID int) 
 		return err
 	}
 
+	// Log what left the collection and what players paid, for the Finance page.
+	if err := recordDraftDisposals(ctx, tx, draftID); err != nil {
+		return err
+	}
+
 	return tx.Commit(ctx)
 }

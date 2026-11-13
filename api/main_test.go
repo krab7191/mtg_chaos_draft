@@ -108,6 +108,12 @@ func TestRouter_Permissions(t *testing.T) {
 		{"log purchase validates for admin", http.MethodPost, "/api/purchases", admin, http.StatusBadRequest},
 		{"edit purchase forbidden for viewer", http.MethodPut, "/api/purchases/1", viewer, http.StatusForbidden},
 		{"edit purchase validates for admin", http.MethodPut, "/api/purchases/1", admin, http.StatusBadRequest},
+		{"disposals forbidden for user", http.MethodGet, "/api/disposals", user, http.StatusForbidden},
+		{"disposals for viewer", http.MethodGet, "/api/disposals", viewer, http.StatusOK},
+		{"record sale forbidden for viewer", http.MethodPost, "/api/sales", viewer, http.StatusForbidden},
+		{"record sale validates for admin", http.MethodPost, "/api/sales", admin, http.StatusBadRequest},
+		{"undo sale forbidden for viewer", http.MethodDelete, "/api/sales/1", viewer, http.StatusForbidden},
+		{"set collected forbidden for viewer", http.MethodPut, "/api/drafts/1/collected", viewer, http.StatusForbidden},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
