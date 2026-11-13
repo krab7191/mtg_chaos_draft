@@ -1,18 +1,21 @@
 <script lang="ts">
   import PriceInput from './PriceInput.svelte';
+  import PackPicker, { type PackChoice, type PickerPack } from './PackPicker.svelte';
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import { localToday, priceFields, type Purchase, type PriceMode } from '../../lib/purchases';
 
-  interface PackOption { id: number; setName: string; productType: string }
+  /** A pack that was just created in the collection (picked from MTGStocks). */
+  interface NewPack extends PickerPack { quantity: number; marketPrice: number | null }
 
-  let { packs, loggedIds, oncreated }: {
-    packs: PackOption[];
+  let { packs, loggedIds, oncreated, onpackadded }: {
+    packs: PickerPack[];
     loggedIds: Set<number>;
     oncreated: (p: Purchase, addedToStock: boolean) => void;
+    onpackadded: (pack: NewPack) => void;
   } = $props();
 
-  let packId     = $state<number | ''>('');
+  let choice     = $state<PackChoice | null>(null);
   let quantity   = $state(1);
   let paid       = $state<number | null>(null);
   let mode       = $state<PriceMode>('total');
@@ -22,21 +25,36 @@
   let saving     = $state(false);
 
   const unlogged = $derived(packs.filter(p => !loggedIds.has(p.id)).length);
-  const ok = $derived(packId !== '' && quantity >= 1 && paid != null && paid >= 0 && (fees == null || fees >= 0) && !!date && !saving);
+  const ok = $derived(choice != null && quantity >= 1 && paid != null && paid >= 0 && (fees == null || fees >= 0) && !!date && !saving);
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
     if (!ok) return;
     saving = true;
-    const created = await send<Purchase>('/api/purchases', 'POST', {
-      packId, quantity, ...priceFields(mode, paid!), fees: fees ?? 0, purchasedOn: date, addToStock,
-    }, 'Failed to log purchase');
+    const purchase = { quantity, ...priceFields(mode, paid!), fees: fees ?? 0, purchasedOn: date, addToStock };
+    let created: Purchase | null = null;
+    if (choice!.kind === 'pack') {
+      const res = await send<Purchase>('/api/purchases', 'POST', { packId: choice!.pack.id, ...purchase }, 'Failed to log purchase');
+      if (res && res !== true) created = res;
+    } else {
+      // Not in the collection yet: add the pack (no stock unless ticked) and the purchase together.
+      const c = choice!.product;
+      const res = await send<NewPack & { purchase?: Purchase }>('/api/collection', 'POST', {
+        mtgstocksId: c.mtgstocksId, name: c.name, setName: c.setName, setCode: c.setCode,
+        productType: c.productType, marketPrice: c.marketPrice, weight: 1, ...purchase,
+      }, 'Failed to add pack');
+      if (res && res !== true) {
+        const { purchase: bought, ...pack } = res;
+        onpackadded(pack);
+        created = bought ?? null;
+      }
+    }
     saving = false;
-    if (!created || created === true) return;
+    if (!created) return;
     oncreated(created, addToStock);
     toast.show('Purchase logged', 'success');
     // Keep the date for the next line of the same receipt.
-    packId = '';
+    choice = null;
     paid = null;
     fees = null;
     quantity = 1;
@@ -44,15 +62,8 @@
 </script>
 
 <form class="form" onsubmit={submit}>
-  <label class="field field--wide">
-    <span>Pack</span>
-    <select bind:value={packId} required>
-      <option value="" disabled>Choose a pack…</option>
-      {#each packs as p (p.id)}
-        <option value={p.id}>{p.setName} — {p.productType}{loggedIds.has(p.id) ? '' : ' · no price yet'}</option>
-      {/each}
-    </select>
-  </label>
+  <PackPicker {packs} bind:value={choice} searchCatalog
+    describe={p => (loggedIds.has(p.id) ? '' : ' · no price yet')} />
   <label class="field">
     <span>Qty</span>
     <input type="number" min="1" max="999" bind:value={quantity} required />

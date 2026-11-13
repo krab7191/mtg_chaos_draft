@@ -15,7 +15,7 @@ func TestAddPackWithPurchase_RecordsPurchase(t *testing.T) {
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
 
-	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61001, "MH3", "Modern Horizons 3", "MH3", "Play Booster", 6, 1.0, fptr(7.5), 14, 31.5, 0, "2026-10-01")
+	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61001, "MH3", "Modern Horizons 3", "MH3", "Play Booster", 6, 6, 1.0, fptr(7.5), 14, 31.5, 0, "2026-10-01")
 	if err != nil {
 		t.Fatalf("AddPackWithPurchase: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestAddPackWithPurchase_RecordsPurchase(t *testing.T) {
 	}
 
 	// Buying more of the same pack merges stock and adds a second purchase.
-	pack, _, err = db.AddPackWithPurchase(ctx, pool, 61001, "MH3", "Modern Horizons 3", "MH3", "Play Booster", 2, 1.0, nil, 14, 6, 0, "")
+	pack, _, err = db.AddPackWithPurchase(ctx, pool, 61001, "MH3", "Modern Horizons 3", "MH3", "Play Booster", 2, 2, 1.0, nil, 14, 6, 0, "")
 	if err != nil {
 		t.Fatalf("second AddPackWithPurchase: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestAddPackWithPurchase_RollsBackOnBadPurchase(t *testing.T) {
 	ctx := context.Background()
 
 	// Negative prices violate the table's CHECK, so the pack must not be added either.
-	if _, _, err := db.AddPackWithPurchase(ctx, pool, 61002, "X", "X", "", "Booster", 1, 1.0, nil, 15, -1, 0, ""); err == nil {
+	if _, _, err := db.AddPackWithPurchase(ctx, pool, 61002, "X", "X", "", "Booster", 1, 1, 1.0, nil, 15, -1, 0, ""); err == nil {
 		t.Fatal("want error for negative price")
 	}
 	packs, _ := db.ListCollection(ctx, pool)
@@ -100,7 +100,7 @@ func TestDeletePurchase_AndCascade(t *testing.T) {
 	pool := testhelper.Pool(t)
 	testhelper.Truncate(t, pool, "collection_packs")
 	ctx := context.Background()
-	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61004, "BLB", "Bloomburrow", "BLB", "Play Booster", 1, 1.0, nil, 14, 4, 0, "")
+	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61004, "BLB", "Bloomburrow", "BLB", "Play Booster", 1, 1, 1.0, nil, 14, 4, 0, "")
 	if err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestUpdatePurchase(t *testing.T) {
 	ctx := context.Background()
 	today := time.Now().Format(time.DateOnly)
 
-	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61005, "TDM", "Tarkir: Dragonstorm", "TDM", "Play Booster", 30, 1.0, fptr(5), 14, 130, 0, "")
+	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61005, "TDM", "Tarkir: Dragonstorm", "TDM", "Play Booster", 30, 30, 1.0, fptr(5), 14, 130, 0, "")
 	if err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -157,5 +157,20 @@ func TestUpdatePurchase(t *testing.T) {
 
 	if _, err := db.UpdatePurchase(ctx, pool, 999999, 1, 1, 0, today); !errors.Is(err, db.ErrPurchaseNotFound) {
 		t.Errorf("missing purchase: want ErrPurchaseNotFound, got %v", err)
+	}
+}
+
+func TestAddPackWithPurchase_WithoutStock(t *testing.T) {
+	pool := testhelper.Pool(t)
+	testhelper.Truncate(t, pool, "collection_packs")
+	ctx := context.Background()
+
+	// Back-filling packs since opened: the pack exists with no stock.
+	pack, p, err := db.AddPackWithPurchase(ctx, pool, 61009, "LTR", "Tales of Middle-earth", "LTR", "Set Booster", 32, 0, 1.0, nil, 14, 210.12, 0, "2023-10-06")
+	if err != nil {
+		t.Fatalf("AddPackWithPurchase: %v", err)
+	}
+	if pack.Quantity != 0 || p.Quantity != 32 || p.TotalPrice != 210.12 {
+		t.Errorf("want 0 in stock and 32 bought, got stock %d, purchase %+v", pack.Quantity, p)
 	}
 }

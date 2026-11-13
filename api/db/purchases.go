@@ -65,16 +65,17 @@ func AddPurchase(ctx context.Context, q Querier, packID, quantity int, totalPric
 	return p, err
 }
 
-// AddPackWithPurchase adds packs to the collection (merging stock like AddPack)
-// and records what was paid for them, atomically.
-func AddPackWithPurchase(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, setName, setCode, productType string, quantity int, weight float64, marketPrice *float64, cardsPerPack int, totalPrice, fees float64, purchasedOn string) (*CollectionPack, *Purchase, error) {
+// AddPackWithPurchase records buying quantity packs and adds stockQuantity of
+// them to the collection (merging stock like AddPack), atomically. A stock
+// quantity of 0 still creates the pack, for back-filling packs since opened.
+func AddPackWithPurchase(ctx context.Context, pool *pgxpool.Pool, mtgstocksID int, name, setName, setCode, productType string, quantity, stockQuantity int, weight float64, marketPrice *float64, cardsPerPack int, totalPrice, fees float64, purchasedOn string) (*CollectionPack, *Purchase, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	pack, err := AddPack(ctx, tx, mtgstocksID, name, setName, setCode, productType, quantity, weight, marketPrice, cardsPerPack)
+	pack, err := AddPack(ctx, tx, mtgstocksID, name, setName, setCode, productType, stockQuantity, weight, marketPrice, cardsPerPack)
 	if err != nil {
 		return nil, nil, err
 	}

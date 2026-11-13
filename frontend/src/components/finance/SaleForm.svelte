@@ -1,5 +1,6 @@
 <script lang="ts">
   import PriceInput from './PriceInput.svelte';
+  import PackPicker, { type PackChoice } from './PackPicker.svelte';
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import { localToday, type PriceMode } from '../../lib/purchases';
@@ -14,7 +15,8 @@
 
   const inStock = $derived(packs.filter(p => p.quantity > 0));
 
-  let packId   = $state<number | ''>('');
+  let choice   = $state<PackChoice | null>(null);
+  const packId = $derived(choice?.kind === 'pack' ? choice.pack.id : null);
   let quantity = $state(1);
   let price    = $state<number | null>(null);
   let mode     = $state<PriceMode>('total');
@@ -24,7 +26,7 @@
 
   const stock = $derived(packs.find(p => p.id === packId)?.quantity ?? 0);
   const ok = $derived(
-    packId !== '' && quantity >= 1 && quantity <= stock && price != null && price >= 0 &&
+    packId != null && quantity >= 1 && quantity <= stock && price != null && price >= 0 &&
     (fees == null || fees >= 0) && !!date && !saving,
   );
 
@@ -40,7 +42,7 @@
     if (!created || created === true) return;
     oncreated(created);
     toast.show('Sale recorded', 'success');
-    packId = '';
+    choice = null;
     price = null;
     fees = null;
     quantity = 1;
@@ -48,15 +50,8 @@
 </script>
 
 <form class="form" onsubmit={submit}>
-  <label class="field field--wide">
-    <span>Pack</span>
-    <select bind:value={packId} required>
-      <option value="" disabled>Choose a pack…</option>
-      {#each inStock as p (p.id)}
-        <option value={p.id}>{p.setName} — {p.productType} ({p.quantity} in stock)</option>
-      {/each}
-    </select>
-  </label>
+  <PackPicker packs={inStock} bind:value={choice}
+    describe={p => ` (${inStock.find(x => x.id === p.id)?.quantity ?? 0} in stock)`} />
   <label class="field">
     <span>Qty</span>
     <input type="number" min="1" max={stock || undefined} bind:value={quantity} required />
@@ -73,6 +68,6 @@
   <button class="btn-save" type="submit" disabled={!ok}>{saving ? 'Saving…' : 'Record sale'}</button>
   <p class="form__hint">
     The packs come out of stock. Fees are what the sale cost you (marketplace fees, postage).
-    {#if packId !== '' && quantity > stock}<strong>Only {stock} in stock.</strong>{/if}
+    {#if packId != null && quantity > stock}<strong>Only {stock} in stock.</strong>{/if}
   </p>
 </form>

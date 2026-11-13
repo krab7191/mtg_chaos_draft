@@ -16,6 +16,7 @@
     productType: string;
     quantity: number;
     marketPrice: number | null;
+    mtgstocksId?: number | null;
   }
 
   let { purchases: initialPurchases, disposals: initialDisposals, packs: initialPacks, canEdit = false }: {
@@ -48,6 +49,9 @@
   function onPurchase(p: Purchase, addedToStock: boolean) {
     purchases = [p, ...purchases].sort(byNewest);
     if (addedToStock) moveStock(p.packId, p.quantity);
+  }
+  function onPackAdded(p: Pack) {
+    if (!packs.some(x => x.id === p.id)) packs = [...packs, p];
   }
   function onPurchaseSaved(p: Purchase) {
     purchases = purchases.map(x => (x.id === p.id ? p : x)).sort(byNewest);
@@ -209,7 +213,7 @@
     </div>
 
     {#if canEdit && openForm === 'buy'}
-      <PurchaseForm packs={packOptions} {loggedIds} oncreated={onPurchase} />
+      <PurchaseForm packs={packOptions} {loggedIds} oncreated={onPurchase} onpackadded={onPackAdded} />
     {:else if canEdit && openForm === 'sale'}
       <SaleForm packs={packOptions} oncreated={onSale} />
     {/if}

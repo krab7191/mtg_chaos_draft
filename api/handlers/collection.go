@@ -46,6 +46,8 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 		PaidTotal   *float64 `json:"paidTotal"`
 		Fees        *float64 `json:"fees"` // tax & shipping within the price paid
 		PurchasedOn string   `json:"purchasedOn"`
+		// Default true. False logs the purchase without adding stock (packs since opened).
+		AddToStock *bool `json:"addToStock"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -73,13 +75,18 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	if body.Weight == 0 {
 		body.Weight = 1.0
 	}
+	stock := body.Quantity
+	if body.AddToStock != nil && !*body.AddToStock {
+		stock = 0
+	}
 	cardsPerPack := lookupCardsPerPack(body.SetCode, body.ProductType)
 	var pack *db.CollectionPack
+	var purchase *db.Purchase
 	var err error
 	if total != nil {
-		pack, _, err = db.AddPackWithPurchase(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack, *total, fees, body.PurchasedOn)
+		pack, purchase, err = db.AddPackWithPurchase(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, stock, body.Weight, body.MarketPrice, cardsPerPack, *total, fees, body.PurchasedOn)
 	} else {
-		pack, err = db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, body.Quantity, body.Weight, body.MarketPrice, cardsPerPack)
+		pack, err = db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, stock, body.Weight, body.MarketPrice, cardsPerPack)
 	}
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
@@ -87,7 +94,11 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(pack)
+	// The pack, plus the purchase when one was logged.
+	_ = json.NewEncoder(w).Encode(struct {
+		*db.CollectionPack
+		Purchase *db.Purchase `json:"purchase,omitempty"`
+	}{pack, purchase})
 }
 
 func (h *CollectionHandler) Update(w http.ResponseWriter, r *http.Request) {

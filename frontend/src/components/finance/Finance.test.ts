@@ -32,6 +32,18 @@ const text = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ') ?? ''
 function button(container: HTMLElement, label: string, scope: ParentNode = container) {
   return Array.from(scope.querySelectorAll('button')).find(b => b.textContent?.includes(label)) as HTMLButtonElement;
 }
+async function openPicker(scope: ParentNode) {
+  const input = scope.querySelector<HTMLInputElement>('input[type=search]')!;
+  await act(() => fireEvent.focus(input));
+  return input;
+}
+const pickerItems = (scope: ParentNode) => Array.from(scope.querySelectorAll('.picker__item')).map(text);
+async function pick(scope: ParentNode, name: string) {
+  const input = await openPicker(scope);
+  await act(() => fireEvent.input(input, { target: { value: name } }));
+  const item = Array.from(scope.querySelectorAll('.picker__item')).find(b => b.textContent?.includes(name))!;
+  await act(() => fireEvent.click(item));
+}
 const rowOf = (container: HTMLElement, tag: string) =>
   Array.from(container.querySelectorAll('.log__item')).find(li => li.querySelector('.tag')?.textContent === tag)!;
 
@@ -127,10 +139,11 @@ describe('Finance purchases', () => {
     const { container } = setup();
     await act(() => fireEvent.click(button(container, 'Log a purchase')));
     const form = container.querySelector('.form')!;
-    expect(text(form)).toContain('Aetherdrift — Play Booster · no price yet');
+    await openPicker(form);
+    expect(pickerItems(form)).toContain('Aetherdrift — Play Booster · no price yet');
     expect(text(form)).toContain('1 pack type with no price yet');
 
-    await act(() => fireEvent.change(form.querySelector('select')!, { target: { value: '2' } }));
+    await pick(form, 'Aetherdrift');
     const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
     await act(() => fireEvent.input(nums[0], { target: { value: '30' } }));
     await act(() => fireEvent.input(nums[1], { target: { value: '132.18' } }));
@@ -143,10 +156,11 @@ describe('Finance purchases', () => {
       packId: 2, quantity: 30, paidTotal: 132.18, fees: 10.68, purchasedOn: localToday(), addToStock: true,
     });
     expect(container.querySelectorAll('.tag--buy')).toHaveLength(2);
-    expect((form.querySelector('select') as HTMLSelectElement).value).toBe('');
+    expect(form.querySelector<HTMLInputElement>('input[type=search]')!.value).toBe('');
     // Added to stock, so it can now be sold.
     await act(() => fireEvent.click(button(container, 'Record a sale')));
-    expect(text(container.querySelector('.form'))).toContain('Aetherdrift — Play Booster (30 in stock)');
+    await openPicker(container.querySelector('.form')!);
+    expect(pickerItems(container)).toContain('Aetherdrift — Play Booster (30 in stock)');
   });
 
   it('keeps the form when logging fails', async () => {
@@ -154,12 +168,12 @@ describe('Finance purchases', () => {
     const { container } = setup();
     await act(() => fireEvent.click(button(container, 'Log a purchase')));
     const form = container.querySelector('.form')!;
-    await act(() => fireEvent.change(form.querySelector('select')!, { target: { value: '1' } }));
+    await pick(form, 'Bloomburrow');
     await act(() => fireEvent.input(form.querySelectorAll('input[type=number]')[1], { target: { value: '4' } }));
     await act(() => fireEvent.submit(form));
     await act(flush);
     expect(toast.msg).toBe('Failed to log purchase: bad');
-    expect((form.querySelector('select') as HTMLSelectElement).value).toBe('1');
+    expect(form.querySelector<HTMLInputElement>('input[type=search]')!.value).toBe('Bloomburrow — Play Booster');
   });
 
   it('edits a purchase in place', async () => {
@@ -197,6 +211,94 @@ describe('Finance purchases', () => {
   });
 });
 
+describe('Finance purchases of packs not in the collection', () => {
+  it('finds a set on MTGStocks and adds it with the purchase, without stock', async () => {
+    const product = {
+      mtgstocksId: 501, name: 'Homelands Booster', setName: 'Homelands', setCode: 'HML',
+      productType: 'Booster Pack', marketPrice: 15,
+    };
+    const added = {
+      id: 3, setName: 'Homelands', productType: 'Booster Pack', quantity: 0, marketPrice: 15, mtgstocksId: 501,
+      purchase: {
+        id: 30, packId: 3, setName: 'Homelands', productType: 'Booster Pack', quantity: 4,
+        totalPrice: 55.92, fees: 5.92, unitPrice: 13.98, currentPrice: 15, purchasedOn: '2026-03-29',
+      },
+    };
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(url.startsWith('/api/search')
+        ? ok([product, { ...product, mtgstocksId: 999, setName: 'Bloomburrow', productType: 'Play Booster' }])
+        : ok(added, 201)));
+    // The Bloomburrow result is already in the collection (by MTGStocks ID), so it isn't offered twice.
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = setup({ packs: [{ ...packs[0], mtgstocksId: 999 }, packs[1]] });
+    await act(() => fireEvent.click(button(container, 'Log a purchase')));
+    const form = container.querySelector('.form')!;
+
+    const input = await openPicker(form);
+    await act(() => fireEvent.input(input, { target: { value: 'homelands' } }));
+    expect(text(form.querySelector('.picker__list'))).toContain('Searching…');
+    await act(() => new Promise(r => setTimeout(r, 450)));
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/search?q=homelands');
+    expect(pickerItems(form)).toEqual(['Homelands — Booster Pack $15.00']);
+    await act(() => fireEvent.click(form.querySelector('.picker__item')!));
+    expect(text(form)).toContain("Not in your collection yet: it'll be added.");
+
+    const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
+    await act(() => fireEvent.input(nums[0], { target: { value: '4' } }));
+    await act(() => fireEvent.input(nums[1], { target: { value: '55.92' } }));
+    await act(() => fireEvent.input(nums[2], { target: { value: '5.92' } }));
+    await act(() => fireEvent.submit(form));
+    await act(flush);
+
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toBe('/api/collection');
+    expect(JSON.parse(init.body)).toEqual({
+      mtgstocksId: 501, name: 'Homelands Booster', setName: 'Homelands', setCode: 'HML',
+      productType: 'Booster Pack', marketPrice: 15, weight: 1,
+      quantity: 4, paidTotal: 55.92, fees: 5.92, purchasedOn: localToday(), addToStock: false,
+    });
+    expect(text(container.querySelector('.log'))).toContain('$55.92 for 4 packs');
+    // Now it's in the collection, so the picker offers it from there.
+    await openPicker(form);
+    expect(pickerItems(form)).toContain('Homelands — Booster Pack');
+  });
+
+  it('says when nothing else matches, and ignores a failed search', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Log a purchase')));
+    const form = container.querySelector('.form')!;
+    const input = await openPicker(form);
+    await act(() => fireEvent.input(input, { target: { value: 'zzz' } }));
+    await act(() => new Promise(r => setTimeout(r, 450)));
+    expect(text(form.querySelector('.picker__list'))).toContain('No other matches');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await act(() => fireEvent.input(input, { target: { value: 'zzzz' } }));
+    await act(() => new Promise(r => setTimeout(r, 450)));
+    expect(text(form.querySelector('.picker__list'))).toContain('No other matches');
+  });
+
+  it('picks the first match with Enter and closes with Escape', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok([])));
+    const { container } = setup();
+    await act(() => fireEvent.click(button(container, 'Record a sale')));
+    const form = container.querySelector('.form')!;
+    const input = await openPicker(form);
+    await act(() => fireEvent.input(input, { target: { value: 'bloom' } }));
+    await act(() => fireEvent.keyDown(input, { key: 'Enter' }));
+    expect(input.value).toBe('Bloomburrow — Play Booster');
+    expect(form.querySelector('.picker__list')).toBeNull();
+    await act(() => fireEvent.focus(input));
+    await act(() => fireEvent.keyDown(input, { key: 'Escape' }));
+    expect(form.querySelector('.picker__list')).toBeNull();
+    await act(() => fireEvent.focus(input));
+    await act(() => fireEvent.input(input, { target: { value: 'nothing like it' } }));
+    expect(text(form.querySelector('.picker__list'))).toContain('No matches');
+    await act(() => fireEvent.keyDown(input, { key: 'Enter' }));
+    expect(input.value).toBe('nothing like it');
+  });
+});
+
 describe('Finance sales', () => {
   it('records a sale and takes the packs out of stock', async () => {
     const created = { ...sale, id: 22, quantity: 4, proceeds: 30 };
@@ -206,10 +308,10 @@ describe('Finance sales', () => {
     await act(() => fireEvent.click(button(container, 'Record a sale')));
     const form = container.querySelector('.form')!;
     // Only packs in stock can be sold.
-    expect(Array.from(form.querySelectorAll('option:not([disabled])')).map(o => o.textContent))
-      .toEqual(['Bloomburrow — Play Booster (12 in stock)']);
+    await openPicker(form);
+    expect(pickerItems(form)).toEqual(['Bloomburrow — Play Booster (12 in stock)']);
 
-    await act(() => fireEvent.change(form.querySelector('select')!, { target: { value: '1' } }));
+    await pick(form, 'Bloomburrow');
     const nums = form.querySelectorAll<HTMLInputElement>('input[type=number]');
     await act(() => fireEvent.input(nums[0], { target: { value: '13' } }));
     expect(text(form)).toContain('Only 12 in stock.');
@@ -226,7 +328,8 @@ describe('Finance sales', () => {
       packId: 1, quantity: 4, salePrice: 7.5, fees: 2, soldOn: localToday(),
     });
     expect(container.querySelectorAll('.tag--sale')).toHaveLength(2);
-    expect(text(form.querySelector('select'))).toContain('(8 in stock)');
+    await openPicker(form);
+    expect(pickerItems(form).join()).toContain('(8 in stock)');
   });
 
   it('edits a sale and adjusts stock by the difference', async () => {
@@ -242,7 +345,8 @@ describe('Finance sales', () => {
     await act(flush);
     expect(text(rowOf(container, 'Sale'))).toContain('$30.00 for 5 packs');
     await act(() => fireEvent.click(button(container, 'Record a sale')));
-    expect(text(container.querySelector('.form select'))).toContain('(9 in stock)');
+    await openPicker(container.querySelector('.form')!);
+    expect(pickerItems(container).join()).toContain('(9 in stock)');
   });
 
   it('undoes a sale, putting the packs back', async () => {
@@ -253,7 +357,8 @@ describe('Finance sales', () => {
     await act(async () => { toast.onConfirm!(); await flush(); });
     expect(container.querySelector('.tag--sale')).toBeNull();
     await act(() => fireEvent.click(button(container, 'Record a sale')));
-    expect(text(container.querySelector('.form select'))).toContain('(14 in stock)');
+    await openPicker(container.querySelector('.form')!);
+    expect(pickerItems(container).join()).toContain('(14 in stock)');
   });
 
   it('keeps a sale when undoing fails', async () => {

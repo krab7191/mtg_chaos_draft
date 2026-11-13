@@ -280,3 +280,41 @@ func TestPurchaseHandler_Update_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionHandler_Add_PurchaseWithoutStock(t *testing.T) {
+	testhelper.Truncate(t, testhelper.Pool(t), "collection_packs")
+	h := newCollectionHandler(t)
+	rr := postJSON(t, h.Add, "/api/collection", map[string]any{
+		"mtgstocksId": 62010, "setName": "Homelands", "productType": "Booster Pack",
+		"quantity": 4, "paidTotal": 55.92, "fees": 5.92, "purchasedOn": "2026-03-29", "addToStock": false,
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d — %s", rr.Code, rr.Body)
+	}
+	var got struct {
+		db.CollectionPack
+		Purchase *db.Purchase `json:"purchase"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Quantity != 0 || got.Purchase == nil || got.Purchase.Quantity != 4 || got.Purchase.PackID != got.ID {
+		t.Errorf("want pack with no stock and a 4-pack purchase, got %+v / %+v", got.CollectionPack, got.Purchase)
+	}
+}
+
+func TestCollectionHandler_Add_NoPurchaseInResponseWithoutPrice(t *testing.T) {
+	testhelper.Truncate(t, testhelper.Pool(t), "collection_packs")
+	h := newCollectionHandler(t)
+	rr := postJSON(t, h.Add, "/api/collection", map[string]any{
+		"mtgstocksId": 62011, "setName": "Chronicles", "productType": "Booster Pack", "quantity": 2,
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status: want 201, got %d", rr.Code)
+	}
+	var got map[string]any
+	_ = json.NewDecoder(rr.Body).Decode(&got)
+	if _, ok := got["purchase"]; ok || got["quantity"] != float64(2) {
+		t.Errorf("unexpected response: %v", got)
+	}
+}
