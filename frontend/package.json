@@ -11,7 +11,7 @@
     "test": "vitest run --coverage && node -e \"const s=JSON.parse(require('fs').readFileSync('./coverage/coverage-summary.json','utf8'));console.log('Coverage: '+s.total.statements.pct+'%')\""
   },
   "engines": {
-    "node": ">=24.15.0"
+    "node": ">=26.13.1"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.12",
@@ -25,7 +25,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.1.0",
     "jsdom": "^31.0.1",
     "svelte-check": "^4.7.8",

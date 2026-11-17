@@ -29,7 +29,8 @@ func (c *blockedCounter) RoundTrip(r *http.Request) (*http.Response, error) {
 func withTransport(rt http.RoundTripper, f func()) {
 	orig := mtgstocksClient
 	mtgstocksClient = &http.Client{Transport: rt}
-	defer func() { mtgstocksClient = orig }()
+	resetMTGStocksBackoff()
+	defer func() { mtgstocksClient = orig; resetMTGStocksBackoff() }()
 	f()
 }
 

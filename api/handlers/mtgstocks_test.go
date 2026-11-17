@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // ── mock transports ────────────────────────────────────────────────────────────
@@ -33,14 +34,16 @@ func (errTransport) RoundTrip(*http.Request) (*http.Response, error) {
 func withMockClient(statusCode int, body string, f func()) {
 	orig := mtgstocksClient
 	mtgstocksClient = &http.Client{Transport: &stubTransport{statusCode: statusCode, body: body}}
-	defer func() { mtgstocksClient = orig }()
+	resetMTGStocksBackoff()
+	defer func() { mtgstocksClient = orig; resetMTGStocksBackoff() }()
 	f()
 }
 
 func withErrClient(f func()) {
 	orig := mtgstocksClient
 	mtgstocksClient = &http.Client{Transport: errTransport{}}
-	defer func() { mtgstocksClient = orig }()
+	resetMTGStocksBackoff()
+	defer func() { mtgstocksClient = orig; resetMTGStocksBackoff() }()
 	f()
 }
 
@@ -229,5 +232,49 @@ func TestNewMTGStocksClient_Proxy(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "https://api.mtgstocks.com/sealed", nil)
 	if u, err := tr.Proxy(req); err != nil || u.Host != "10.8.0.2:8888" {
 		t.Errorf("proxy for request: %v %v", u, err)
+	}
+}
+
+func TestProxyMTGStocks_BacksOffAfterFailure(t *testing.T) {
+	blocked := &blockedCounter{status: http.StatusForbidden}
+	withTransport(blocked, func() {
+		for i := 0; i < 3; i++ {
+			_, _, _ = proxyMTGStocks("https://api.mtgstocks.com/sealed/1")
+		}
+		if n := blocked.calls.Load(); n != 1 {
+			t.Errorf("want 1 request during backoff, got %d", n)
+		}
+		if _, status, err := proxyMTGStocks("https://api.mtgstocks.com/sealed/1"); err != errMTGStocksBackoff || status != http.StatusServiceUnavailable {
+			t.Errorf("want backoff error, got %d %v", status, err)
+		}
+		// Prices still come from the saved catalog meanwhile.
+		catalogMu.Lock()
+		currentCatalog, lastLiveAttempt = &catalog{prices: map[int]float64{1: 2.5}}, time.Now()
+		catalogMu.Unlock()
+		defer resetProductsCache()
+		if price, ok := fetchSealedPrice(1); !ok || price != 2.5 {
+			t.Errorf("want cached 2.5, got %v %v", price, ok)
+		}
+	})
+}
+
+func TestProxyMTGStocks_NotFoundIsNotAnOutage(t *testing.T) {
+	notFound := &blockedCounter{status: http.StatusNotFound}
+	withTransport(notFound, func() {
+		_, _, _ = proxyMTGStocks("https://api.mtgstocks.com/sealed/1")
+		_, _, _ = proxyMTGStocks("https://api.mtgstocks.com/sealed/2")
+		if n := notFound.calls.Load(); n != 2 {
+			t.Errorf("404 must not trigger backoff: want 2 requests, got %d", n)
+		}
+	})
+}
+
+func TestProxyMTGStocks_SuccessClearsBackoff(t *testing.T) {
+	recordMTGStocksResult(0, fmt.Errorf("down"))
+	recordMTGStocksResult(http.StatusOK, nil)
+	mtgstocksMu.Lock()
+	defer mtgstocksMu.Unlock()
+	if !mtgstocksDownUntil.IsZero() {
+		t.Error("success should clear the backoff")
 	}
 }

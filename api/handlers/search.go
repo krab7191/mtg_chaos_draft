@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/sahilm/fuzzy"
 )
@@ -51,10 +53,49 @@ var excludePackTypes = map[string]bool{
 	"boosterbox": true,
 }
 
+// notSinglePack matches names of products that hold several packs or aren't
+// draft boosters, e.g. "Theme Booster Pack [Red]", "Collector Booster Pack
+// Display", "3x Booster Packs (draft set)", "Jumpstart Booster Pack (2-Pack)".
+var notSinglePack = regexp.MustCompile(
+	`\b(theme|display|box|case|bundle|blister|battle|prerelease|omega|includes)\b|\bset of\b|\b\d+x\b|\d+-(pack|booster)\b|\bbooster packs\b`)
+
+// plainBoosterNames are untyped single-pack names MTGStocks uses for newer
+// sets ("Play Booster" rather than "Play Booster Pack").
+var plainBoosterNames = map[string]bool{
+	"play booster": true, "collector booster": true, "set booster": true,
+	"draft booster": true, "jumpstart booster": true,
+}
+
+func isSingleBoosterName(nameLower string) bool {
+	if notSinglePack.MatchString(nameLower) {
+		return false
+	}
+	if strings.Contains(nameLower, "booster pack") {
+		return true
+	}
+	// Drop a "<Set> - " prefix and a "Sleeved" marker before matching.
+	if i := strings.LastIndex(nameLower, " - "); i >= 0 {
+		nameLower = nameLower[i+3:]
+	}
+	nameLower = strings.TrimPrefix(strings.TrimSpace(nameLower), "sleeved ")
+	return plainBoosterNames[nameLower]
+}
+
+// words returns the set of whole words in s, so "display" never counts as
+// "play" and "[Set of 5]" never as a Set Booster.
+func words(s string) map[string]bool {
+	w := map[string]bool{}
+	for _, f := range strings.FieldsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) }) {
+		w[f] = true
+	}
+	return w
+}
+
 func deriveProductType(p msProduct) (string, bool) {
 	nameLower := strings.ToLower(p.Name)
+	w := words(nameLower)
 	sleevedPrefix := ""
-	if strings.Contains(nameLower, "sleeved") {
+	if w["sleeved"] {
 		sleevedPrefix = "Sleeved "
 	}
 
@@ -67,24 +108,24 @@ func deriveProductType(p msProduct) (string, bool) {
 		}
 	}
 
-	// null type — include only if name suggests it's a booster pack
-	if strings.Contains(nameLower, "booster pack") {
-		switch {
-		case strings.Contains(nameLower, "jumpstart"):
-			return sleevedPrefix + "Jumpstart Booster", true
-		case strings.Contains(nameLower, "play"):
-			return sleevedPrefix + "Play Booster", true
-		case strings.Contains(nameLower, "set"):
-			return sleevedPrefix + "Set Booster", true
-		case strings.Contains(nameLower, "draft"):
-			return sleevedPrefix + "Draft Booster", true
-		case strings.Contains(nameLower, "collector"):
-			return sleevedPrefix + "Collector Booster", true
-		default:
-			return p.Name, true
-		}
+	// Untyped: include only names that say they're a single booster pack.
+	if !isSingleBoosterName(nameLower) {
+		return "", false
 	}
-	return "", false
+	switch {
+	case w["jumpstart"]:
+		return sleevedPrefix + "Jumpstart Booster", true
+	case w["play"]:
+		return sleevedPrefix + "Play Booster", true
+	case w["set"]:
+		return sleevedPrefix + "Set Booster", true
+	case w["draft"]:
+		return sleevedPrefix + "Draft Booster", true
+	case w["collector"], w["collectors"]:
+		return sleevedPrefix + "Collector Booster", true
+	default:
+		return p.Name, true
+	}
 }
 
 func CheapestPacks(w http.ResponseWriter, r *http.Request) {

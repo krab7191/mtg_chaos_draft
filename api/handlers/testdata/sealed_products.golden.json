@@ -1,0 +1,2207 @@
+[
+  {
+    "set": "Marvel: Darkhold Destiny",
+    "type": "Collector Booster",
+    "name": "Collector Booster",
+    "id": 13907,
+    "price": 60
+  },
+  {
+    "set": "Marvel: Darkhold Destiny",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 13904,
+    "price": 11.92
+  },
+  {
+    "set": "The Zeta Set",
+    "type": "Set Booster",
+    "name": "MSCHF: The Zeta Set Booster Pack",
+    "id": 13597,
+    "price": 30.62
+  },
+  {
+    "set": "The Hobbit",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 12560,
+    "price": 54.4
+  },
+  {
+    "set": "The Hobbit",
+    "type": "Sleeved Play Booster",
+    "name": "The Hobbit - Sleeved Play Booster Pack",
+    "id": 13510,
+    "price": 5.44
+  },
+  {
+    "set": "The Hobbit",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 12557,
+    "price": 5.02
+  },
+  {
+    "set": "Marvel Super Heroes",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 11702,
+    "price": 41.68
+  },
+  {
+    "set": "Marvel Super Heroes",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 12937,
+    "price": 4.94
+  },
+  {
+    "set": "Marvel Super Heroes",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 11699,
+    "price": 4.66
+  },
+  {
+    "set": "Marvel Super Heroes",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 11717,
+    "price": 6.68
+  },
+  {
+    "set": "Secrets of Strixhaven",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 11727,
+    "price": 46.72
+  },
+  {
+    "set": "Secrets of Strixhaven",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 12772,
+    "price": 8.77
+  },
+  {
+    "set": "Secrets of Strixhaven",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 11724,
+    "price": 5.09
+  },
+  {
+    "set": "Lorwyn Eclipsed",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 10963,
+    "price": 43.32
+  },
+  {
+    "set": "Lorwyn Eclipsed",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 11617,
+    "price": 7.25
+  },
+  {
+    "set": "Lorwyn Eclipsed",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 10960,
+    "price": 4.81
+  },
+  {
+    "set": "Marvel's Spider-Man",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 9112,
+    "price": 41.77
+  },
+  {
+    "set": "Marvel's Spider-Man",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 10990,
+    "price": 6.48
+  },
+  {
+    "set": "Marvel's Spider-Man",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 9109,
+    "price": 5.04
+  },
+  {
+    "set": "Edge of Eternities",
+    "type": "Collector Booster",
+    "name": "Collector Booster",
+    "id": 8950,
+    "price": 79.3
+  },
+  {
+    "set": "Edge of Eternities",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 10594,
+    "price": 8.68
+  },
+  {
+    "set": "Edge of Eternities",
+    "type": "Play Booster",
+    "name": "Play Booster",
+    "id": 8951,
+    "price": 7.76
+  },
+  {
+    "set": "Universes Beyond: Final Fantasy",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 8893,
+    "price": 165.08
+  },
+  {
+    "set": "Universes Beyond: Final Fantasy",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 10726,
+    "price": 10.31
+  },
+  {
+    "set": "Universes Beyond: Final Fantasy",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 8890,
+    "price": 9.8
+  },
+  {
+    "set": "Universes Beyond: Final Fantasy",
+    "type": "Chocobo Booster Pack",
+    "name": "Chocobo Booster Pack",
+    "id": 11584,
+    "price": 195.61
+  },
+  {
+    "set": "Universes Beyond: Final Fantasy",
+    "type": "Basic Booster Pack (Japanese)",
+    "name": "Basic Booster Pack (Japanese)",
+    "id": 11586,
+    "price": 9.53
+  },
+  {
+    "set": "Tarkir: Dragonstorm",
+    "type": "Collector Booster",
+    "name": "Collector Booster",
+    "id": 8954,
+    "price": 47.7
+  },
+  {
+    "set": "Tarkir: Dragonstorm",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 10528,
+    "price": 7.18
+  },
+  {
+    "set": "Tarkir: Dragonstorm",
+    "type": "Play Booster",
+    "name": "Play Booster",
+    "id": 8923,
+    "price": 7
+  },
+  {
+    "set": "Aetherdrift",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 8617,
+    "price": 27.76
+  },
+  {
+    "set": "Aetherdrift",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 9901,
+    "price": 5.99
+  },
+  {
+    "set": "Aetherdrift",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 8614,
+    "price": 4.15
+  },
+  {
+    "set": "Innistrad Remastered",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 8485,
+    "price": 51.99
+  },
+  {
+    "set": "Innistrad Remastered",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 8482,
+    "price": 10.99
+  },
+  {
+    "set": "Innistrad Remastered",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 10892,
+    "price": 6.98
+  },
+  {
+    "set": "Foundations",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 7759,
+    "price": 92.22
+  },
+  {
+    "set": "Foundations",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 10891,
+    "price": 7.25
+  },
+  {
+    "set": "Foundations",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 7756,
+    "price": 6.38
+  },
+  {
+    "set": "Foundations",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 7766,
+    "price": 5.17
+  },
+  {
+    "set": "Bloomburrow",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 7198,
+    "price": 130.55
+  },
+  {
+    "set": "Bloomburrow",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 7888,
+    "price": 10.08
+  },
+  {
+    "set": "Bloomburrow",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 7195,
+    "price": 7.96
+  },
+  {
+    "set": "Modern Horizons 3",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 7231,
+    "price": 88.92
+  },
+  {
+    "set": "Modern Horizons 3",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 7228,
+    "price": 11.03
+  },
+  {
+    "set": "Modern Horizons 3",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 7855,
+    "price": 9.99
+  },
+  {
+    "set": "Universes Beyond: Fallout",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 6242,
+    "price": 187.64
+  },
+  {
+    "set": "Ravnica: Clue Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 8888,
+    "price": 8.47
+  },
+  {
+    "set": "Murders at Karlov Manor",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 6408,
+    "price": 37.06
+  },
+  {
+    "set": "Murders at Karlov Manor",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 6414,
+    "price": 4.77
+  },
+  {
+    "set": "Universes Beyond: Doctor Who",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 5516,
+    "price": 77.4
+  },
+  {
+    "set": "Mystery Booster 2",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 7822,
+    "price": 16.3
+  },
+  {
+    "set": "Avatar: The Last Airbender",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 10630,
+    "price": 44.13
+  },
+  {
+    "set": "Avatar: The Last Airbender",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 13366,
+    "price": 10
+  },
+  {
+    "set": "Avatar: The Last Airbender",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 10627,
+    "price": 4.72
+  },
+  {
+    "set": "Avatar: The Last Airbender",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 10634,
+    "price": 5.67
+  },
+  {
+    "set": "Duskmourn: House of Horror",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 7665,
+    "price": 77.76
+  },
+  {
+    "set": "Duskmourn: House of Horror",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 8350,
+    "price": 9.07
+  },
+  {
+    "set": "Duskmourn: House of Horror",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 7662,
+    "price": 7.12
+  },
+  {
+    "set": "Universes Beyond: Assassin's Creed",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 7252,
+    "price": 48.26
+  },
+  {
+    "set": "Universes Beyond: Assassin's Creed",
+    "type": "Beyond Booster Pack",
+    "name": "Beyond Booster Pack",
+    "id": 7249,
+    "price": 8.08
+  },
+  {
+    "set": "Outlaws of Thunder Junction",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 7243,
+    "price": 46.89
+  },
+  {
+    "set": "Outlaws of Thunder Junction",
+    "type": "Sleeved Play Booster",
+    "name": "Sleeved Play Booster Pack",
+    "id": 7856,
+    "price": 7
+  },
+  {
+    "set": "Outlaws of Thunder Junction",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 7240,
+    "price": 6.75
+  },
+  {
+    "set": "Ravnica Remastered",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 6419,
+    "price": 106.24
+  },
+  {
+    "set": "Ravnica Remastered",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 6416,
+    "price": 9.88
+  },
+  {
+    "set": "Ravnica Remastered",
+    "type": "Sleeved Draft Booster",
+    "name": "Sleeved Draft Booster Pack",
+    "id": 10000,
+    "price": 9
+  },
+  {
+    "set": "Commander Masters",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 5054,
+    "price": 138.44
+  },
+  {
+    "set": "Commander Masters",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 5059,
+    "price": 28.68
+  },
+  {
+    "set": "Commander Masters",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 5051,
+    "price": 37.5
+  },
+  {
+    "set": "The Lord of the Rings: Tales of Middle-earth",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 5067,
+    "price": 193.03
+  },
+  {
+    "set": "The Lord of the Rings: Tales of Middle-earth",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 10597,
+    "price": 20.62
+  },
+  {
+    "set": "The Lord of the Rings: Tales of Middle-earth",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 5079,
+    "price": 10.8
+  },
+  {
+    "set": "The Lord of the Rings: Tales of Middle-earth",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Vol. 2 Booster Pack",
+    "id": 5951,
+    "price": 24.4
+  },
+  {
+    "set": "The Lord of the Rings: Tales of Middle-earth",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 5062,
+    "price": 11.16
+  },
+  {
+    "set": "Dominaria Remastered",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 4259,
+    "price": 51.27
+  },
+  {
+    "set": "Dominaria Remastered",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 4269,
+    "price": 10.27
+  },
+  {
+    "set": "Mystery Booster: Commander Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 13300,
+    "price": 27.92
+  },
+  {
+    "set": "Star Trek",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 13049,
+    "price": 40.96
+  },
+  {
+    "set": "Star Trek",
+    "type": "Sleeved Play Booster",
+    "name": "Star Trek - Sleeved Play Booster Pack",
+    "id": 14059,
+    "price": 8.51
+  },
+  {
+    "set": "Star Trek",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 13046,
+    "price": 5.4
+  },
+  {
+    "set": "Reality Fracture",
+    "type": "Collector Booster",
+    "name": "Collector Booster",
+    "id": 12548,
+    "price": 36.42
+  },
+  {
+    "set": "Reality Fracture",
+    "type": "Sleeved Play Booster",
+    "name": "Reality Fracture - Sleeved Play Booster",
+    "id": 13828,
+    "price": 5.29
+  },
+  {
+    "set": "Reality Fracture",
+    "type": "Play Booster",
+    "name": "Play Booster",
+    "id": 12545,
+    "price": 4.98
+  },
+  {
+    "set": "Teenage Mutant Ninja Turtles",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 11187,
+    "price": 40.21
+  },
+  {
+    "set": "Teenage Mutant Ninja Turtles",
+    "type": "Play Booster",
+    "name": "Play Booster Pack",
+    "id": 11184,
+    "price": 4.32
+  },
+  {
+    "set": "The Lost Caverns of Ixalan",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 6043,
+    "price": 120.01
+  },
+  {
+    "set": "The Lost Caverns of Ixalan",
+    "type": "Sleeved Draft Booster",
+    "name": "The Lost Caverns of Ixalan - Sleeved Draft Booster Pack",
+    "id": 13829,
+    "price": 11.8
+  },
+  {
+    "set": "The Lost Caverns of Ixalan",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 6046,
+    "price": 7.34
+  },
+  {
+    "set": "The Lost Caverns of Ixalan",
+    "type": "Sleeved Set Booster",
+    "name": "The Lost Caverns of Ixalan - Sleeved Set Booster Pack",
+    "id": 13830,
+    "price": null
+  },
+  {
+    "set": "The Lost Caverns of Ixalan",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 6045,
+    "price": 16.33
+  },
+  {
+    "set": "Wilds of Eldraine",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 5387,
+    "price": 94.22
+  },
+  {
+    "set": "Wilds of Eldraine",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 5380,
+    "price": 11.41
+  },
+  {
+    "set": "Wilds of Eldraine",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 5382,
+    "price": 16.9
+  },
+  {
+    "set": "March of the Machine: The Aftermath",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 5149,
+    "price": 32.16
+  },
+  {
+    "set": "March of the Machine: The Aftermath",
+    "type": "Epilogue Booster Pack",
+    "name": "Epilogue Booster Pack",
+    "id": 5155,
+    "price": 6.46
+  },
+  {
+    "set": "March of the Machine",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 4829,
+    "price": 104.95
+  },
+  {
+    "set": "March of the Machine",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 4831,
+    "price": 6.05
+  },
+  {
+    "set": "March of the Machine",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 4821,
+    "price": 12.33
+  },
+  {
+    "set": "March of the Machine",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 4826,
+    "price": 8.95
+  },
+  {
+    "set": "March of the Machine",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 5347,
+    "price": 6.5
+  },
+  {
+    "set": "Phyrexia: All Will Be One",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 4495,
+    "price": 112.64
+  },
+  {
+    "set": "Phyrexia: All Will Be One",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 4489,
+    "price": 10.13
+  },
+  {
+    "set": "Phyrexia: All Will Be One",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 4491,
+    "price": 14.26
+  },
+  {
+    "set": "Phyrexia: All Will Be One",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 4492,
+    "price": 9.72
+  },
+  {
+    "set": "Jumpstart 2022",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 4261,
+    "price": 9.8
+  },
+  {
+    "set": "The Brothers' War",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 3970,
+    "price": 76.59
+  },
+  {
+    "set": "The Brothers' War",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 3971,
+    "price": 7.56
+  },
+  {
+    "set": "The Brothers' War",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 3973,
+    "price": 14.17
+  },
+  {
+    "set": "The Brothers' War",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 4229,
+    "price": 7.93
+  },
+  {
+    "set": "Dominaria United",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 3823,
+    "price": 38.21
+  },
+  {
+    "set": "Dominaria United",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 3808,
+    "price": 7.16
+  },
+  {
+    "set": "Dominaria United",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 3800,
+    "price": 12.02
+  },
+  {
+    "set": "Dominaria United",
+    "type": "Jumpstart Booster",
+    "name": "Jumpstart Booster Pack",
+    "id": 3804,
+    "price": 6.98
+  },
+  {
+    "set": "Double Masters 2022",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 3404,
+    "price": 123.79
+  },
+  {
+    "set": "Double Masters 2022",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 3403,
+    "price": 24.27
+  },
+  {
+    "set": "Double Masters 2022",
+    "type": "Sleeved Draft Booster",
+    "name": "Sleeved Draft Booster Pack",
+    "id": 3928,
+    "price": 26.4
+  },
+  {
+    "set": "Commander Legends: Battle for Baldur's Gate",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 3175,
+    "price": 71.91
+  },
+  {
+    "set": "Commander Legends: Battle for Baldur's Gate",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 3173,
+    "price": 18.67
+  },
+  {
+    "set": "Commander Legends: Battle for Baldur's Gate",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 3172,
+    "price": 22.48
+  },
+  {
+    "set": "Streets Of New Capenna",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 3198,
+    "price": 30.5
+  },
+  {
+    "set": "Streets Of New Capenna",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 3192,
+    "price": 5.01
+  },
+  {
+    "set": "Streets Of New Capenna",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 3197,
+    "price": 7.15
+  },
+  {
+    "set": "Unfinity",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 3501,
+    "price": 37.68
+  },
+  {
+    "set": "Unfinity",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 3499,
+    "price": 6.9
+  },
+  {
+    "set": "Kamigawa: Neon Dynasty",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 2888,
+    "price": 60.61
+  },
+  {
+    "set": "Kamigawa: Neon Dynasty",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 2879,
+    "price": 9.13
+  },
+  {
+    "set": "Kamigawa: Neon Dynasty",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 2886,
+    "price": 15.79
+  },
+  {
+    "set": "Innistrad: Double Feature",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 2876,
+    "price": 15.34
+  },
+  {
+    "set": "Innistrad: Crimson Vow",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 2018,
+    "price": 35.18
+  },
+  {
+    "set": "Innistrad: Crimson Vow",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 2022,
+    "price": 6.11
+  },
+  {
+    "set": "Innistrad: Crimson Vow",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 2025,
+    "price": 9.79
+  },
+  {
+    "set": "Innistrad: Midnight Hunt",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 1960,
+    "price": 27.6
+  },
+  {
+    "set": "Innistrad: Midnight Hunt",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 11587,
+    "price": 24.95
+  },
+  {
+    "set": "Innistrad: Midnight Hunt",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 1948,
+    "price": 6.59
+  },
+  {
+    "set": "Innistrad: Midnight Hunt",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 1954,
+    "price": 7.79
+  },
+  {
+    "set": "Adventures in the Forgotten Realms",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 962,
+    "price": 42.9
+  },
+  {
+    "set": "Adventures in the Forgotten Realms",
+    "type": "Sleeved Set Booster",
+    "name": "Adventures in the Forgotten Realms - Sleeved Set Booster Pack",
+    "id": 13432,
+    "price": 25.99
+  },
+  {
+    "set": "Adventures in the Forgotten Realms",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 960,
+    "price": 9.7
+  },
+  {
+    "set": "Adventures in the Forgotten Realms",
+    "type": "Sleeved Draft Booster",
+    "name": "Sleeved Draft Booster Pack",
+    "id": 10792,
+    "price": 9.25
+  },
+  {
+    "set": "Adventures in the Forgotten Realms",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 961,
+    "price": 13.06
+  },
+  {
+    "set": "Modern Horizons 2",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 383,
+    "price": 71.97
+  },
+  {
+    "set": "Modern Horizons 2",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 481,
+    "price": 10.99
+  },
+  {
+    "set": "Modern Horizons 2",
+    "type": "Sleeved Collector Booster",
+    "name": "Sleeved Collector Booster Pack",
+    "id": 4293,
+    "price": 66.42
+  },
+  {
+    "set": "Modern Horizons 2",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 404,
+    "price": 16.86
+  },
+  {
+    "set": "Modern Horizons 2",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 4292,
+    "price": 15.37
+  },
+  {
+    "set": "Modern Horizons 2",
+    "type": "Sleeved Draft Booster",
+    "name": "Sleeved Draft Booster Pack",
+    "id": 6436,
+    "price": 8.96
+  },
+  {
+    "set": "Strixhaven: School of Mages",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 541,
+    "price": 65.05
+  },
+  {
+    "set": "Strixhaven: School of Mages",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 657,
+    "price": 7.16
+  },
+  {
+    "set": "Strixhaven: School of Mages",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 8321,
+    "price": 9.97
+  },
+  {
+    "set": "Strixhaven: School of Mages",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 482,
+    "price": 8.93
+  },
+  {
+    "set": "Time Spiral: Remastered",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 494,
+    "price": 12.45
+  },
+  {
+    "set": "Kaldheim",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 379,
+    "price": 37.89
+  },
+  {
+    "set": "Kaldheim",
+    "type": "Sleeved Draft Booster",
+    "name": "Sleeved Draft Booster Pack",
+    "id": 10794,
+    "price": 15.99
+  },
+  {
+    "set": "Kaldheim",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 10793,
+    "price": 9.34
+  },
+  {
+    "set": "Kaldheim",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 284,
+    "price": 7.17
+  },
+  {
+    "set": "Kaldheim",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 421,
+    "price": 11.18
+  },
+  {
+    "set": "Commander Legends",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 119,
+    "price": 79.59
+  },
+  {
+    "set": "Commander Legends",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 47,
+    "price": 15.79
+  },
+  {
+    "set": "Commander Legends",
+    "type": "Sleeved Draft Booster",
+    "name": "Sleeved Draft Booster Pack",
+    "id": 8317,
+    "price": 13
+  },
+  {
+    "set": "Zendikar Rising",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 672,
+    "price": 43.41
+  },
+  {
+    "set": "Zendikar Rising",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 583,
+    "price": 5.18
+  },
+  {
+    "set": "Zendikar Rising",
+    "type": "Sleeved Set Booster",
+    "name": "Sleeved Set Booster Pack",
+    "id": 8323,
+    "price": 9
+  },
+  {
+    "set": "Zendikar Rising",
+    "type": "Set Booster",
+    "name": "Set Booster Pack",
+    "id": 709,
+    "price": 8.11
+  },
+  {
+    "set": "Double Masters",
+    "type": "Sleeved Booster Pack",
+    "name": "Sleeved Booster Pack",
+    "id": 11815,
+    "price": 87.5
+  },
+  {
+    "set": "Double Masters",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 125,
+    "price": 47.13
+  },
+  {
+    "set": "Jumpstart",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 279,
+    "price": 7.41
+  },
+  {
+    "set": "Core 2021",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 235,
+    "price": 52.24
+  },
+  {
+    "set": "Core 2021",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 108,
+    "price": 6.57
+  },
+  {
+    "set": "Ikoria: Lair of Behemoths",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 353,
+    "price": 61.37
+  },
+  {
+    "set": "Ikoria: Lair of Behemoths",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 286,
+    "price": 10.17
+  },
+  {
+    "set": "Theros: Beyond Death",
+    "type": "Sleeved Collector Booster",
+    "name": "Sleeved Collector Booster Pack",
+    "id": 13403,
+    "price": 49.99
+  },
+  {
+    "set": "Theros: Beyond Death",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 641,
+    "price": 33.46
+  },
+  {
+    "set": "Theros: Beyond Death",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 545,
+    "price": 6.9
+  },
+  {
+    "set": "Mystery Booster: Playtest Cards",
+    "type": "Mystery Booster Pack [Convention Edition]",
+    "name": "Mystery Booster Pack [Convention Edition]",
+    "id": 349,
+    "price": 25.25
+  },
+  {
+    "set": "Mystery Booster: Playtest Cards",
+    "type": "Mystery Booster Pack [Convention Edition] (2021)",
+    "name": "Mystery Booster Pack [Convention Edition] (2021)",
+    "id": 2048,
+    "price": 17.99
+  },
+  {
+    "set": "Mystery Booster: Retail Exclusives",
+    "type": "Mystery Booster Pack [Retail Exclusive]",
+    "name": "Mystery Booster Pack [Retail Exclusive]",
+    "id": 354,
+    "price": 28.51
+  },
+  {
+    "set": "Throne of Eldraine",
+    "type": "Collector Booster",
+    "name": "Collector Booster Pack",
+    "id": 699,
+    "price": 34.61
+  },
+  {
+    "set": "Throne of Eldraine",
+    "type": "Draft Booster",
+    "name": "Draft Booster Pack",
+    "id": 505,
+    "price": 7.43
+  },
+  {
+    "set": "Core Set 2020",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 112,
+    "price": 6.79
+  },
+  {
+    "set": "Modern Horizons",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 339,
+    "price": 10.91
+  },
+  {
+    "set": "War of the Spark",
+    "type": "Sleeved Booster Pack",
+    "name": "Sleeved Booster Pack",
+    "id": 8322,
+    "price": 20
+  },
+  {
+    "set": "War of the Spark",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 618,
+    "price": 8.31
+  },
+  {
+    "set": "Ultimate Masters",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 555,
+    "price": 24.15
+  },
+  {
+    "set": "Ravnica Allegiance",
+    "type": "Collector Booster",
+    "name": "Collectors Booster Pack",
+    "id": 715,
+    "price": 1875
+  },
+  {
+    "set": "Ravnica Allegiance",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 477,
+    "price": 6.5
+  },
+  {
+    "set": "Guilds of Ravnica",
+    "type": "Sleeved Booster Pack",
+    "name": "Sleeved Booster Pack",
+    "id": 8319,
+    "price": 6.79
+  },
+  {
+    "set": "Guilds of Ravnica",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 289,
+    "price": 6.22
+  },
+  {
+    "set": "Core Set 2019",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 76,
+    "price": 6.86
+  },
+  {
+    "set": "Battlebond",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 110,
+    "price": 10.17
+  },
+  {
+    "set": "Dominaria",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 151,
+    "price": 7.73
+  },
+  {
+    "set": "Masters 25",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 900,
+    "price": 15.85
+  },
+  {
+    "set": "Rivals of Ixalan",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 480,
+    "price": 7.16
+  },
+  {
+    "set": "Unstable",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 549,
+    "price": 8.15
+  },
+  {
+    "set": "Iconic Masters",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 274,
+    "price": 16.25
+  },
+  {
+    "set": "Ixalan",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 320,
+    "price": 7.53
+  },
+  {
+    "set": "Hour of Devastation",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 268,
+    "price": 9.96
+  },
+  {
+    "set": "Amonkhet",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 18,
+    "price": 14.48
+  },
+  {
+    "set": "Modern Masters 2017",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 885,
+    "price": 18.21
+  },
+  {
+    "set": "Aether Revolt",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 31,
+    "price": 6.85
+  },
+  {
+    "set": "Kaladesh",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 315,
+    "price": 15.62
+  },
+  {
+    "set": "Conspiracy: Take the Crown",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 24,
+    "price": 9.64
+  },
+  {
+    "set": "Eldritch Moon",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 850,
+    "price": 12.03
+  },
+  {
+    "set": "Eldritch Moon",
+    "type": "Sleeved Booster Pack",
+    "name": "Sleeved Booster Pack",
+    "id": 8318,
+    "price": 5
+  },
+  {
+    "set": "Eternal Masters",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 852,
+    "price": 27.95
+  },
+  {
+    "set": "Shadows over Innistrad",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 916,
+    "price": 7.09
+  },
+  {
+    "set": "Shadows over Innistrad",
+    "type": "Sleeved Booster Pack",
+    "name": "Sleeved Booster Pack",
+    "id": 8320,
+    "price": 5
+  },
+  {
+    "set": "Oath of the Gatewatch",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 902,
+    "price": 8.33
+  },
+  {
+    "set": "Battle for Zendikar",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 828,
+    "price": 8.9
+  },
+  {
+    "set": "Magic Origins",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 888,
+    "price": 5.95
+  },
+  {
+    "set": "Modern Masters 2015",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 897,
+    "price": 21.97
+  },
+  {
+    "set": "Dragons of Tarkir",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 851,
+    "price": 10.93
+  },
+  {
+    "set": "Fate Reforged",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 859,
+    "price": 7.7
+  },
+  {
+    "set": "Khans of Tarkir",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 874,
+    "price": 10.67
+  },
+  {
+    "set": "Magic 2015 (M15)",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 882,
+    "price": 9.11
+  },
+  {
+    "set": "Conspiracy",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 846,
+    "price": 9.88
+  },
+  {
+    "set": "Journey into Nyx",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 870,
+    "price": 9.59
+  },
+  {
+    "set": "Born of the Gods",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 841,
+    "price": 9.08
+  },
+  {
+    "set": "Theros",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 925,
+    "price": 10.06
+  },
+  {
+    "set": "Magic 2014 (M14)",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 883,
+    "price": 9.89
+  },
+  {
+    "set": "Modern Masters",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 899,
+    "price": 23.57
+  },
+  {
+    "set": "Dragon's Maze",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 849,
+    "price": 5.23
+  },
+  {
+    "set": "Gatecrash",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 866,
+    "price": 7.35
+  },
+  {
+    "set": "Renaissance",
+    "type": "Italian Booster Pack",
+    "name": "Italian Booster Pack",
+    "id": 488,
+    "price": 95
+  },
+  {
+    "set": "Renaissance",
+    "type": "French Booster Pack",
+    "name": "French Booster Pack",
+    "id": 453,
+    "price": 54.56
+  },
+  {
+    "set": "Renaissance",
+    "type": "German Booster Pack",
+    "name": "German Booster Pack",
+    "id": 478,
+    "price": 39.49
+  },
+  {
+    "set": "Return to Ravnica",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 915,
+    "price": 7.15
+  },
+  {
+    "set": "Magic 2013 (M13)",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 881,
+    "price": 10.76
+  },
+  {
+    "set": "Avacyn Restored",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 827,
+    "price": 17.22
+  },
+  {
+    "set": "Dark Ascension",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 847,
+    "price": 11.16
+  },
+  {
+    "set": "Innistrad",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 861,
+    "price": 18.87
+  },
+  {
+    "set": "Magic 2012 (M12)",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 875,
+    "price": 11.99
+  },
+  {
+    "set": "New Phyrexia",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 895,
+    "price": 39.48
+  },
+  {
+    "set": "Mirrodin Besieged",
+    "type": "Phyrexian Faction Booster Pack",
+    "name": "Phyrexian Faction Booster Pack",
+    "id": 896,
+    "price": 29.35
+  },
+  {
+    "set": "Mirrodin Besieged",
+    "type": "6-Card Booster Pack",
+    "name": "6-Card Booster Pack",
+    "id": 910,
+    "price": 24
+  },
+  {
+    "set": "Mirrodin Besieged",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 890,
+    "price": 19.61
+  },
+  {
+    "set": "Mirrodin Besieged",
+    "type": "Mirran Faction Booster Pack",
+    "name": "Mirran Faction Booster Pack",
+    "id": 898,
+    "price": 15.75
+  },
+  {
+    "set": "Scars of Mirrodin",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 911,
+    "price": 21.56
+  },
+  {
+    "set": "Magic 2011 (M11)",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 880,
+    "price": 14.43
+  },
+  {
+    "set": "Magic 2011 (M11)",
+    "type": "Magic 2011 - 6-Card Booster Pack",
+    "name": "Magic 2011 - 6-Card Booster Pack",
+    "id": 1752,
+    "price": null
+  },
+  {
+    "set": "Rise of the Eldrazi",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 921,
+    "price": 46.63
+  },
+  {
+    "set": "Worldwake",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 936,
+    "price": 31.26
+  },
+  {
+    "set": "Zendikar",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 935,
+    "price": 31.21
+  },
+  {
+    "set": "Magic 2010 (M10)",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 879,
+    "price": 23.51
+  },
+  {
+    "set": "Alara Reborn",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 826,
+    "price": 19.12
+  },
+  {
+    "set": "Conflux",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 844,
+    "price": 22.51
+  },
+  {
+    "set": "Shards of Alara",
+    "type": "Premium Foil Booster Pack",
+    "name": "Premium Foil Booster Pack",
+    "id": 544,
+    "price": 61.42
+  },
+  {
+    "set": "Shards of Alara",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 913,
+    "price": 23.21
+  },
+  {
+    "set": "Eventide",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 853,
+    "price": 26.48
+  },
+  {
+    "set": "Shadowmoor",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 917,
+    "price": 48.65
+  },
+  {
+    "set": "Morningtide",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 893,
+    "price": 27.68
+  },
+  {
+    "set": "Lorwyn",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 876,
+    "price": 51.09
+  },
+  {
+    "set": "10th Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 830,
+    "price": 21.15
+  },
+  {
+    "set": "Future Sight",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 862,
+    "price": 56.87
+  },
+  {
+    "set": "Planar Chaos",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 905,
+    "price": 30.55
+  },
+  {
+    "set": "Time Spiral",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 926,
+    "price": 36.19
+  },
+  {
+    "set": "Coldsnap",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 843,
+    "price": 26.01
+  },
+  {
+    "set": "Dissension",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 854,
+    "price": 20.09
+  },
+  {
+    "set": "Guildpact",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 863,
+    "price": 19.74
+  },
+  {
+    "set": "Ravnica",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 914,
+    "price": 25.62
+  },
+  {
+    "set": "9th Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 831,
+    "price": 29.4
+  },
+  {
+    "set": "Saviors of Kamigawa",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 919,
+    "price": 20.61
+  },
+  {
+    "set": "Betrayers of Kamigawa",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 838,
+    "price": 26.76
+  },
+  {
+    "set": "Unhinged",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 934,
+    "price": 36.67
+  },
+  {
+    "set": "Champions of Kamigawa",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 842,
+    "price": 42.59
+  },
+  {
+    "set": "Fifth Dawn",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 857,
+    "price": 27.66
+  },
+  {
+    "set": "Darksteel",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 848,
+    "price": 29.29
+  },
+  {
+    "set": "Mirrodin",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 894,
+    "price": 38.48
+  },
+  {
+    "set": "8th Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 835,
+    "price": 31.61
+  },
+  {
+    "set": "Scourge",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 918,
+    "price": 27.89
+  },
+  {
+    "set": "Legions",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 877,
+    "price": 28.67
+  },
+  {
+    "set": "Onslaught",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 904,
+    "price": 60.02
+  },
+  {
+    "set": "Judgment",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 872,
+    "price": 39.62
+  },
+  {
+    "set": "Torment",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 927,
+    "price": 25.88
+  },
+  {
+    "set": "Odyssey",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 903,
+    "price": 35.76
+  },
+  {
+    "set": "Apocalypse",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 833,
+    "price": 40.21
+  },
+  {
+    "set": "7th Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 837,
+    "price": 119.51
+  },
+  {
+    "set": "Planeshift",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 909,
+    "price": 34.39
+  },
+  {
+    "set": "Invasion",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 869,
+    "price": 53.38
+  },
+  {
+    "set": "Starter 2000",
+    "type": "Sampler Booster Pack",
+    "name": "Sampler Booster Pack",
+    "id": 2839,
+    "price": 50
+  },
+  {
+    "set": "Prophecy",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 912,
+    "price": 56.09
+  },
+  {
+    "set": "Nemesis",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 901,
+    "price": 33.94
+  },
+  {
+    "set": "Mercadian Masques",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 887,
+    "price": 68.77
+  },
+  {
+    "set": "Starter 1999",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 472,
+    "price": 69.95
+  },
+  {
+    "set": "Starter 1999",
+    "type": "Demo Game Booster Pack",
+    "name": "Demo Game Booster Pack",
+    "id": 2840,
+    "price": 41.24
+  },
+  {
+    "set": "Urza's Destiny",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 930,
+    "price": 113.66
+  },
+  {
+    "set": "Portal Three Kingdoms",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 908,
+    "price": 543.71
+  },
+  {
+    "set": "Classic Sixth Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 845,
+    "price": 45.7
+  },
+  {
+    "set": "Urza's Legacy",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 931,
+    "price": 138.54
+  },
+  {
+    "set": "Urza's Saga",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 932,
+    "price": 270.54
+  },
+  {
+    "set": "Unglued",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 928,
+    "price": 36.05
+  },
+  {
+    "set": "Exodus",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 856,
+    "price": 88.1
+  },
+  {
+    "set": "Portal Second Age",
+    "type": "Demo Game Booster Pack",
+    "name": "Demo Game Booster Pack",
+    "id": 13235,
+    "price": 69
+  },
+  {
+    "set": "Portal Second Age",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 907,
+    "price": 56.75
+  },
+  {
+    "set": "Stronghold",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 923,
+    "price": 145.93
+  },
+  {
+    "set": "Tempest",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 922,
+    "price": 105.47
+  },
+  {
+    "set": "Weatherlight",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 933,
+    "price": 40.27
+  },
+  {
+    "set": "Portal",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 906,
+    "price": 35.29
+  },
+  {
+    "set": "Fifth Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 860,
+    "price": 41.36
+  },
+  {
+    "set": "Visions",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 937,
+    "price": 57.44
+  },
+  {
+    "set": "Mirage",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 891,
+    "price": 136.96
+  },
+  {
+    "set": "Alliances",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 840,
+    "price": 67.16
+  },
+  {
+    "set": "Homelands",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 864,
+    "price": 14.52
+  },
+  {
+    "set": "Chronicles",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 839,
+    "price": 23.41
+  },
+  {
+    "set": "Ice Age",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 867,
+    "price": 49.02
+  },
+  {
+    "set": "Fourth Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 858,
+    "price": 41.45
+  },
+  {
+    "set": "Fallen Empires",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 855,
+    "price": 11.51
+  },
+  {
+    "set": "The Dark",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 924,
+    "price": 85.19
+  },
+  {
+    "set": "Legends",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 871,
+    "price": 593.27
+  },
+  {
+    "set": "Revised Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 920,
+    "price": 346.54
+  },
+  {
+    "set": "Antiquities",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 834,
+    "price": 589
+  },
+  {
+    "set": "Arabian Nights",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 836,
+    "price": 4504.99
+  },
+  {
+    "set": "Unlimited Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 929,
+    "price": 13888.88
+  },
+  {
+    "set": "Beta Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 829,
+    "price": 19645
+  },
+  {
+    "set": "Alpha Edition",
+    "type": "Booster Pack",
+    "name": "Booster Pack",
+    "id": 832,
+    "price": null
+  }
+]

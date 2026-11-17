@@ -128,3 +128,32 @@ func TestDeriveProductType_SleevedNullType(t *testing.T) {
 		t.Errorf("want %q, got %q", "Sleeved Draft Booster", got)
 	}
 }
+
+func TestDeriveProductType_NullType_PlainBoosterNames(t *testing.T) {
+	cases := map[string]string{
+		"Play Booster":      "Play Booster",
+		"Collector Booster": "Collector Booster",
+		"Set Booster":       "Set Booster",
+		"Draft Booster":     "Draft Booster",
+		"Jumpstart Booster": "Jumpstart Booster",
+		"Reality Fracture - Sleeved Play Booster": "Sleeved Play Booster",
+	}
+	for name, want := range cases {
+		got, ok := deriveProductType(msProduct{Name: name})
+		if !ok || got != want {
+			t.Errorf("%q: want %q, got %q (ok=%v)", name, want, got, ok)
+		}
+	}
+}
+
+func TestDeriveProductType_NullType_BoosterLookalikesExcluded(t *testing.T) {
+	for _, name := range []string{
+		"Theme Booster [Red]", "Booster Battle Pack", "Collector Booster Omega Pack",
+		"Play Booster Display", "Collector Booster Display Case", "Advanced Boosters",
+		"Theme Booster [Set of 5]", "Prerelease Pack",
+	} {
+		if got, ok := deriveProductType(msProduct{Name: name}); ok {
+			t.Errorf("%q should be excluded, got %q", name, got)
+		}
+	}
+}

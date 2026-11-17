@@ -5,11 +5,44 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 )
+
+// After MTGStocks fails (blocked, down, or the proxy tunnel is off), live
+// requests are skipped for mtgstocksBackoff so callers fall back to the saved
+// catalog at once instead of each waiting for a timeout.
+const mtgstocksBackoff = 10 * time.Minute
+
+var (
+	mtgstocksMu        sync.Mutex
+	mtgstocksDownUntil time.Time
+)
+
+var errMTGStocksBackoff = fmt.Errorf("mtgstocks unavailable recently; using saved prices for up to %s", mtgstocksBackoff)
+
+func resetMTGStocksBackoff() {
+	mtgstocksMu.Lock()
+	mtgstocksDownUntil = time.Time{}
+	mtgstocksMu.Unlock()
+}
+
+// recordMTGStocksResult starts a backoff after a failure that suggests
+// MTGStocks is unreachable, and clears it after a success.
+func recordMTGStocksResult(status int, err error) {
+	failed := err != nil || status == http.StatusForbidden || status == http.StatusTooManyRequests || status >= 500
+	mtgstocksMu.Lock()
+	defer mtgstocksMu.Unlock()
+	if failed {
+		mtgstocksDownUntil = time.Now().Add(mtgstocksBackoff)
+	} else {
+		mtgstocksDownUntil = time.Time{}
+	}
+}
 
 var mtgstocksClient = newMTGStocksClient(os.Getenv("MTGSTOCKS_PROXY"))
 
@@ -28,6 +61,8 @@ func newMTGStocksClient(proxyURL string) *http.Client {
 	}
 	t := http.DefaultTransport.(*http.Transport).Clone()
 	t.Proxy = http.ProxyURL(u)
+	// Fail fast when the tunnel to the proxy is down.
+	t.DialContext = (&net.Dialer{Timeout: 3 * time.Second}).DialContext
 	c.Transport = t
 	log.Printf("mtgstocks: requests go through proxy %s", u.Host)
 	return c
@@ -44,11 +79,20 @@ func proxyMTGStocks(url string) ([]byte, int, error) {
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Origin", "https://www.mtgstocks.com")
 
+	mtgstocksMu.Lock()
+	backingOff := time.Now().Before(mtgstocksDownUntil)
+	mtgstocksMu.Unlock()
+	if backingOff {
+		return nil, http.StatusServiceUnavailable, errMTGStocksBackoff
+	}
+
 	resp, err := mtgstocksClient.Do(req)
 	if err != nil {
+		recordMTGStocksResult(0, err)
 		return nil, 502, err
 	}
 	defer resp.Body.Close()
+	recordMTGStocksResult(resp.StatusCode, nil)
 	body, err := io.ReadAll(resp.Body)
 	return body, resp.StatusCode, err
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -25,88 +26,118 @@ import (
 
 var Version string
 
+// Overridable in tests: the background maintenance job and how often it runs.
+var (
+	refreshPrices       = handlers.RefreshPrices
+	maintenanceInterval = 24 * time.Hour
+)
+
+const viewerEmailsPath = "/etc/mtg-chaos-draft/viewer_emails"
+
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	if err := run(ctx, os.Getenv, viewerEmailsPath); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("shutdown complete")
+}
+
+// run starts the API and blocks until ctx is cancelled (then shuts down
+// gracefully) or the server fails.
+func run(ctx context.Context, getenv func(string) string, viewerPath string) error {
 	log.Printf("starting mtg-chaos-draft %s", Version)
 
-	bgCtx, bgCancel := context.WithCancel(context.Background())
-
-	pool, err := db.New(bgCtx, mustEnv("DATABASE_URL"))
+	env, err := requireEnv(getenv, "DATABASE_URL", "GOOGLE_REDIRECT_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "ADMIN_EMAIL")
 	if err != nil {
-		log.Fatalf("db init: %v", err)
+		return err
+	}
+
+	pool, err := db.New(ctx, env["DATABASE_URL"])
+	if err != nil {
+		return fmt.Errorf("db init: %w", err)
 	}
 	defer pool.Close()
 
 	// Must precede the first price refresh so it can fall back to the saved catalog.
 	handlers.UseCatalogStore(pool)
 
-	// Daily price refresh + session cleanup goroutine
-	go func() {
-		handlers.RefreshPrices(bgCtx, pool)
-		if err := db.DeleteExpiredSessions(bgCtx, pool); err != nil {
-			log.Printf("session cleanup: %v", err)
-		}
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				handlers.RefreshPrices(bgCtx, pool)
-				if err := db.DeleteExpiredSessions(bgCtx, pool); err != nil {
-					log.Printf("session cleanup: %v", err)
-				}
-			case <-bgCtx.Done():
-				return
-			}
-		}
-	}()
+	bgCtx, bgCancel := context.WithCancel(ctx)
+	defer bgCancel()
+	go runMaintenance(bgCtx, pool, maintenanceInterval)
 
-	redirectURL := mustEnv("GOOGLE_REDIRECT_URL")
+	redirectURL := env["GOOGLE_REDIRECT_URL"]
 	oauthConfig := &oauth2.Config{
-		ClientID:     mustEnv("GOOGLE_CLIENT_ID"),
-		ClientSecret: mustEnv("GOOGLE_CLIENT_SECRET"),
+		ClientID:     env["GOOGLE_CLIENT_ID"],
+		ClientSecret: env["GOOGLE_CLIENT_SECRET"],
 		RedirectURL:  redirectURL,
 		Scopes:       []string{"openid", "email", "profile"},
 		Endpoint:     google.Endpoint,
 	}
 
-	viewerEmails := loadViewerEmails("/etc/mtg-chaos-draft/viewer_emails", os.Getenv("VIEWER_EMAILS"))
+	viewerEmails := loadViewerEmails(viewerPath, getenv("VIEWER_EMAILS"))
 	secureCookies := strings.HasPrefix(redirectURL, "https://")
-	r := newRouter(pool, oauthConfig, mustEnv("ADMIN_EMAIL"), viewerEmails, secureCookies)
+	r := newRouter(pool, oauthConfig, env["ADMIN_EMAIL"], viewerEmails, secureCookies)
 
-	port := os.Getenv("PORT")
+	port := getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+	srv := &http.Server{Addr: ":" + port, Handler: r, ReadHeaderTimeout: 10 * time.Second}
 
-	srv := &http.Server{Addr: ":" + port, Handler: r}
-
+	serveErr := make(chan error, 1)
 	go func() {
 		log.Printf("API listening on :%s", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %v", err)
-		}
+		serveErr <- srv.ListenAndServe()
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
-	<-quit
+	select {
+	case err := <-serveErr:
+		return fmt.Errorf("listen: %w", err)
+	case <-ctx.Done():
+	}
 
 	bgCancel()
 	log.Printf("shutting down...")
 	shutCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutCtx); err != nil {
-		log.Fatalf("shutdown: %v", err)
+		return fmt.Errorf("shutdown: %w", err)
 	}
-	log.Printf("shutdown complete")
+	return nil
 }
 
-func mustEnv(key string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		log.Fatalf("missing required env var: %s", key)
+// runMaintenance refreshes prices and clears expired sessions now and then
+// every interval, until ctx is cancelled.
+func runMaintenance(ctx context.Context, pool *pgxpool.Pool, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		refreshPrices(ctx, pool)
+		if err := db.DeleteExpiredSessions(ctx, pool); err != nil && ctx.Err() == nil {
+			log.Printf("session cleanup: %v", err)
+		}
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
 	}
-	return v
+}
+
+// requireEnv reads the named variables, failing if any is empty.
+func requireEnv(getenv func(string) string, keys ...string) (map[string]string, error) {
+	env := make(map[string]string, len(keys))
+	var missing []string
+	for _, k := range keys {
+		if env[k] = getenv(k); env[k] == "" {
+			missing = append(missing, k)
+		}
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing required env vars: %s", strings.Join(missing, ", "))
+	}
+	return env, nil
 }
 
 // loadViewerEmails reads viewer emails one per line from path, falling back to

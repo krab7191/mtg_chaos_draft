@@ -12,6 +12,12 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
+// Startup waits up to pingAttempts × pingRetryDelay for Postgres.
+var (
+	pingAttempts   = 10
+	pingRetryDelay = 3 * time.Second
+)
+
 func New(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
@@ -19,18 +25,25 @@ func New(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	}
 
 	// Retry ping for up to 30 seconds (useful when postgres is still starting)
-	for i := range 10 {
+	for i := range pingAttempts {
 		if err = pool.Ping(ctx); err == nil {
 			break
 		}
-		if i == 9 {
+		if i == pingAttempts-1 {
+			pool.Close()
 			return nil, fmt.Errorf("ping db after retries: %w", err)
 		}
-		fmt.Printf("waiting for database... (%d/10)\n", i+1)
-		time.Sleep(3 * time.Second)
+		fmt.Printf("waiting for database... (%d/%d)\n", i+1, pingAttempts)
+		select {
+		case <-time.After(pingRetryDelay):
+		case <-ctx.Done():
+			pool.Close()
+			return nil, fmt.Errorf("ping db: %w", ctx.Err())
+		}
 	}
 
 	if err := runMigrations(ctx, pool); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 	return pool, nil
