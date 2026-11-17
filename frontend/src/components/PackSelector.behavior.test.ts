@@ -417,10 +417,10 @@ describe('PackSelector saving', () => {
   it('reports a failed save and lets the pod size be changed again', async () => {
     const show = vi.spyOn(toast, 'show');
     const { container } = fillDraft(vi.fn(async (url: string) =>
-      url === '/api/drafts' ? { ok: false } : { ok: true, json: async () => ({ marketPrice: 5 }) }));
+      url === '/api/drafts' ? { ok: false, status: 500 } : { ok: true, json: async () => ({ marketPrice: 5 }) }));
     await act(() => fireEvent.click(button(container, 'Roll all')));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('Failed to save draft', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to save draft: the server hit an error (500)', 'error');
     expect((container.querySelector('#pod-size') as HTMLInputElement).disabled).toBe(false);
   });
 
@@ -432,7 +432,7 @@ describe('PackSelector saving', () => {
     }));
     await act(() => fireEvent.click(button(container, 'Roll all')));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('Failed to save draft', 'error');
+    expect(show).toHaveBeenCalledWith("Failed to save draft: can't reach the server — check your connection", 'error');
   });
 
   it('a successful save locks the pod size and toasts', async () => {

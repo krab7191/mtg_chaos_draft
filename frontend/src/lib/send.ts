@@ -1,4 +1,4 @@
-import { toast } from './toast.svelte';
+import { toastNetworkError, toastResponseError } from './api';
 
 /**
  * Send JSON to the API. Returns the parsed response (or true for an empty
@@ -12,13 +12,17 @@ export async function send<T = unknown>(url: string, method: string, body: unkno
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const msg = (await res.text().catch(() => '')).trim();
-      toast.show(`${failure}: ${msg || res.status}`, 'error');
+      await toastResponseError(failure, res);
       return null;
     }
-    return res.status === 204 ? true : ((await res.json()) as T);
+    if (res.status === 204) return true;
+    try {
+      return (await res.json()) as T;
+    } catch {
+      return true; // succeeded, but with no JSON body
+    }
   } catch {
-    toast.show(failure, 'error');
+    toastNetworkError(failure);
     return null;
   }
 }

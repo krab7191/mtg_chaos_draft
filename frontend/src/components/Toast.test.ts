@@ -1,37 +1,16 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, act } from '../tests/svelte';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render } from '../tests/svelte';
 import Toast from './Toast.svelte';
-import { toast } from '../lib/toast.svelte';
 
-beforeEach(() => {
-  toast.dismiss();
-  vi.useFakeTimers();
-});
+afterEach(() => vi.unstubAllGlobals());
 
 describe('Toast component', () => {
-  it('renders nothing when toast is not visible', () => {
+  it('mounts the notifications region', () => {
+    // jsdom has no matchMedia; sonner uses it for the theme.
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(),
+    }));
     const { container } = render(Toast);
-    expect(container.querySelector('.toast')).toBeNull();
-  });
-
-  it('renders message after show()', async () => {
-    const { container } = render(Toast);
-    await act(() => { toast.show('hello world'); });
-    expect(container.querySelector('.toast__msg')?.textContent).toBe('hello world');
-  });
-
-  it('renders confirm buttons after confirm()', async () => {
-    const { container } = render(Toast);
-    await act(() => { toast.confirm('sure?', vi.fn(), vi.fn()); });
-    expect(container.querySelector('.toast__confirm')).not.toBeNull();
-    expect(container.querySelector('.toast__cancel')).not.toBeNull();
-  });
-
-  it('hides after dismiss()', async () => {
-    const { container } = render(Toast);
-    await act(() => { toast.show('bye'); });
-    expect(container.querySelector('.toast')).not.toBeNull();
-    await act(() => { toast.dismiss(); });
-    expect(container.querySelector('.toast')).toBeNull();
+    expect(container.querySelector('section[aria-label*="Notifications"]')).not.toBeNull();
   });
 });

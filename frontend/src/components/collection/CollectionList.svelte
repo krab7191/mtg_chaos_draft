@@ -3,6 +3,8 @@
   import CollectionCard from './CollectionCard.svelte';
   import { computeSortedSets, type Pack } from '../../lib/collection';
   import { toast } from '../../lib/toast.svelte';
+  import { toastNetworkError, toastResponseError } from '../../lib/api';
+  import { send } from '../../lib/send';
 
   let { packs: initialPacks }: { packs: Pack[] } = $props();
 
@@ -39,24 +41,19 @@
     const prev = pack.quantity;
     const next = Math.max(0, prev + delta);
     pack.quantity = next;
-    const res = await fetch(`/api/collection/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: next }),
-    });
-    if (!res.ok) {
+    if (!(await send(`/api/collection/${id}`, 'PUT', { quantity: next }, 'Failed to update quantity'))) {
       pack.quantity = prev;
-      toast.show(`Failed to update quantity: ${res.status} ${res.statusText}`, 'error');
     }
   }
 
   // ── Delete ─────────────────────────────────────────────────
   function onDelete(id: number, label: string) {
     toast.confirm(`Remove "${label}"?`, async () => {
-      const res = await fetch(`/api/collection/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        toast.show(`Failed to delete: ${res.status} ${res.statusText}`, 'error');
-        return;
+      try {
+        const res = await fetch(`/api/collection/${id}`, { method: 'DELETE' });
+        if (!res.ok) return toastResponseError('Failed to delete', res);
+      } catch {
+        return toastNetworkError('Failed to delete');
       }
       packs = packs.filter(p => p.id !== id);
     });

@@ -78,7 +78,7 @@
       if (await send(`/api/purchases/${p.id}`, 'DELETE', null, 'Failed to delete')) {
         purchases = purchases.filter(x => x.id !== p.id);
       }
-    });
+    }, undefined, 'Delete');
   }
   function undoSale(d: Disposal) {
     toast.confirm(`Undo the ${d.disposedOn} sale of ${d.quantity} ${d.setName} ${d.productType}? The packs go back into stock.`, async () => {
@@ -86,7 +86,7 @@
         disposals = disposals.filter(x => x.id !== d.id);
         moveStock(d.packId, d.quantity);
       }
-    });
+    }, undefined, 'Undo sale');
   }
 
   // ── Formatting ─────────────────────────────────────────────

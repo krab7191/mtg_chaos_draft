@@ -104,12 +104,38 @@ func getMTGStocksProducts() ([]SearchResult, error) {
 	}
 	productsCacheMu.RUnlock()
 
+	products, err := fetchMTGStocksProducts()
+	if err != nil {
+		fmt.Printf("mtgstocks: catalog refresh failed: %v\n", err)
+		// Serve the last good catalog rather than failing outright.
+		productsCacheMu.RLock()
+		stale := productsCache
+		productsCacheMu.RUnlock()
+		if stale != nil {
+			return stale, nil
+		}
+		return nil, err
+	}
+
+	productsCacheMu.Lock()
+	productsCache = products
+	productsCacheTime = time.Now()
+	productsCacheMu.Unlock()
+
+	return products, nil
+}
+
+func fetchMTGStocksProducts() ([]SearchResult, error) {
 	body, status, err := proxyMTGStocks("https://api.mtgstocks.com/sealed")
 	if err != nil {
 		return nil, fmt.Errorf("mtgstocks fetch: %w", err)
 	}
 	if status != 200 {
-		return nil, fmt.Errorf("mtgstocks returned %d", status)
+		snippet := body
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
+		return nil, fmt.Errorf("mtgstocks returned %d: %s", status, snippet)
 	}
 
 	var sets []msSet
@@ -170,19 +196,13 @@ func getMTGStocksProducts() ([]SearchResult, error) {
 	}
 
 	fmt.Printf("mtgstocks: loaded %d sealed products from %d sets\n", len(products), len(sets))
-
-	productsCacheMu.Lock()
-	productsCache = products
-	productsCacheTime = time.Now()
-	productsCacheMu.Unlock()
-
 	return products, nil
 }
 
 func CheapestPacks(w http.ResponseWriter, r *http.Request) {
 	products, err := getMTGStocksProducts()
 	if err != nil {
-		http.Error(w, "fetch error", http.StatusBadGateway)
+		http.Error(w, "couldn't reach MTGStocks — try again shortly", http.StatusBadGateway)
 		return
 	}
 
@@ -234,7 +254,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	products, err := getMTGStocksProducts()
 	if err != nil {
-		http.Error(w, "search error", http.StatusBadGateway)
+		http.Error(w, "couldn't reach MTGStocks — try again shortly", http.StatusBadGateway)
 		return
 	}
 

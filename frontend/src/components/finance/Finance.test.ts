@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, fireEvent, act } from '../../tests/svelte';
 import Finance from './Finance.svelte';
 import { toast } from '../../lib/toast.svelte';
@@ -23,7 +23,18 @@ const sale = {
 const flush = () => new Promise(r => setTimeout(r, 0));
 const ok = (body: unknown, status = 200) => ({ ok: true, status, json: async () => body });
 
-afterEach(() => { vi.unstubAllGlobals(); toast.dismiss(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+// The latest toast message, and a way to answer the latest confirm.
+let showSpy: ReturnType<typeof vi.spyOn>;
+let confirmSpy: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+  showSpy = vi.spyOn(toast, 'show');
+  confirmSpy = vi.spyOn(toast, 'confirm').mockReturnValue(0);
+});
+const lastToast = () => showSpy.mock.lastCall?.[0] as string | undefined;
+const lastConfirm = () => confirmSpy.mock.lastCall?.[0] as string | undefined;
+const acceptConfirm = () => (confirmSpy.mock.lastCall![1] as () => void)();
 
 function setup(props: Record<string, unknown> = {}) {
   return render(Finance, { props: { purchases: [display], disposals: [draft, sale], packs, canEdit: true, ...props } });
@@ -172,7 +183,7 @@ describe('Finance purchases', () => {
     await act(() => fireEvent.input(form.querySelectorAll('input[type=number]')[1], { target: { value: '4' } }));
     await act(() => fireEvent.submit(form));
     await act(flush);
-    expect(toast.msg).toBe('Failed to log purchase: bad');
+    expect(lastToast()).toBe('Failed to log purchase: bad');
     expect(form.querySelector<HTMLInputElement>('input[type=search]')!.value).toBe('Bloomburrow — Play Booster');
   });
 
@@ -205,8 +216,8 @@ describe('Finance purchases', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }));
     const { container } = setup();
     await act(() => fireEvent.click(rowOf(container, 'Buy').querySelector('.btn-row--danger')!));
-    expect(toast.mode).toBe('confirm');
-    await act(async () => { toast.onConfirm!(); await flush(); });
+    expect(confirmSpy).toHaveBeenCalled();
+    await act(async () => { acceptConfirm(); await flush(); });
     expect(container.querySelector('.tag--buy')).toBeNull();
   });
 });
@@ -353,8 +364,8 @@ describe('Finance sales', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }));
     const { container } = setup();
     await act(() => fireEvent.click(rowOf(container, 'Sale').querySelector('.btn-row--danger')!));
-    expect(toast.msg).toContain('The packs go back into stock');
-    await act(async () => { toast.onConfirm!(); await flush(); });
+    expect(lastConfirm()).toContain('The packs go back into stock');
+    await act(async () => { acceptConfirm(); await flush(); });
     expect(container.querySelector('.tag--sale')).toBeNull();
     await act(() => fireEvent.click(button(container, 'Record a sale')));
     await openPicker(container.querySelector('.form')!);
@@ -365,9 +376,9 @@ describe('Finance sales', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => '' }));
     const { container } = setup();
     await act(() => fireEvent.click(rowOf(container, 'Sale').querySelector('.btn-row--danger')!));
-    await act(async () => { toast.onConfirm!(); await flush(); });
+    await act(async () => { acceptConfirm(); await flush(); });
     expect(container.querySelector('.tag--sale')).not.toBeNull();
-    expect(toast.msg).toBe('Failed to undo sale: 500');
+    expect(lastToast()).toBe('Failed to undo sale: the server hit an error (500)');
   });
 });
 
@@ -395,7 +406,7 @@ describe('Finance drafts', () => {
     await act(() => fireEvent.click(button(container, 'Edit', rowOf(container, 'Draft'))));
     await act(() => fireEvent.submit(container.querySelector('.form--inline')!));
     await act(flush);
-    expect(toast.msg).toBe('Failed to save: draft not approved');
+    expect(lastToast()).toBe('Failed to save: draft not approved');
     expect(container.querySelector('.form--inline')).not.toBeNull();
   });
 });

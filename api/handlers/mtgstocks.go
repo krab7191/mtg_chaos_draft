@@ -72,7 +72,7 @@ func Price(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("mtgstocksId")
 	body, status, err := proxyMTGStocks("https://api.mtgstocks.com/sealed/" + id)
 	if err != nil {
-		http.Error(w, "proxy error", http.StatusBadGateway)
+		http.Error(w, "couldn't reach MTGStocks — try again shortly", http.StatusBadGateway)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

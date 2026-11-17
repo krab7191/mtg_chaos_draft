@@ -197,6 +197,9 @@
 </style>
 
 <script>
+  import { getJSON } from '../lib/api';
+  import { send } from '../lib/send';
+
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   // Purchase date for packs added this visit; defaults to today (local time).
@@ -224,9 +227,11 @@
   });
 
   async function doSearch(q: string) {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-    if (!res.ok) return;
-    const items: any[] = await res.json();
+    const items = await getJSON<any[]>(`/api/search?q=${encodeURIComponent(q)}`, 'Search failed');
+    if (!items) {
+      results.hidden = true;
+      return;
+    }
 
     results.innerHTML = '';
 
@@ -334,10 +339,7 @@
         const paidField = paidMode.value === 'each' ? 'paidPrice' : 'paidTotal';
         const purchasedOn = dateInput.value || today;
 
-        const res = await fetch('/api/collection', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const added = await send('/api/collection', 'POST', {
             mtgstocksId: parseInt(btn.dataset.id!),
             name: btn.dataset.name,
             setName: btn.dataset.setName,
@@ -347,10 +349,9 @@
             weight: 1.0,
             marketPrice,
             ...(paid != null ? { [paidField]: paid, purchasedOn } : {}),
-          }),
-        });
+        }, `Couldn't add ${btn.dataset.setName} ${btn.dataset.productType}`);
 
-        if (res.ok) {
+        if (added) {
           btn.textContent = '✓ Added';
           btn.classList.add('added');
           document.dispatchEvent(new CustomEvent('collection-updated'));

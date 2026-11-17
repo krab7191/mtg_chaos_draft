@@ -2,7 +2,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { send } from './send';
 import { toast } from './toast.svelte';
 
-afterEach(() => { vi.unstubAllGlobals(); toast.dismiss(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+const spyShow = () => vi.spyOn(toast, 'show');
 
 describe('send', () => {
   it('sends JSON and returns the parsed response', async () => {
@@ -21,17 +23,23 @@ describe('send', () => {
 
   it('shows the server message on an error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409, text: async () => 'not enough packs in stock\n' }));
+    const show = spyShow();
     expect(await send('/api/x', 'POST', {}, 'Failed to record sale')).toBeNull();
-    expect(toast.msg).toBe('Failed to record sale: not enough packs in stock');
-    expect(toast.type).toBe('error');
+    expect(show).toHaveBeenCalledWith('Failed to record sale: not enough packs in stock', 'error');
   });
 
-  it('falls back to the status code, and handles network errors', async () => {
+  it('describes the status when the server sends nothing useful, and handles network errors', async () => {
+    const show = spyShow();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => { throw new Error('x'); } }));
     expect(await send('/api/x', 'POST', {}, 'Failed')).toBeNull();
-    expect(toast.msg).toBe('Failed: 500');
+    expect(show).toHaveBeenLastCalledWith('Failed: the server hit an error (500)', 'error');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     expect(await send('/api/x', 'POST', {}, 'Offline')).toBeNull();
-    expect(toast.msg).toBe('Offline');
+    expect(show).toHaveBeenLastCalledWith("Offline: can't reach the server — check your connection", 'error');
+  });
+
+  it('treats a successful response without a JSON body as success', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('x'); } }));
+    expect(await send('/api/x', 'PUT', {}, 'Failed')).toBe(true);
   });
 });

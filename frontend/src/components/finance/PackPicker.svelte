@@ -22,6 +22,8 @@
 </script>
 
 <script lang="ts">
+  import { getJSON } from '../../lib/api';
+
   // Type to find a pack: the collection first, then (optionally) MTGStocks for
   // packs that aren't in the collection yet.
   let { packs, value = $bindable(null), searchCatalog = false, describe = () => '', label = 'Pack' }: {
@@ -75,11 +77,8 @@
   async function search(q: string) {
     const mine = ++seq;
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const items = res.ok ? await res.json() : [];
+      const items = await getJSON<CatalogProduct[]>(`/api/search?q=${encodeURIComponent(q)}`, 'Search failed');
       if (mine === seq) catalog = Array.isArray(items) ? items : [];
-    } catch {
-      if (mine === seq) catalog = [];
     } finally {
       if (mine === seq) searching = false;
     }

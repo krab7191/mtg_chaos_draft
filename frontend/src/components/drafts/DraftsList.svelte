@@ -18,6 +18,7 @@
 
   import { untrack } from 'svelte';
   import { toast } from '../../lib/toast.svelte';
+  import { toastNetworkError, toastResponseError } from '../../lib/api';
   import { groupPicks } from '../../lib/draft';
 
   let { drafts: initialDrafts, isAdmin }: {
@@ -31,11 +32,12 @@
 
   function removeDraft(draftId: number) {
     toast.confirm('Remove this draft?', async () => {
-      const res = await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' });
-      if (res.ok) {
-        drafts = drafts.filter(d => d.id !== draftId);
-      } else {
-        toast.show(`Failed to remove draft: ${res.status}`, 'error');
+      try {
+        const res = await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' });
+        if (res.ok) drafts = drafts.filter(d => d.id !== draftId);
+        else await toastResponseError('Failed to remove draft', res);
+      } catch {
+        toastNetworkError('Failed to remove draft');
       }
     });
   }
@@ -66,11 +68,10 @@
         );
         toast.show('Draft approved', 'success');
       } else {
-        const msg = await res.text();
-        toast.show(msg.trim() || `Failed to approve: ${res.status}`, 'error');
+        await toastResponseError('Failed to approve draft', res);
       }
     } catch {
-      toast.show('Failed to approve draft', 'error');
+      toastNetworkError('Failed to approve draft');
     } finally {
       approving[draftId] = false;
     }

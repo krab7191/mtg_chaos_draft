@@ -10,7 +10,7 @@ const flush = () => new Promise(r => setTimeout(r, 0));
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: 'OK', text: async () => '' }));
   // Run confirm callbacks immediately, as if the admin clicked "yes".
-  vi.spyOn(toast, 'confirm').mockImplementation((_msg: string, onConfirm: () => void) => { onConfirm(); });
+  vi.spyOn(toast, 'confirm').mockImplementation((_msg: string, onConfirm: () => void) => { onConfirm(); return 0; });
 });
 
 afterEach(() => {
@@ -142,7 +142,7 @@ describe('WeightsList behavior', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Boom' }));
     await act(() => fireEvent.click(container.querySelector('.btn-save')!));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('Failed to save: 500 Boom', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to save: the server hit an error (500)', 'error');
   });
 });
 
@@ -197,7 +197,7 @@ describe('CollectionList behavior', () => {
     await act(() => fireEvent.click(container.querySelector('.qty__btn--dec')!));
     await act(flush);
     expect(qty()).toBe('3');
-    expect(show).toHaveBeenCalledWith('Failed to update quantity: 409 Conflict', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to update quantity: it conflicts with existing data', 'error');
   });
 
   it('deletes a pack, and keeps it with an error when the delete fails', async () => {
@@ -208,7 +208,7 @@ describe('CollectionList behavior', () => {
     await act(() => fireEvent.click(container.querySelector('.btn-delete')!));
     await act(flush);
     expect(setNames(container)).toEqual(['A', 'B']);
-    expect(show).toHaveBeenCalledWith('Failed to delete: 500 Err', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to delete: the server hit an error (500)', 'error');
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
     await act(() => fireEvent.click(container.querySelector('.btn-delete')!));
@@ -256,17 +256,17 @@ describe('DraftsList behavior', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409, text: async () => 'insufficient stock for: A\n' }));
     await act(() => fireEvent.click(container.querySelector('.btn-approve')!));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('insufficient stock for: A', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to approve draft: insufficient stock for: A', 'error');
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => '  ' }));
     await act(() => fireEvent.click(container.querySelector('.btn-approve')!));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('Failed to approve: 500', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to approve draft: the server hit an error (500)', 'error');
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     await act(() => fireEvent.click(container.querySelector('.btn-approve')!));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('Failed to approve draft', 'error');
+    expect(show).toHaveBeenCalledWith("Failed to approve draft: can't reach the server — check your connection", 'error');
     expect((container.querySelector('.btn-approve') as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -277,7 +277,7 @@ describe('DraftsList behavior', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
     await act(() => fireEvent.click(container.querySelector('.btn-remove')!));
     await act(flush);
-    expect(show).toHaveBeenCalledWith('Failed to remove draft: 500', 'error');
+    expect(show).toHaveBeenCalledWith('Failed to remove draft: the server hit an error (500)', 'error');
     expect(container.querySelectorAll('.draft-card')).toHaveLength(2);
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));

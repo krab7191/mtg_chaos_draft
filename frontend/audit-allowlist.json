@@ -1,0 +1,6 @@
+{
+  "GHSA-fc5q-39xc-vjpf": {
+    "until": "2027-01-31",
+    "reason": "picomatch ReDoS via attacker-supplied extglobs. No patched release exists (<=4.0.7 is every version). Only reached through Astro/Vite build config globs, never user input. Remove once picomatch ships a fix."
+  }
+}

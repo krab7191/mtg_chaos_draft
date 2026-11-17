@@ -1,44 +1,33 @@
-type ToastType = 'info' | 'error' | 'success';
+// Thin adapter over svelte-sonner so call sites keep a small, stable API.
+import { toast as sonner } from 'svelte-sonner';
 
-class ToastStore {
-  visible = $state(false);
-  msg     = $state('');
-  type    = $state<ToastType>('info');
-  mode    = $state<'info' | 'confirm'>('info');
+export type ToastType = 'info' | 'error' | 'success';
 
-  // Not reactive — only read on button click
-  onConfirm: (() => void) | undefined;
-  onCancel:  (() => void) | undefined;
+/** Errors linger longer: they're the ones people need time to read. */
+export const DURATIONS: Record<ToastType, number> = { success: 4000, info: 5000, error: 8000 };
 
-  #timer: ReturnType<typeof setTimeout> | null = null;
+export const toast = {
+  show(msg: string, type: ToastType = 'info'): string | number {
+    // Keying on the message means a repeat (e.g. a search failing on every
+    // keystroke) refreshes the existing toast instead of stacking duplicates.
+    const opts = { id: `${type}:${msg}`, duration: DURATIONS[type] };
+    if (type === 'error') return sonner.error(msg, opts);
+    if (type === 'success') return sonner.success(msg, opts);
+    return sonner.info(msg, opts);
+  },
 
-  show(msg: string, type: ToastType = 'info') {
-    this.#clear();
-    this.msg  = msg;
-    this.type = type;
-    this.mode = 'info';
-    this.visible = true;
-    this.#timer = setTimeout(() => this.dismiss(), 4000);
-  }
+  error(msg: string)   { return this.show(msg, 'error'); },
+  success(msg: string) { return this.show(msg, 'success'); },
 
-  confirm(msg: string, onConfirm: () => void, onCancel?: () => void) {
-    this.#clear();
-    this.msg       = msg;
-    this.type      = 'info';
-    this.mode      = 'confirm';
-    this.onConfirm = onConfirm;
-    this.onCancel  = onCancel;
-    this.visible   = true;
-  }
+  /** A question that waits for an answer: stays until a button is pressed. */
+  confirm(msg: string, onConfirm: () => void, onCancel?: () => void, confirmLabel = 'Remove'): string | number {
+    return sonner(msg, {
+      id: 'confirm', // one pending question at a time
+      duration: Number.POSITIVE_INFINITY,
+      action: { label: confirmLabel, onClick: () => onConfirm() },
+      cancel: { label: 'Cancel', onClick: () => onCancel?.() },
+    });
+  },
 
-  dismiss() {
-    this.#clear();
-    this.visible = false;
-  }
-
-  #clear() {
-    if (this.#timer) { clearTimeout(this.#timer); this.#timer = null; }
-  }
-}
-
-export const toast = new ToastStore();
+  dismiss(id?: string | number) { sonner.dismiss(id); },
+};

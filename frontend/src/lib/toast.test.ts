@@ -1,50 +1,56 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { toast } from './toast.svelte';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-beforeEach(() => {
-  toast.dismiss();
-  vi.useFakeTimers();
+const sonner = vi.hoisted(() => {
+  const fn = vi.fn(() => 'id') as any;
+  fn.error = vi.fn(() => 'id');
+  fn.success = vi.fn(() => 'id');
+  fn.info = vi.fn(() => 'id');
+  fn.dismiss = vi.fn();
+  return fn;
 });
+vi.mock('svelte-sonner', () => ({ toast: sonner }));
 
-afterEach(() => {
-  vi.useRealTimers();
-});
+import { toast, DURATIONS } from './toast.svelte';
 
-describe('toast store', () => {
-  it('show() sets visible, msg, and default type=info', () => {
-    toast.show('hello');
-    expect(toast.visible).toBe(true);
-    expect(toast.msg).toBe('hello');
-    expect(toast.type).toBe('info');
-    expect(toast.mode).toBe('info');
-  });
+beforeEach(() => vi.clearAllMocks());
 
-  it('show() accepts explicit type', () => {
-    toast.show('oops', 'error');
-    expect(toast.type).toBe('error');
-  });
-
-  it('dismiss() clears visible', () => {
+describe('toast adapter', () => {
+  it('routes each type to sonner, keyed by message so repeats collapse', () => {
     toast.show('hi');
-    toast.dismiss();
-    expect(toast.visible).toBe(false);
+    expect(sonner.info).toHaveBeenCalledWith('hi', { id: 'info:hi', duration: DURATIONS.info });
+    toast.error('bad');
+    expect(sonner.error).toHaveBeenCalledWith('bad', { id: 'error:bad', duration: DURATIONS.error });
+    toast.success('yay');
+    expect(sonner.success).toHaveBeenCalledWith('yay', { id: 'success:yay', duration: DURATIONS.success });
   });
 
-  it('auto-dismisses after 4s', () => {
-    toast.show('bye');
-    expect(toast.visible).toBe(true);
-    vi.advanceTimersByTime(4000);
-    expect(toast.visible).toBe(false);
+  it('keeps errors up longer than success messages', () => {
+    expect(DURATIONS.error).toBeGreaterThan(DURATIONS.success);
   });
 
-  it('confirm() sets mode=confirm and stores callbacks', () => {
+  it('confirm() waits for an answer and wires both buttons', () => {
     const onConfirm = vi.fn();
-    const onCancel  = vi.fn();
-    toast.confirm('sure?', onConfirm, onCancel);
-    expect(toast.visible).toBe(true);
-    expect(toast.mode).toBe('confirm');
-    expect(toast.msg).toBe('sure?');
-    expect(toast.onConfirm).toBe(onConfirm);
-    expect(toast.onCancel).toBe(onCancel);
+    const onCancel = vi.fn();
+    toast.confirm('sure?', onConfirm, onCancel, 'Delete');
+    const [msg, opts] = sonner.mock.calls[0];
+    expect(msg).toBe('sure?');
+    expect(opts.duration).toBe(Number.POSITIVE_INFINITY);
+    expect(opts.action.label).toBe('Delete');
+    opts.action.onClick();
+    expect(onConfirm).toHaveBeenCalled();
+    opts.cancel.onClick();
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it('confirm() defaults to "Remove" and tolerates no cancel handler', () => {
+    toast.confirm('sure?', vi.fn());
+    const [, opts] = sonner.mock.calls[0];
+    expect(opts.action.label).toBe('Remove');
+    expect(() => opts.cancel.onClick()).not.toThrow();
+  });
+
+  it('dismiss() passes through', () => {
+    toast.dismiss(3);
+    expect(sonner.dismiss).toHaveBeenCalledWith(3);
   });
 });

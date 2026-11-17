@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { toast } from '../lib/toast.svelte';
+  import { toastNetworkError, toastResponseError } from '../lib/api';
 
   interface Pack {
     id: number;
@@ -96,6 +97,7 @@
   let livePrices      = $state<Record<string, number>>({});
   let draftSaved      = $state(_prefs.draftSaved === true && _init.length > 0);
   let historyEl       = $state<HTMLElement | null>(null);
+  let pickRowEl       = $state<HTMLElement | null>(null);
 
   // Picks per pack in the draft being built, worked out from the (persisted)
   // history so stock stays correct after a reload. Once the draft is saved,
@@ -121,6 +123,26 @@
   const pricingPending = $derived(history.some(e => e.pricing));
 
   // ── Persist history / pod size whenever they change ─────────
+  // Keep notifications above the fixed pick bar instead of covering its buttons.
+  $effect(() => {
+    const el = pickRowEl;
+    if (!el) return;
+    const root = document.documentElement;
+    const update = () => {
+      const top = el.getBoundingClientRect().top;
+      root.style.setProperty('--toast-offset', `${Math.max(0, window.innerHeight - top)}px`);
+    };
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', update);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', update);
+      root.style.removeProperty('--toast-offset');
+    };
+  });
+
   $effect(() => {
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch { /* storage unavailable */ }
   });
@@ -299,16 +321,16 @@
           marketPrice: e.marketPrice ?? null,
         })),
       }),
-    }).then(res => {
+    }).then(async res => {
       if (res.ok) {
         toast.show('Draft saved', 'success');
       } else {
         draftSaved = false;
-        toast.show('Failed to save draft', 'error');
+        await toastResponseError('Failed to save draft', res);
       }
     }).catch(() => {
       draftSaved = false;
-      toast.show('Failed to save draft', 'error');
+      toastNetworkError('Failed to save draft');
     });
   }
 
@@ -552,7 +574,7 @@
   {/if}
 
   <!-- Pick row -->
-  <div class="pick-row">
+  <div class="pick-row" bind:this={pickRowEl}>
     <button
       class="btn btn--primary btn--large"
       disabled={noneChecked || draftFull || selectedSlots === 0}

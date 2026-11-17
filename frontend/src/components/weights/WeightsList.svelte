@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import SetCard from './SetCard.svelte';
   import { toast } from '../../lib/toast.svelte';
+  import { send } from '../../lib/send';
 
   let { packs, settings }: {
     packs: any[];
@@ -151,16 +152,9 @@
 
   // ── Save ───────────────────────────────────────────────────
   async function saveSettings(showSuccess = false) {
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceFloor, priceCap, quantityCap, packWeights: { ...multipliers } }),
-    });
-    if (res.ok) {
-      if (showSuccess) toast.show('Settings saved', 'success');
-    } else {
-      toast.show(`Failed to save: ${res.status} ${res.statusText}`, 'error');
-    }
+    const ok = await send('/api/settings', 'PUT',
+      { priceFloor, priceCap, quantityCap, packWeights: { ...multipliers } }, 'Failed to save');
+    if (ok && showSuccess) toast.show('Settings saved', 'success');
   }
 
   async function save() {
