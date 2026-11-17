@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"mtg-chaos-draft/testhelper"
 )
@@ -131,4 +133,48 @@ func TestRefreshPrices_FetchError(t *testing.T) {
 		// should not panic; function logs and returns
 		RefreshPrices(context.Background(), pool)
 	})
+}
+
+func TestCheapestPacks_ExcludesSleeved(t *testing.T) {
+	resetProductsCache()
+	t.Cleanup(resetProductsCache)
+	const sets = `[{"name":"Eldritch Moon","abbreviation":"EMN","date":"2016-07-22","products":[
+	  {"id":1,"name":"Sleeved Booster Pack","type":null,"latestPrice":{"market":5.00}},
+	  {"id":2,"name":"Booster Pack","type":null,"latestPrice":{"market":14.84}}]}]`
+	withMockClient(200, sets, func() {
+		rr := httptest.NewRecorder()
+		CheapestPacks(rr, httptest.NewRequest(http.MethodGet, "/api/cheapest", nil))
+		var results []SearchResult
+		if err := json.NewDecoder(rr.Body).Decode(&results); err != nil {
+			t.Fatal(err)
+		}
+		if len(results) != 1 || results[0].MTGStocksID != 2 {
+			t.Errorf("want only the regular booster, got %+v", results)
+		}
+	})
+}
+
+// TestCheapestPacks_RealCatalogHasNoSleeved checks the rule against every
+// set in the real MTGStocks snapshot.
+func TestCheapestPacks_RealCatalogHasNoSleeved(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	catalogMu.Lock()
+	currentCatalog, lastLiveAttempt = c, time.Now()
+	catalogMu.Unlock()
+	t.Cleanup(resetProductsCache)
+
+	rr := httptest.NewRecorder()
+	CheapestPacks(rr, httptest.NewRequest(http.MethodGet, "/api/cheapest", nil))
+	var results []SearchResult
+	if err := json.NewDecoder(rr.Body).Decode(&results); err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 10 {
+		t.Fatalf("want a full top 10, got %d", len(results))
+	}
+	for _, r := range results {
+		if strings.HasPrefix(r.ProductType, "Sleeved") {
+			t.Errorf("sleeved pack listed: %s %s", r.SetName, r.ProductType)
+		}
+	}
 }

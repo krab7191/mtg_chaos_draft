@@ -151,6 +151,12 @@ func CheapestPacks(w http.ResponseWriter, r *http.Request) {
 		if p.MarketPrice == nil || *p.MarketPrice <= 0 {
 			continue
 		}
+		// Sleeved packs were big-box retail exclusives (Target, Walmart):
+		// out of print and priced differently from the regular booster, so
+		// they don't belong in a "cheapest packs to buy" list.
+		if strings.HasPrefix(p.ProductType, "Sleeved ") {
+			continue
+		}
 		if !beforeTime.IsZero() {
 			released, err := time.Parse("2006-01-02", p.ReleasedAt)
 			if err != nil || !released.Before(beforeTime) {
