@@ -71,7 +71,8 @@
         Prices live from MTGStocks, updated {age(status.fetchedAt!)}.
       {/if}
     </span>
-    {#if isAdmin}
+    <!-- Only needed when live prices aren't arriving. -->
+    {#if isAdmin && (!status.available || stale)}
       <label class="catalog__upload" title="JSON saved from api.mtgstocks.com/sealed">
         {uploading ? 'Uploading…' : 'Upload snapshot'}
         <input bind:this={fileInput} type="file" accept="application/json,.json" onchange={upload} disabled={uploading} hidden />

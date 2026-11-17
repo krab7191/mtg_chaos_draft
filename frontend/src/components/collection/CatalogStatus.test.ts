@@ -22,12 +22,15 @@ describe('CatalogStatus', () => {
     const { text, container } = await mount({ available: true, fetchedAt: ago(5 * 60_000), source: 'live', products: 900 });
     expect(text()).toContain('Prices live from MTGStocks, updated 5 min ago');
     expect(container.querySelector('.catalog--warn')).toBeNull();
+    // Nothing to fix, so no upload button.
+    expect(container.querySelector('.catalog__upload')).toBeNull();
   });
 
   it('warns when the live catalog is stale', async () => {
     const { text, container } = await mount({ available: true, fetchedAt: ago(5 * 3_600_000), source: 'live', products: 900 });
     expect(text()).toContain('MTGStocks unreachable — using prices from 5 h ago');
     expect(container.querySelector('.catalog--warn')).not.toBeNull();
+    expect(container.querySelector('.catalog__upload')).not.toBeNull();
   });
 
   it('flags an uploaded snapshot with its age', async () => {

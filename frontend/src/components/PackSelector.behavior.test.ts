@@ -522,3 +522,36 @@ describe('PackSelector pod size and restore', () => {
     expect(container.querySelector('.history')).toBeNull();
   });
 });
+
+// ── Less common states ────────────────────────────────────────────────────────
+
+describe('PackSelector less common states', () => {
+  it('when the selection is too small but the collection is not, says how much the selection fills', async () => {
+    localStorage.setItem('draft-pod-size', '2'); // 6 slots
+    const { container } = render(PackSelector, {
+      props: { packs: [pack(1, 'Few', { quantity: 2 }), pack(2, 'Many', { quantity: 10 })], settings: baseSettings },
+    });
+    // Uncheck "Many" so only 2 of the 6 slots are covered.
+    const many = Array.from(container.querySelectorAll('.pack-item')).find(li => li.textContent?.includes('Many'))!;
+    await act(() => fireEvent.click(many.querySelector('input[type=checkbox]')!));
+    const warning = container.querySelector('.stock-warning')?.textContent ?? '';
+    expect(warning).toContain('selected packs fill 2 of the 6 remaining slots');
+    expect(warning).not.toContain('whole collection');
+  });
+
+  it('prices multi-pack slots per slot in the footnote and the history', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    // 7-card packs need 2 packs per slot.
+    const { container } = render(PackSelector, {
+      props: { packs: [pack(1, 'Small', { cardsPerPack: 7, marketPrice: 3, quantity: 10 })], settings: baseSettings },
+    });
+    const footnote = Array.from(container.querySelectorAll('li')).map(li => li.textContent ?? '').find(t => t.includes('cards/pack')) ?? '';
+    expect(footnote).toContain('7 cards/pack, 2 packs per slot');
+    expect(footnote).toContain('$6.00');
+    await act(() => fireEvent.click(button(container, 'Pick a Pack')));
+    await act(flush);
+    expect(container.querySelector('.history')?.textContent).toContain('2 packs');
+    expect(container.querySelector('.history__pack-mult')?.textContent).toContain('2× $3.00 =');
+  });
+});
