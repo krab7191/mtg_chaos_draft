@@ -26,6 +26,12 @@ updates:
     groups:
       docker-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Hold Go 1.27: govulncheck v1.1.4 can't type-check its stdlib yet
+      # (generic methods), which fails CI. Go is bumped by hand in both
+      # api/go.mod and api/Dockerfile. Remove once govulncheck supports 1.27.
+      - dependency-name: golang
+        versions: [">= 1.27"]
 
   - package-ecosystem: github-actions
     directory: /

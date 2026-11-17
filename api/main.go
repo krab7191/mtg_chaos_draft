@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -131,12 +132,18 @@ var trustedProxyPrefixes = []string{
 }
 
 // clientIPKey keys the rate limiter by the client IP resolved by the
-// ClientIPFrom* middleware, falling back to the TCP peer address.
+// ClientIPFrom* middleware (which only trusts X-Real-IP from Caddy), falling
+// back to the TCP peer address. IPv6 clients are bucketed per /64.
 func clientIPKey(r *http.Request) (string, error) {
-	if ip := middleware.GetClientIP(r.Context()); ip != "" {
-		return ip, nil
+	ip := middleware.GetClientIP(r.Context())
+	if ip == "" {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			host = r.RemoteAddr
+		}
+		ip = host
 	}
-	return httprate.KeyByIP(r)
+	return httprate.CanonicalizeIP(ip), nil
 }
 
 // newRouter wires up all HTTP routes and their auth requirements.
@@ -155,7 +162,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 	// header when the request comes from Caddy on the private Docker network;
 	// anyone else is identified by their connection address.
 	r.Use(middleware.ClientIPFromHeader("X-Real-IP", trustedProxyPrefixes...))
-	r.Use(httprate.Limit(100, time.Minute, httprate.WithKeyFuncs(clientIPKey)))
+	r.Use(httprate.LimitBy(100, time.Minute, clientIPKey))
 
 	// Health check
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) {
