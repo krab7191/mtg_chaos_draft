@@ -9,26 +9,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// RefreshPrices fetches current prices from MTGStocks and updates all
-// collection packs that have a matching mtgstocks_id.
+// RefreshPrices applies the current catalog's prices (live, or the saved
+// copy when MTGStocks is unreachable) to every pack with an mtgstocks_id.
 func RefreshPrices(ctx context.Context, pool *pgxpool.Pool) {
-	products, err := getMTGStocksProducts()
+	c, err := getCatalog()
 	if err != nil {
 		log.Printf("price refresh: fetch failed: %v", err)
 		return
 	}
-
-	prices := make(map[int]float64, len(products))
-	for _, p := range products {
-		if p.MarketPrice != nil {
-			prices[p.MTGStocksID] = *p.MarketPrice
-		}
-	}
+	prices := c.prices
 
 	if err := db.BulkUpdatePrices(ctx, pool, prices); err != nil {
 		log.Printf("price refresh: db update failed: %v", err)
 		return
 	}
 
-	log.Printf("price refresh: updated prices for up to %d products", len(prices))
+	log.Printf("price refresh: updated prices for up to %d products (%s catalog from %s)",
+		len(prices), c.source, c.fetchedAt.Format("2006-01-02 15:04"))
 }

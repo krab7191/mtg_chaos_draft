@@ -36,6 +36,9 @@ func main() {
 	}
 	defer pool.Close()
 
+	// Must precede the first price refresh so it can fall back to the saved catalog.
+	handlers.UseCatalogStore(pool)
+
 	// Daily price refresh + session cleanup goroutine
 	go func() {
 		handlers.RefreshPrices(bgCtx, pool)
@@ -154,6 +157,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 	draftHandler := handlers.NewDraftHandler(pool)
 	purchaseHandler := handlers.NewPurchaseHandler(pool)
 	saleHandler := handlers.NewSaleHandler(pool)
+	catalogHandler := handlers.NewCatalogHandler(pool)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -188,6 +192,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Use(mw.RequireAdminOrViewer)
 
 			r.Get("/api/search", handlers.Search)
+			r.Get("/api/catalog", catalogHandler.Status)
 			r.Get("/api/cheapest", handlers.CheapestPacks)
 			r.Get("/api/price/{mtgstocksId}", handlers.Price)
 			r.Get("/api/drafts", draftHandler.List)
@@ -211,6 +216,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Delete("/api/sales/{id}", saleHandler.Delete)
 			r.Put("/api/drafts/{id}/collected", saleHandler.SetDraftCollected)
 			r.Put("/api/settings", settingsHandler.Update)
+			r.Put("/api/catalog", catalogHandler.Upload)
 			r.Post("/api/drafts", draftHandler.Create)
 			r.Delete("/api/drafts/{id}", draftHandler.Delete)
 			r.Post("/api/drafts/{id}/approve", draftHandler.Approve)

@@ -4,12 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"time"
 )
 
-var mtgstocksClient = &http.Client{
-	Timeout: 10 * time.Second,
+var mtgstocksClient = newMTGStocksClient(os.Getenv("MTGSTOCKS_PROXY"))
+
+// newMTGStocksClient returns the client for MTGStocks requests. When proxyURL
+// is set (e.g. an HTTP proxy reached over WireGuard), only these requests go
+// through it; everything else the server does is unaffected.
+func newMTGStocksClient(proxyURL string) *http.Client {
+	c := &http.Client{Timeout: 10 * time.Second}
+	if proxyURL == "" {
+		return c
+	}
+	u, err := url.Parse(proxyURL)
+	if err != nil || u.Host == "" {
+		log.Printf("mtgstocks: ignoring invalid MTGSTOCKS_PROXY %q", proxyURL)
+		return c
+	}
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.Proxy = http.ProxyURL(u)
+	c.Transport = t
+	log.Printf("mtgstocks: requests go through proxy %s", u.Host)
+	return c
 }
 
 func proxyMTGStocks(url string) ([]byte, int, error) {
@@ -32,9 +53,17 @@ func proxyMTGStocks(url string) ([]byte, int, error) {
 	return body, resp.StatusCode, err
 }
 
-// fetchSealedPrice fetches the market price for an MTGStocks sealed product.
-// Returns the price and true on success, or 0 and false if unavailable.
+// fetchSealedPrice returns the market price for an MTGStocks sealed product:
+// live when MTGStocks answers, otherwise from the cached catalog. Returns
+// 0 and false if neither has a price.
 func fetchSealedPrice(mtgstocksID int) (float64, bool) {
+	if price, ok := fetchLiveSealedPrice(mtgstocksID); ok {
+		return price, true
+	}
+	return cachedSealedPrice(mtgstocksID)
+}
+
+func fetchLiveSealedPrice(mtgstocksID int) (float64, bool) {
 	body, status, err := proxyMTGStocks(fmt.Sprintf("https://api.mtgstocks.com/sealed/%d", mtgstocksID))
 	if err != nil || status != 200 {
 		return 0, false

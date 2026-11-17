@@ -35,6 +35,8 @@ services:
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost/api/auth/callback}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       VIEWER_EMAILS: ${VIEWER_EMAILS:-}
+      # Optional HTTP proxy for MTGStocks requests only (e.g. over WireGuard).
+      MTGSTOCKS_PROXY: ${MTGSTOCKS_PROXY:-}
       PORT: "8080"
     volumes:
       - /etc/mtg-chaos-draft/viewer_emails:/etc/mtg-chaos-draft/viewer_emails:ro

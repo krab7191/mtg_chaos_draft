@@ -213,3 +213,21 @@ func TestPrice_Handler_NetworkError(t *testing.T) {
 		}
 	})
 }
+
+func TestNewMTGStocksClient_Proxy(t *testing.T) {
+	if c := newMTGStocksClient(""); c.Transport != nil {
+		t.Error("no proxy: want default transport")
+	}
+	if c := newMTGStocksClient("::not a url"); c.Transport != nil {
+		t.Error("invalid proxy: want default transport")
+	}
+	c := newMTGStocksClient("http://10.8.0.2:8888")
+	tr, ok := c.Transport.(*http.Transport)
+	if !ok || tr.Proxy == nil {
+		t.Fatal("want proxying transport")
+	}
+	req, _ := http.NewRequest(http.MethodGet, "https://api.mtgstocks.com/sealed", nil)
+	if u, err := tr.Proxy(req); err != nil || u.Host != "10.8.0.2:8888" {
+		t.Errorf("proxy for request: %v %v", u, err)
+	}
+}

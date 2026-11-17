@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import PackSearch from '../../components/PackSearch.astro';
 import CollectionList from '../../components/collection/CollectionList.svelte';
+import CatalogStatus from '../../components/collection/CatalogStatus.svelte';
 
 const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
 const cookie = Astro.request.headers.get('cookie') ?? '';
@@ -26,6 +27,7 @@ const packs: any[] = colRes.ok ? await colRes.json() : [];
     <h1 class="page__title">Manage Collection</h1>
     <p class="page__sub">Search to add packs. Enter what you paid to track it on the <a href="/admin/finance">Finance</a> page.</p>
 
+    <CatalogStatus client:load isAdmin={user.role === 'admin'} />
     <PackSearch />
 
     <section class="collection">

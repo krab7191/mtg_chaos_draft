@@ -47,3 +47,6 @@ lcov.info
 coverage.out
 coverage.html
 frontend/coverage
+
+# Vitest reporter output
+frontend/.vitest/

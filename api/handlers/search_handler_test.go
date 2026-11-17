@@ -34,10 +34,10 @@ const fakeSetsJSON = `[
 ]`
 
 func resetProductsCache() {
-	productsCacheMu.Lock()
-	productsCache = nil
-	productsCacheTime = time.Time{}
-	productsCacheMu.Unlock()
+	catalogMu.Lock()
+	currentCatalog = nil
+	lastLiveAttempt = time.Time{}
+	catalogMu.Unlock()
 }
 
 // ── getMTGStocksProducts ───────────────────────────────────────────────────────

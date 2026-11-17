@@ -2,11 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sahilm/fuzzy"
@@ -39,12 +37,6 @@ type SearchResult struct {
 	ProductType string   `json:"productType"`
 	MarketPrice *float64 `json:"marketPrice"`
 }
-
-var (
-	productsCache     []SearchResult
-	productsCacheTime time.Time
-	productsCacheMu   sync.RWMutex
-)
 
 var knownPackTypes = map[string]string{
 	"draft_booster":     "Draft Booster",
@@ -93,110 +85,6 @@ func deriveProductType(p msProduct) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func getMTGStocksProducts() ([]SearchResult, error) {
-	productsCacheMu.RLock()
-	if productsCache != nil && time.Since(productsCacheTime) < time.Hour {
-		p := productsCache
-		productsCacheMu.RUnlock()
-		return p, nil
-	}
-	productsCacheMu.RUnlock()
-
-	products, err := fetchMTGStocksProducts()
-	if err != nil {
-		fmt.Printf("mtgstocks: catalog refresh failed: %v\n", err)
-		// Serve the last good catalog rather than failing outright.
-		productsCacheMu.RLock()
-		stale := productsCache
-		productsCacheMu.RUnlock()
-		if stale != nil {
-			return stale, nil
-		}
-		return nil, err
-	}
-
-	productsCacheMu.Lock()
-	productsCache = products
-	productsCacheTime = time.Now()
-	productsCacheMu.Unlock()
-
-	return products, nil
-}
-
-func fetchMTGStocksProducts() ([]SearchResult, error) {
-	body, status, err := proxyMTGStocks("https://api.mtgstocks.com/sealed")
-	if err != nil {
-		return nil, fmt.Errorf("mtgstocks fetch: %w", err)
-	}
-	if status != 200 {
-		snippet := body
-		if len(snippet) > 200 {
-			snippet = snippet[:200]
-		}
-		return nil, fmt.Errorf("mtgstocks returned %d: %s", status, snippet)
-	}
-
-	var sets []msSet
-	if err := json.Unmarshal(body, &sets); err != nil {
-		return nil, fmt.Errorf("mtgstocks decode: %w", err)
-	}
-
-	var products []SearchResult
-	type seenKey struct{ setCode, productType string }
-	seen := make(map[seenKey]bool)
-
-	addProduct := func(s msSet, p msProduct) {
-		productType, ok := deriveProductType(p)
-		if !ok {
-			return
-		}
-		key := seenKey{s.Abbreviation, productType}
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-		result := SearchResult{
-			MTGStocksID: p.ID,
-			Name:        p.Name,
-			SetName:     s.Name,
-			SetCode:     s.Abbreviation,
-			ReleasedAt:  s.Date,
-			ProductType: productType,
-		}
-		if p.LatestPrice != nil {
-			if price, ok := pickPrice(p.LatestPrice.Low, p.LatestPrice.Market, p.LatestPrice.Average); ok {
-				result.MarketPrice = &price
-			}
-		}
-		products = append(products, result)
-	}
-
-	for _, s := range sets {
-		// Pass 1: explicitly-typed products win deduplication
-		for _, p := range s.Products {
-			if p.Type == nil {
-				continue
-			}
-			if _, ok := knownPackTypes[*p.Type]; !ok {
-				continue
-			}
-			addProduct(s, p)
-		}
-		// Pass 2: null/unknown-typed products only fill slots not already taken
-		for _, p := range s.Products {
-			if p.Type != nil {
-				if _, ok := knownPackTypes[*p.Type]; ok {
-					continue
-				}
-			}
-			addProduct(s, p)
-		}
-	}
-
-	fmt.Printf("mtgstocks: loaded %d sealed products from %d sets\n", len(products), len(sets))
-	return products, nil
 }
 
 func CheapestPacks(w http.ResponseWriter, r *http.Request) {
