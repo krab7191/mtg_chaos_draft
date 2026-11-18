@@ -259,3 +259,54 @@ export function activity(purchases: Purchase[], disposals: Disposal[]): Activity
   const rank = (a: Activity) => (a.type === 'buy' ? 0 : 1);
   return rows.sort((a, b) => b.date.localeCompare(a.date) || rank(b) - rank(a) || b.id - a.id);
 }
+
+// ── Sorting holdings ─────────────────────────────────────────
+
+export type HoldingSortKey = 'name' | 'avgCost' | 'unrealized' | 'gain' | 'realized';
+export interface HoldingSort { key: HoldingSortKey; dir: 'desc' | 'asc' }
+
+/** The number each sort key compares; null means "—" in the table. */
+const holdingValue: Record<Exclude<HoldingSortKey, 'name'>, (p: Position) => number | null> = {
+  avgCost: p => (p.costed > 0 ? p.avgCost : null),
+  unrealized: p => p.unrealized,
+  gain: p => p.unrealizedPct,
+  realized: p => (p.disposed > 0 ? p.realized : null),
+};
+
+/** Sorted copy of positions; packs without a value go last either way. */
+export function sortHoldings(positions: Position[], sort: HoldingSort | null): Position[] {
+  if (!sort) return positions;
+  if (sort.key === 'name') {
+    const sign = sort.dir === 'asc' ? 1 : -1;
+    return [...positions].sort((a, b) =>
+      sign * (a.setName.localeCompare(b.setName) || a.productType.localeCompare(b.productType)));
+  }
+  const get = holdingValue[sort.key];
+  return [...positions].sort((a, b) => {
+    const x = get(a), y = get(b);
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+    return sort.dir === 'desc' ? y - x : x - y;
+  });
+}
+
+/**
+ * Next sort after clicking a column: numbers go highest first, then lowest
+ * first, then back to the default order; the pack name goes A–Z, then Z–A.
+ */
+export function nextHoldingSort(current: HoldingSort | null, key: HoldingSortKey): HoldingSort | null {
+  const first = key === 'name' ? 'asc' : 'desc';
+  if (current?.key !== key) return { key, dir: first };
+  if (current.dir === first) return { key, dir: first === 'asc' ? 'desc' : 'asc' };
+  return key === 'name' ? { key, dir: 'asc' } : null;
+}
+
+/** Parse a stored sort, ignoring anything malformed. */
+export function parseHoldingSort(raw: string | null): HoldingSort | null {
+  try {
+    const s = JSON.parse(raw ?? 'null');
+    const known = s && (s.key === 'name' || s.key in holdingValue);
+    return known && (s.dir === 'asc' || s.dir === 'desc') ? { key: s.key, dir: s.dir } : null;
+  } catch {
+    return null;
+  }
+}

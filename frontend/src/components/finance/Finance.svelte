@@ -8,7 +8,10 @@
   import SaleEdit from './SaleEdit.svelte';
   import DraftEdit from './DraftEdit.svelte';
   import { packCost, discount, verdict, formatDiscount, formatReturn, byNewest, type Purchase } from '../../lib/purchases';
-  import { portfolio, activity, type Disposal } from '../../lib/portfolio';
+  import {
+    portfolio, activity, sortHoldings, nextHoldingSort, parseHoldingSort,
+    type Disposal, type HoldingSort, type HoldingSortKey,
+  } from '../../lib/portfolio';
 
   interface Pack {
     id: number;
@@ -31,6 +34,25 @@
   let packs     = $state<Pack[]>(untrack(() => initialPacks.map(p => ({ ...p }))));
 
   const pf      = $derived(portfolio(purchases, disposals, packs));
+
+  // ── Holdings sort (remembered per browser) ─────────────────
+  const SORT_KEY = 'finance-holdings-sort';
+  let holdingSort = $state<HoldingSort | null>(readSort());
+  function readSort(): HoldingSort | null {
+    try { return parseHoldingSort(localStorage.getItem(SORT_KEY)); } catch { return null; }
+  }
+  function sortBy(key: HoldingSortKey) {
+    holdingSort = nextHoldingSort(holdingSort, key);
+    try {
+      if (holdingSort) localStorage.setItem(SORT_KEY, JSON.stringify(holdingSort));
+      else localStorage.removeItem(SORT_KEY);
+    } catch { /* storage unavailable */ }
+  }
+  const holdings = $derived(sortHoldings(pf.positions, holdingSort));
+  const ariaSort = (key: HoldingSortKey) =>
+    holdingSort?.key === key ? (holdingSort.dir === 'desc' ? 'descending' : 'ascending') : 'none';
+  const active = (key: HoldingSortKey) => holdingSort?.key === key;
+  const icon = (key: HoldingSortKey) => (active(key) ? (holdingSort!.dir === 'desc' ? '↓' : '↑') : '⇅');
   const rows    = $derived(activity(purchases, disposals));
   const loggedIds = $derived(new Set(purchases.map(p => p.packId)));
   const packOptions = $derived(
@@ -151,20 +173,41 @@
         <table class="holdings">
           <thead>
             <tr>
-              <th>Pack</th>
+              <th aria-sort={ariaSort('name')}>
+                <button class="sort" class:sort--active={active('name')} title="Sort by name" onclick={() => sortBy('name')}>
+                  Pack<span class="sort__icon" aria-hidden="true">{icon('name')}</span>
+                </button>
+              </th>
               <th class="num">In stock</th>
-              <th class="num">Avg cost</th>
+              <th class="num" aria-sort={ariaSort('avgCost')}>
+                <button class="sort" class:sort--active={active('avgCost')} title="Sort by average cost" onclick={() => sortBy('avgCost')}>
+                  Avg cost<span class="sort__icon" aria-hidden="true">{icon('avgCost')}</span>
+                </button>
+              </th>
               <th class="num">Market</th>
               <th class="num">Value</th>
-              <th class="num">Unrealized</th>
-              <th class="num">Realized</th>
+              <th class="num" aria-sort={ariaSort('unrealized')}>
+                <button class="sort" class:sort--active={active('unrealized')} title="Sort by unrealized $" onclick={() => sortBy('unrealized')}>
+                  Unrealized<span class="sort__icon" aria-hidden="true">{icon('unrealized')}</span>
+                </button>
+              </th>
+              <th class="num" aria-sort={ariaSort('gain')}>
+                <button class="sort" class:sort--active={active('gain')} title="Sort by % gain" onclick={() => sortBy('gain')}>
+                  %<span class="sort__icon" aria-hidden="true">{icon('gain')}</span>
+                </button>
+              </th>
+              <th class="num" aria-sort={ariaSort('realized')}>
+                <button class="sort" class:sort--active={active('realized')} title="Sort by realized $" onclick={() => sortBy('realized')}>
+                  Realized<span class="sort__icon" aria-hidden="true">{icon('realized')}</span>
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {#each pf.positions as h (h.packId)}
+            {#each holdings as h (h.packId)}
               <tr class:closed={h.stock === 0}>
                 <td class="holdings__name">
-                  {h.setName} <span class="muted">{h.productType}</span>
+                  {h.setName} <span class="muted holdings__type">{h.productType}</span>
                   {#if h.bought > 0 || h.uncosted > 0}
                     <span class="holdings__detail">
                       {[
@@ -180,10 +223,8 @@
                 <td class="num">{h.costed > 0 ? money(h.avgCost) : '—'}</td>
                 <td class="num">{money(h.currentPrice)}</td>
                 <td class="num">{money(h.value)}</td>
-                <td class="num tone--{tone(h.unrealized)}">
-                  {h.unrealized != null ? signed(h.unrealized) : '—'}
-                  {#if h.unrealizedPct != null}<span class="muted">{formatReturn(h.unrealizedPct)}</span>{/if}
-                </td>
+                <td class="num tone--{tone(h.unrealized)}">{h.unrealized != null ? signed(h.unrealized) : '—'}</td>
+                <td class="num muted-cell">{h.unrealizedPct != null ? formatReturn(h.unrealizedPct) : '—'}</td>
                 <td class="num tone--{tone(h.realized)}">{h.disposed > 0 ? signed(h.realized) : '—'}</td>
               </tr>
             {/each}
@@ -394,6 +435,26 @@
     border-bottom: 1px solid var(--color-border);
     white-space: nowrap;
   }
+  /* Sortable headers: a faint ⇅ marks them; the active one is highlighted. */
+  .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: none;
+    border: none;
+    border-radius: var(--radius);
+    padding: 0.1rem 0.3rem;
+    margin: -0.1rem -0.3rem;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sort:hover { color: var(--color-text); background: rgba(255, 255, 255, 0.06); }
+  .sort:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+  .sort__icon { opacity: 0.45; font-size: 0.85em; }
+  .sort--active { color: var(--color-text); font-weight: 600; }
+  .sort--active .sort__icon { opacity: 1; color: var(--color-accent); }
   .holdings td {
     padding: 0.45rem 0.7rem;
     border-bottom: 1px solid var(--color-border);
@@ -401,7 +462,9 @@
   }
   .holdings tr:last-child td { border-bottom: none; }
   .holdings .num { text-align: right; }
-  .holdings .num .muted { margin-left: 0.25rem; }
+  .holdings .muted-cell { color: var(--color-text-muted); font-size: 0.8rem; }
+  /* The pack type wraps as a whole, never mid-name ("Play / Booster"). */
+  .holdings__type { white-space: nowrap; }
   .holdings__name { white-space: normal !important; min-width: 10rem; }
   .holdings__detail { display: block; font-size: 0.7rem; color: var(--color-text-muted); }
   .invested { font-size: 0.85rem; color: var(--color-text-muted); margin: 0 0 0.6rem; }

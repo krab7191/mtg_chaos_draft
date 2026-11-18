@@ -110,3 +110,73 @@ describe('Finance page states', () => {
     expect(names[0]).toContain('Alpha');
   });
 });
+
+describe('Finance holdings sorting', () => {
+  const rows = (c: HTMLElement) => Array.from(c.querySelectorAll('.holdings tbody tr')).map(r => r.querySelector('.holdings__name')?.childNodes[0]?.textContent?.trim());
+  const header = (c: HTMLElement, label: string) =>
+    Array.from(c.querySelectorAll<HTMLButtonElement>('.holdings th button')).find(b => b.textContent?.startsWith(label))!;
+  const props = {
+    packs: [pack(1, { setName: 'Cheap', marketPrice: 10 }), pack(2, { setName: 'Dear', marketPrice: 12 })],
+    purchases: [
+      purchase({ id: 1, packId: 1, setName: 'Cheap', quantity: 3, totalPrice: 6, unitPrice: 2 }),   // +$24, +400%
+      purchase({ id: 2, packId: 2, setName: 'Dear', quantity: 3, totalPrice: 30, unitPrice: 10 }),  // +$6, +20%
+    ],
+  };
+
+  afterEach(() => localStorage.clear());
+
+  it('sorts by avg cost, $ and % gain, and cycles back to the default order', async () => {
+    localStorage.clear();
+    const { container } = setup(props);
+    const initial = rows(container);
+
+    await act(() => fireEvent.click(header(container, 'Avg cost')));
+    expect(rows(container)).toEqual(['Dear', 'Cheap']);
+    expect(header(container, 'Avg cost').textContent).toContain('↓');
+    expect(header(container, 'Avg cost').closest('th')?.getAttribute('aria-sort')).toBe('descending');
+
+    await act(() => fireEvent.click(header(container, 'Avg cost')));
+    expect(rows(container)).toEqual(['Cheap', 'Dear']);
+
+    await act(() => fireEvent.click(header(container, 'Avg cost')));
+    expect(rows(container)).toEqual(initial);
+
+    await act(() => fireEvent.click(header(container, '%')));
+    expect(rows(container)).toEqual(['Cheap', 'Dear']);
+    await act(() => fireEvent.click(header(container, 'Unrealized')));
+    expect(rows(container)).toEqual(['Cheap', 'Dear']);
+    await act(() => fireEvent.click(header(container, 'Realized')));
+    expect(header(container, 'Realized').closest('th')?.getAttribute('aria-sort')).toBe('descending');
+  });
+
+  it('sorts by pack name A–Z and back, and marks sortable headers', async () => {
+    localStorage.clear();
+    const { container } = setup({ ...props, packs: [pack(2, { setName: 'Dear', marketPrice: 12 }), pack(1, { setName: 'Cheap', marketPrice: 10 })] });
+    // Every sortable header shows the neutral icon until used.
+    const icons = Array.from(container.querySelectorAll('.holdings th .sort__icon')).map(i => i.textContent);
+    expect(icons).toEqual(['⇅', '⇅', '⇅', '⇅', '⇅']);
+
+    await act(() => fireEvent.click(header(container, 'Pack')));
+    expect(rows(container)).toEqual(['Cheap', 'Dear']);
+    expect(header(container, 'Pack').classList.contains('sort--active')).toBe(true);
+    expect(header(container, 'Pack').textContent).toContain('↑');
+
+    await act(() => fireEvent.click(header(container, 'Pack')));
+    expect(rows(container)).toEqual(['Dear', 'Cheap']);
+    expect(header(container, 'Pack').textContent).toContain('↓');
+  });
+
+  it('remembers the sort across reloads and ignores broken storage', async () => {
+    localStorage.clear();
+    const first = setup(props);
+    await act(() => fireEvent.click(header(first.container, 'Avg cost')));
+    first.unmount();
+    expect(rows(setup(props).container)).toEqual(['Dear', 'Cheap']);
+
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    const blocked = setup(props);
+    await act(() => fireEvent.click(header(blocked.container, 'Avg cost')));
+    expect(rows(blocked.container)).toEqual(['Dear', 'Cheap']);
+  });
+});

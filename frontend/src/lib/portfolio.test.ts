@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { portfolio, activity, type Disposal, type StockPack } from './portfolio';
+import {
+  portfolio, activity, sortHoldings, nextHoldingSort, parseHoldingSort,
+  type Disposal, type StockPack, type Position,
+} from './portfolio';
 import type { Purchase } from './purchases';
 
 const buy = (over: Partial<Purchase> = {}): Purchase => ({
@@ -163,5 +166,69 @@ describe('activity', () => {
     const draft = rows[1];
     expect(draft.type === 'draft' && draft.disposals.length).toBe(2);
     expect(draft.type === 'draft' && draft.draftId).toBe(7);
+  });
+});
+
+describe('sorting holdings', () => {
+  const pos = (packId: number, over: Partial<Position>): Position => ({
+    packId, setName: `Set ${packId}`, productType: 'Play Booster', bought: 1, disposed: 0, stock: 1, costed: 1,
+    uncosted: 0, opened: 0, openedCost: 0, cost: 1, avgCost: 1, currentPrice: 1, value: 1,
+    unrealized: 0, unrealizedPct: 0, realized: 0, purchaseFees: 0, ...over,
+  });
+  const a = pos(1, { avgCost: 3, unrealized: 50, unrealizedPct: 0.1, disposed: 1, realized: -2 });
+  const b = pos(2, { avgCost: 10, unrealized: 5, unrealizedPct: 2.0, disposed: 1, realized: 4 });
+  const none = pos(3, { costed: 0, unrealized: null, unrealizedPct: null, disposed: 0 }); // shows "—"
+  const ids = (list: Position[]) => list.map(p => p.packId);
+
+  it('keeps the given order with no sort', () => {
+    expect(ids(sortHoldings([none, b, a], null))).toEqual([3, 2, 1]);
+  });
+
+  it.each([
+    ['avgCost', [2, 1, 3], [1, 2, 3]],
+    ['unrealized', [1, 2, 3], [2, 1, 3]],
+    ['gain', [2, 1, 3], [1, 2, 3]],
+    ['realized', [2, 1, 3], [1, 2, 3]],
+  ] as const)('sorts by %s both ways, with blanks last', (key, desc, asc) => {
+    expect(ids(sortHoldings([none, a, b], { key, dir: 'desc' }))).toEqual(desc);
+    expect(ids(sortHoldings([none, a, b], { key, dir: 'asc' }))).toEqual(asc);
+  });
+
+  it('sorts by name A–Z and Z–A, using the pack type for ties', () => {
+    const z = pos(5, { setName: 'Zendikar' });
+    const aCollector = pos(6, { setName: 'Alara', productType: 'Collector Booster' });
+    const aPlay = pos(7, { setName: 'Alara', productType: 'Play Booster' });
+    expect(ids(sortHoldings([z, aPlay, aCollector], { key: 'name', dir: 'asc' }))).toEqual([6, 7, 5]);
+    expect(ids(sortHoldings([z, aPlay, aCollector], { key: 'name', dir: 'desc' }))).toEqual([5, 7, 6]);
+  });
+
+  it('name toggles A–Z ↔ Z–A and never turns off', () => {
+    const s1 = nextHoldingSort(null, 'name');
+    expect(s1).toEqual({ key: 'name', dir: 'asc' });
+    const s2 = nextHoldingSort(s1, 'name');
+    expect(s2).toEqual({ key: 'name', dir: 'desc' });
+    expect(nextHoldingSort(s2, 'name')).toEqual({ key: 'name', dir: 'asc' });
+  });
+
+  it('keeps blanks together at the end', () => {
+    const none2 = pos(4, { costed: 0, unrealized: null, unrealizedPct: null });
+    expect(ids(sortHoldings([none, a, none2], { key: 'avgCost', dir: 'asc' }))).toEqual([1, 3, 4]);
+  });
+
+  it('cycles highest first → lowest first → off, and restarts on a new column', () => {
+    const s1 = nextHoldingSort(null, 'gain');
+    expect(s1).toEqual({ key: 'gain', dir: 'desc' });
+    const s2 = nextHoldingSort(s1, 'gain');
+    expect(s2).toEqual({ key: 'gain', dir: 'asc' });
+    expect(nextHoldingSort(s2, 'gain')).toBeNull();
+    expect(nextHoldingSort(s2, 'realized')).toEqual({ key: 'realized', dir: 'desc' });
+  });
+
+  it('parses a stored sort and rejects junk', () => {
+    expect(parseHoldingSort('{"key":"realized","dir":"asc"}')).toEqual({ key: 'realized', dir: 'asc' });
+    expect(parseHoldingSort('{"key":"name","dir":"desc"}')).toEqual({ key: 'name', dir: 'desc' });
+    for (const bad of [null, '', 'not json', '{"key":"value","dir":"asc"}', '{"key":"gain","dir":"up"}', '7']) {
+      expect(parseHoldingSort(bad)).toBeNull();
+    }
   });
 });
