@@ -76,18 +76,19 @@ func TestNotifyAlerts_SendsOncePerAlertAndAgainAfterItClears(t *testing.T) {
 		return n
 	}
 
-	if n := run(); n != 2 { // floor + drop
-		t.Fatalf("first run: want 2 notifications, got %d", n)
+	// Floor + drop on the same day: one summary notification, not two.
+	if n := run(); n != 1 {
+		t.Fatalf("first run: want 1 notification, got %d", n)
 	}
 	h := ntfy.got[0]
-	if !strings.HasPrefix(h.Get("Title"), "Possible floor: Test Set Draft Booster") || h.Get("Click") != "https://cards.example/admin/trends" {
+	if h.Get("Title") != "2 new price alerts" || h.Get("Click") != "https://cards.example/admin/trends" {
 		t.Errorf("headers: %v", h)
 	}
-	if !strings.Contains(ntfy.bodies[0], "$6.00") || !strings.Contains(ntfy.bodies[0], "-40% since release") {
-		t.Errorf("floor body: %q", ntfy.bodies[0])
-	}
-	if !strings.HasPrefix(ntfy.got[1].Get("Title"), "Price drop:") || !strings.Contains(ntfy.bodies[1], "your alert: -30%") {
-		t.Errorf("drop alert: %v %q", ntfy.got[1].Get("Title"), ntfy.bodies[1])
+	body := ntfy.bodies[0]
+	if !strings.Contains(body, "◆ Test Set Draft Booster: possible floor at $6.00, -40% since release") ||
+		!strings.Contains(body, "↓ Test Set Draft Booster: $6.00, -40% since release (alert -30%)") ||
+		strings.Count(body, "\n") != 1 {
+		t.Errorf("summary body: %q", body)
 	}
 
 	if n := run(); n != 0 {
@@ -104,9 +105,64 @@ func TestNotifyAlerts_SendsOncePerAlertAndAgainAfterItClears(t *testing.T) {
 	}
 	// ...so a later floor notifies again.
 	seedFloor(t, ctx, 6)
-	if n := run(); n != 2 {
-		t.Errorf("new floor: want 2, got %d", n)
+	if n := run(); n != 1 || ntfy.count() != 2 {
+		t.Errorf("new floor: want 1 more notification, got %d (total %d)", n, ntfy.count())
 	}
+}
+
+func TestNotifyAlerts_SingleAlertGetsItsOwnMessage(t *testing.T) {
+	ctx := trendsDB(t)
+	pool := testhelper.Pool(t)
+	ntfy := newFakeNtfy(t)
+	_ = db.SetWatch(ctx, pool, db.Watch{MTGStocksID: 1})
+	seedFloor(t, ctx, 6)
+	withMockClient(200, fakeSetsJSON, func() {
+		if n, err := NotifyAlerts(ctx, pool); n != 1 || err != nil {
+			t.Fatalf("%d %v", n, err)
+		}
+	})
+	if !strings.HasPrefix(ntfy.got[0].Get("Title"), "Possible floor: Test Set Draft Booster") ||
+		!strings.Contains(ntfy.bodies[0], "Steady near its low ($6.00)") {
+		t.Errorf("single: %v %q", ntfy.got[0].Get("Title"), ntfy.bodies[0])
+	}
+}
+
+func TestWatching_MarksExistingAlertsSeen(t *testing.T) {
+	ctx := trendsDB(t)
+	pool := testhelper.Pool(t)
+	ntfy := newFakeNtfy(t)
+	seedFloor(t, ctx, 6) // product 1 is already at a floor
+	h := newTestTrendsHandler(t)
+
+	withMockClient(200, fakeSetsJSON, func() {
+		// Mass-watch: the page shows the floor right away...
+		rr := httptest.NewRecorder()
+		h.SetWatchMany(rr, httptest.NewRequest(http.MethodPut, "/api/trends/watch", strings.NewReader(`{"ids":[1,2],"watch":true}`)))
+		if rr.Code != 204 {
+			t.Fatalf("watch many: %d", rr.Code)
+		}
+		// ...so the daily check doesn't buzz the phone about it.
+		if n, _ := NotifyAlerts(ctx, pool); n != 0 || ntfy.count() != 0 {
+			t.Errorf("already-seen alerts were sent: %d", ntfy.count())
+		}
+
+		// Adding a drop alert that's already exceeded: also seen, not sent.
+		req := httptest.NewRequest(http.MethodPut, "/", strings.NewReader(`{"watch":true,"dropAlert":0.3}`))
+		req.SetPathValue("mtgstocksId", "1")
+		h.SetWatch(httptest.NewRecorder(), req)
+		if n, _ := NotifyAlerts(ctx, pool); n != 0 {
+			t.Errorf("drop alert set on screen was sent: %d", n)
+		}
+	})
+	if w, _ := db.ListWatches(ctx, pool); strings.Join(w[1].Notified, ",") != "floor,drop" {
+		t.Errorf("seen: %v", w[1].Notified)
+	}
+
+	// Without a catalog, marking seen is skipped (logged), not an error.
+	withMockClient(403, "", func() {
+		resetProductsCache()
+		markAlertsSeen(ctx, pool, []int{1})
+	})
 }
 
 func TestNotifyAlerts_RetriesFailedSends(t *testing.T) {

@@ -483,6 +483,9 @@ func (h *TrendsHandler) SetWatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	if body.Watch {
+		markAlertsSeen(r.Context(), h.pool, []int{id})
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -506,6 +509,9 @@ func (h *TrendsHandler) SetWatchMany(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
+	}
+	if body.Watch {
+		markAlertsSeen(r.Context(), h.pool, body.IDs)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -73,69 +73,152 @@ func alertMessage(p SearchResult, t *Trend, w *db.Watch, reason string) (title, 
 		fmt.Sprintf("%s, %s. Steady near its low ($%.2f) for %d days.", price, since, t.Low, floorWindow)
 }
 
-// NotifyAlerts sends a phone alert for each watched product with an alert
-// that hasn't been sent yet, and forgets alerts that cleared so they can fire
-// again. Returns how many notifications were sent.
-func NotifyAlerts(ctx context.Context, pool *pgxpool.Pool) (int, error) {
-	if !notificationsOn() {
-		return 0, nil
-	}
+// watchedAlert is a watched product with its current trend and alerts.
+type watchedAlert struct {
+	product SearchResult
+	trend   *Trend
+	watch   db.Watch
+	alerts  []string
+}
+
+// currentAlerts works out today's alerts for watched products (all of them,
+// or only those in ids).
+func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watchedAlert, error) {
 	watches, err := db.ListWatches(ctx, pool)
 	if err != nil || len(watches) == 0 {
-		return 0, err
+		return nil, err
+	}
+	only := map[int]bool{}
+	for _, id := range ids {
+		only[id] = true
 	}
 	c, err := getCatalog()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	products := map[int]SearchResult{}
-	var ids []int
+	var picked []SearchResult
+	var pickedIDs []int
 	for _, p := range trackedProducts(c) {
-		if _, ok := watches[p.MTGStocksID]; ok {
-			products[p.MTGStocksID] = p
-			ids = append(ids, p.MTGStocksID)
+		if _, ok := watches[p.MTGStocksID]; ok && (ids == nil || only[p.MTGStocksID]) {
+			picked = append(picked, p)
+			pickedIDs = append(pickedIDs, p.MTGStocksID)
 		}
 	}
-	history, err := db.PriceHistory(ctx, pool, ids, time.Time{})
+	history, err := db.PriceHistory(ctx, pool, pickedIDs, time.Time{})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-
 	today := time.Now().UTC().Truncate(24 * time.Hour)
-	sent := 0
-	for _, id := range ids {
-		p, w := products[id], watches[id]
+	out := make([]watchedAlert, 0, len(picked))
+	for _, p := range picked {
 		var released *time.Time
 		if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err == nil {
 			released = &rel
 		}
-		t := summarize(history[id], released, today)
-		alerts := alertsFor(t, &w)
+		w := watches[p.MTGStocksID]
+		t := summarize(history[p.MTGStocksID], released, today)
+		out = append(out, watchedAlert{product: p, trend: t, watch: w, alerts: alertsFor(t, &w)})
+	}
+	return out, nil
+}
 
-		delivered := []string{}
-		for _, reason := range alerts {
-			if slices.Contains(w.Notified, reason) {
-				delivered = append(delivered, reason)
-				continue
+// alertLine is one alert in a summary notification.
+func alertLine(a watchedAlert, reason string) string {
+	t := a.trend
+	since := fmt.Sprintf("%+.0f%% since release", -t.DropFromRelease*100)
+	name := a.product.SetName + " " + a.product.ProductType
+	if reason == AlertDrop && a.watch.DropAlert != nil {
+		return fmt.Sprintf("↓ %s: $%.2f, %s (alert -%.0f%%)", name, t.Current, since, *a.watch.DropAlert*100)
+	}
+	return fmt.Sprintf("◆ %s: possible floor at $%.2f, %s", name, t.Current, since)
+}
+
+// NotifyAlerts sends the phone what's new since the last check: one
+// notification for a single new alert, or one summary for several, so a
+// busy day doesn't buzz the phone over and over. Alerts that cleared are
+// forgotten so they can fire again later. Returns notifications sent.
+func NotifyAlerts(ctx context.Context, pool *pgxpool.Pool) (int, error) {
+	if !notificationsOn() {
+		return 0, nil
+	}
+	current, err := currentAlerts(ctx, pool, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	type pending struct {
+		a      watchedAlert
+		reason string
+	}
+	var news []pending
+	for _, a := range current {
+		for _, reason := range a.alerts {
+			if !slices.Contains(a.watch.Notified, reason) {
+				news = append(news, pending{a, reason})
 			}
-			title, body := alertMessage(p, t, &w, reason)
-			if err := sendNotification(ctx, title, body); err != nil {
-				log.Printf("price alerts: sending %q: %v", title, err)
-				continue // retried next run
-			}
-			delivered = append(delivered, reason)
-			sent++
 		}
-		if !slices.Equal(delivered, w.Notified) {
-			if err := db.SetNotified(ctx, pool, id, delivered); err != nil {
+	}
+
+	sent := 0
+	delivered := len(news) == 0
+	switch {
+	case len(news) == 1:
+		title, body := alertMessage(news[0].a.product, news[0].a.trend, &news[0].a.watch, news[0].reason)
+		delivered = sendNotification(ctx, title, body) == nil
+	case len(news) > 1:
+		lines := make([]string, len(news))
+		for i, n := range news {
+			lines[i] = alertLine(n.a, n.reason)
+		}
+		delivered = sendNotification(ctx, fmt.Sprintf("%d new price alerts", len(news)), strings.Join(lines, "\n")) == nil
+	}
+	if len(news) > 0 {
+		if !delivered {
+			log.Printf("price alerts: sending %d new alerts failed; retrying next run", len(news))
+		} else {
+			sent = 1
+			log.Printf("price alerts: sent %d new alerts", len(news))
+		}
+	}
+
+	// Remember what the phone has been told: everything current once
+	// delivered; otherwise only what it already knew (minus cleared alerts).
+	for _, a := range current {
+		known := a.alerts
+		if !delivered {
+			known = []string{}
+			for _, r := range a.alerts {
+				if slices.Contains(a.watch.Notified, r) {
+					known = append(known, r)
+				}
+			}
+		}
+		if !slices.Equal(known, a.watch.Notified) {
+			if err := db.SetNotified(ctx, pool, a.watch.MTGStocksID, known); err != nil {
 				return sent, err
 			}
 		}
 	}
-	if sent > 0 {
-		log.Printf("price alerts: sent %d", sent)
-	}
 	return sent, nil
+}
+
+// markAlertsSeen records the current alerts of newly (re)configured watches
+// as already delivered: the page shows them right away, so the phone only
+// hears about alerts that appear later. Best effort; failures are logged.
+func markAlertsSeen(ctx context.Context, pool *pgxpool.Pool, ids []int) {
+	current, err := currentAlerts(ctx, pool, ids)
+	if err != nil {
+		log.Printf("price alerts: marking seen: %v", err)
+		return
+	}
+	for _, a := range current {
+		if !slices.Equal(a.alerts, a.watch.Notified) {
+			if err := db.SetNotified(ctx, pool, a.watch.MTGStocksID, a.alerts); err != nil {
+				log.Printf("price alerts: marking seen: %v", err)
+				return
+			}
+		}
+	}
 }
 
 // NotifyTest sends a test alert so the phone setup can be checked.
