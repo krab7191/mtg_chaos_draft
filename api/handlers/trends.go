@@ -23,10 +23,14 @@ import (
 // ── Recording ─────────────────────────────────────────────────
 
 // trackedProducts are the products whose prices are recorded: single packs
-// (one per set and pack type) and booster boxes.
+// (one per set and pack type, not sleeved) and booster boxes.
 func trackedProducts(c *catalog) []SearchResult {
 	out := make([]SearchResult, 0, len(c.products)+len(c.boxes))
-	out = append(out, c.products...)
+	for _, p := range c.products {
+		if !isSleeved(p) { // can't be hunted down after release weeks
+			out = append(out, p)
+		}
+	}
 	return append(out, c.boxes...)
 }
 

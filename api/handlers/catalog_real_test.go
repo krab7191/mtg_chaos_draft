@@ -102,7 +102,7 @@ func checkGolden(t *testing.T, path string, items []SearchResult) {
 // draftable booster may reach search.
 func TestRealCatalog_OnlySinglePacks(t *testing.T) {
 	c, _ := loadRealCatalog(t)
-	banned := []string{"theme booster", "display", "case", "bundle", "box", "battle pack", "3-booster", "omega", "prerelease", "set of", "sleeved"}
+	banned := []string{"theme booster", "display", "case", "bundle", "box", "battle pack", "3-booster", "omega", "prerelease", "set of"}
 	for _, p := range c.products {
 		name := strings.ToLower(p.Name)
 		for _, b := range banned {
@@ -138,7 +138,7 @@ func TestRealCatalog_EveryBoosterIsFound(t *testing.T) {
 func TestRealCatalog_KnownSets(t *testing.T) {
 	c, _ := loadRealCatalog(t)
 	want := map[string][]string{
-		"Reality Fracture":    {"Play Booster", "Collector Booster"},
+		"Reality Fracture":    {"Play Booster", "Collector Booster", "Sleeved Play Booster"},
 		"Edge of Eternities":  {"Play Booster", "Collector Booster"},
 		"Tarkir: Dragonstorm": {"Play Booster", "Collector Booster"},
 	}
@@ -186,6 +186,26 @@ func TestRealCatalog_BoxesAreSingleEnglishBoosterBoxes(t *testing.T) {
 		got, ok := have[k]
 		if !ok || (name != "" && got != name) {
 			t.Errorf("%s: want %q, got %q (found=%v)", k, name, got, ok)
+		}
+	}
+}
+
+// TestRealCatalog_SleevedSearchableButNotTracked: sleeved packs can be found
+// and added to the collection, but price trends never track them.
+func TestRealCatalog_SleevedSearchableButNotTracked(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	searchable := 0
+	for _, p := range c.products {
+		if isSleeved(p) {
+			searchable++
+		}
+	}
+	if searchable == 0 {
+		t.Fatal("sleeved packs should be searchable")
+	}
+	for _, p := range trackedProducts(c) {
+		if isSleeved(p) {
+			t.Errorf("sleeved pack tracked for trends: %s %s", p.SetName, p.ProductType)
 		}
 	}
 }

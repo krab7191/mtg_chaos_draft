@@ -75,11 +75,11 @@ func isSingleBoosterName(nameLower string) bool {
 	if strings.Contains(nameLower, "booster pack") {
 		return true
 	}
-	// Drop a "<Set> - " prefix before matching.
+	// Drop a "<Set> - " prefix and a "Sleeved" marker before matching.
 	if i := strings.LastIndex(nameLower, " - "); i >= 0 {
 		nameLower = nameLower[i+3:]
 	}
-	nameLower = strings.TrimSpace(nameLower)
+	nameLower = strings.TrimPrefix(strings.TrimSpace(nameLower), "sleeved ")
 	return plainBoosterNames[nameLower]
 }
 
@@ -93,19 +93,26 @@ func words(s string) map[string]bool {
 	return w
 }
 
+// sleevedLabel prefixes sleeved packs' type. They're big-box retail
+// exclusives (Target, Walmart; the sleeve hides an anti-theft tag) that sell
+// out within weeks of release: searchable, so a store find can be added to
+// the collection, but left out of cheapest packs and price trends.
+const sleevedLabel = "Sleeved "
+
+// isSleeved reports whether a product is a sleeved retail pack.
+func isSleeved(p SearchResult) bool { return strings.HasPrefix(p.ProductType, sleevedLabel) }
+
 func deriveProductType(p msProduct) (string, bool) {
 	nameLower := strings.ToLower(p.Name)
 	w := words(nameLower)
-	// Sleeved packs are big-box retail exclusives (Target, Walmart; the sleeve
-	// hides an anti-theft tag) that sell out within weeks of release, so
-	// they're left out of search, cheapest packs and price trends.
+	sleevedPrefix := ""
 	if w["sleeved"] {
-		return "", false
+		sleevedPrefix = sleevedLabel
 	}
 
 	if p.Type != nil {
 		if label, ok := knownPackTypes[*p.Type]; ok {
-			return label, true
+			return sleevedPrefix + label, true
 		}
 		if excludePackTypes[*p.Type] {
 			return "", false
@@ -118,15 +125,15 @@ func deriveProductType(p msProduct) (string, bool) {
 	}
 	switch {
 	case w["jumpstart"]:
-		return "Jumpstart Booster", true
+		return sleevedPrefix + "Jumpstart Booster", true
 	case w["play"]:
-		return "Play Booster", true
+		return sleevedPrefix + "Play Booster", true
 	case w["set"]:
-		return "Set Booster", true
+		return sleevedPrefix + "Set Booster", true
 	case w["draft"]:
-		return "Draft Booster", true
+		return sleevedPrefix + "Draft Booster", true
 	case w["collector"], w["collectors"]:
-		return "Collector Booster", true
+		return sleevedPrefix + "Collector Booster", true
 	default:
 		return p.Name, true
 	}
@@ -152,7 +159,7 @@ func CheapestPacks(w http.ResponseWriter, r *http.Request) {
 
 	var priced []SearchResult
 	for _, p := range products {
-		if p.MarketPrice == nil || *p.MarketPrice <= 0 {
+		if p.MarketPrice == nil || *p.MarketPrice <= 0 || isSleeved(p) {
 			continue
 		}
 		if !beforeTime.IsZero() {

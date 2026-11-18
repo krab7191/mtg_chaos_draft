@@ -44,19 +44,19 @@ func TestDeriveProductType_ExcludedTypes(t *testing.T) {
 	}
 }
 
-func TestDeriveProductType_SleevedExcluded(t *testing.T) {
-	for _, tc := range []struct{ name, typ string }{
-		{"Sleeved Draft Booster Pack", "draft_booster"},
-		{"Sleeved Collector Booster", "collector_booster"},
-		{"Sleeved Draft Booster Pack", ""},
-		{"Reality Fracture - Sleeved Play Booster", ""},
+func TestDeriveProductType_SleevedStaysSearchable(t *testing.T) {
+	for _, tc := range []struct{ name, typ, want string }{
+		{"Sleeved Draft Booster Pack", "draft_booster", "Sleeved Draft Booster"},
+		{"Sleeved Collector Booster", "collector_booster", "Sleeved Collector Booster"},
+		{"Sleeved Draft Booster Pack", "", "Sleeved Draft Booster"},
+		{"Reality Fracture - Sleeved Play Booster", "", "Sleeved Play Booster"},
 	} {
 		p := msProduct{Name: tc.name}
 		if tc.typ != "" {
 			p.Type = strptr(tc.typ)
 		}
-		if got, ok := deriveProductType(p); ok {
-			t.Errorf("%q (%q) should be excluded, got %q", tc.name, tc.typ, got)
+		if got, ok := deriveProductType(p); !ok || got != tc.want {
+			t.Errorf("%q (%q): want %q, got %q (ok=%v)", tc.name, tc.typ, tc.want, got, ok)
 		}
 	}
 }
