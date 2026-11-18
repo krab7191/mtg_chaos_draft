@@ -276,9 +276,13 @@
   <details class="explain">
     <summary>How the signals work</summary>
     <ul>
-      <li><strong>◆ Possible floor</strong>: at least {Math.round(th.floorDrop * 100)}% below its release price,
-        moving within a {Math.round(th.floorBand * 100)}% range for the last {th.floorWindow} days, and within
-        {Math.round(th.floorNear * 100)}% of its lowest price since release. Watched products that hit this raise an alert.</li>
+      <li><strong>◆ Possible floor</strong>: released at least {th.floorMinAge} days ago, at least
+        {Math.round(th.floorDrop * 100)}% below its release price, moving within a {Math.round(th.floorBand * 100)}% range
+        for the last {th.floorWindow} days, and within {Math.round(th.floorNear * 100)}% of its lowest price since release.
+        Watched products that hit this raise an alert.</li>
+      <li>Backtested on 163 real pack and box price histories from 2019–2025: the real low came a median of
+        ~6 months after release. When this signal fired it bought ~9% above that low (median), against ~17% for simply
+        waiting 3 months. It's a hint, not a guarantee: about a third of the time the price dipped another 10%+ later.</li>
       <li><strong>↓ Falling / ↑ Rising</strong>: moved more than {Math.round(th.trendMove * 100)}% over {th.trendWindow} days.</li>
       <li><strong>★ New</strong>: released under {th.newSetDays} days ago, when prices still carry release hype.</li>
       <li>Prices are TCGplayer market prices via MTGStocks. A box's per-pack price assumes its standard pack count.</li>

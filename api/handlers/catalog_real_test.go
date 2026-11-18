@@ -102,7 +102,7 @@ func checkGolden(t *testing.T, path string, items []SearchResult) {
 // draftable booster may reach search.
 func TestRealCatalog_OnlySinglePacks(t *testing.T) {
 	c, _ := loadRealCatalog(t)
-	banned := []string{"theme booster", "display", "case", "bundle", "box", "battle pack", "3-booster", "omega", "prerelease", "set of"}
+	banned := []string{"theme booster", "display", "case", "bundle", "box", "battle pack", "3-booster", "omega", "prerelease", "set of", "sleeved"}
 	for _, p := range c.products {
 		name := strings.ToLower(p.Name)
 		for _, b := range banned {
@@ -138,7 +138,7 @@ func TestRealCatalog_EveryBoosterIsFound(t *testing.T) {
 func TestRealCatalog_KnownSets(t *testing.T) {
 	c, _ := loadRealCatalog(t)
 	want := map[string][]string{
-		"Reality Fracture":    {"Play Booster", "Collector Booster", "Sleeved Play Booster"},
+		"Reality Fracture":    {"Play Booster", "Collector Booster"},
 		"Edge of Eternities":  {"Play Booster", "Collector Booster"},
 		"Tarkir: Dragonstorm": {"Play Booster", "Collector Booster"},
 	}

@@ -44,26 +44,20 @@ func TestDeriveProductType_ExcludedTypes(t *testing.T) {
 	}
 }
 
-func TestDeriveProductType_SleevedPrefix(t *testing.T) {
-	cases := []struct {
-		name     string
-		typ      string
-		wantType string
-	}{
-		{"Sleeved Draft Booster Pack", "draft_booster", "Sleeved Draft Booster"},
-		{"Sleeved Collector Booster", "collector_booster", "Sleeved Collector Booster"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := msProduct{Name: tc.name, Type: strptr(tc.typ)}
-			got, ok := deriveProductType(p)
-			if !ok {
-				t.Fatalf("want ok=true")
-			}
-			if got != tc.wantType {
-				t.Errorf("want %q, got %q", tc.wantType, got)
-			}
-		})
+func TestDeriveProductType_SleevedExcluded(t *testing.T) {
+	for _, tc := range []struct{ name, typ string }{
+		{"Sleeved Draft Booster Pack", "draft_booster"},
+		{"Sleeved Collector Booster", "collector_booster"},
+		{"Sleeved Draft Booster Pack", ""},
+		{"Reality Fracture - Sleeved Play Booster", ""},
+	} {
+		p := msProduct{Name: tc.name}
+		if tc.typ != "" {
+			p.Type = strptr(tc.typ)
+		}
+		if got, ok := deriveProductType(p); ok {
+			t.Errorf("%q (%q) should be excluded, got %q", tc.name, tc.typ, got)
+		}
 	}
 }
 
@@ -118,17 +112,6 @@ func TestDeriveProductType_UnknownType_FallsThroughToNameCheck(t *testing.T) {
 	}
 }
 
-func TestDeriveProductType_SleevedNullType(t *testing.T) {
-	p := msProduct{Name: "Sleeved Draft Booster Pack", Type: nil}
-	got, ok := deriveProductType(p)
-	if !ok {
-		t.Fatal("want ok=true")
-	}
-	if got != "Sleeved Draft Booster" {
-		t.Errorf("want %q, got %q", "Sleeved Draft Booster", got)
-	}
-}
-
 func TestDeriveProductType_NullType_PlainBoosterNames(t *testing.T) {
 	cases := map[string]string{
 		"Play Booster":      "Play Booster",
@@ -136,7 +119,6 @@ func TestDeriveProductType_NullType_PlainBoosterNames(t *testing.T) {
 		"Set Booster":       "Set Booster",
 		"Draft Booster":     "Draft Booster",
 		"Jumpstart Booster": "Jumpstart Booster",
-		"Reality Fracture - Sleeved Play Booster": "Sleeved Play Booster",
 	}
 	for name, want := range cases {
 		got, ok := deriveProductType(msProduct{Name: name})

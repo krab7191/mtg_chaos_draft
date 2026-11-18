@@ -15,7 +15,7 @@ const row = (id: number, over: Partial<TrendRow> = {}): TrendRow => ({
   mtgstocksId: id, name: 'Play Booster Display', setName: `Set ${id}`, setCode: 'S', releasedAt: '2026-01-01',
   productType: 'Play Booster Box', marketPrice: 118, packsPerBox: 36, trend: trend(), watch: null, alerts: [], ...over,
 });
-const thresholds = { newSetDays: 45, trendWindow: 30, trendMove: 0.05, floorDrop: 0.2, floorWindow: 21, floorBand: 0.08, floorNear: 0.1 };
+const thresholds = { newSetDays: 45, trendWindow: 30, trendMove: 0.05, floorMinAge: 150, floorDrop: 0.1, floorWindow: 14, floorBand: 0.12, floorNear: 0.1 };
 const response = (products: TrendRow[], over: Partial<TrendsResponse> = {}): TrendsResponse =>
   ({ products, notifications: false, backfilled: 10, tracked: 10, thresholds, ...over });
 
@@ -88,7 +88,7 @@ describe('Trends page', () => {
     });
     await act(() => fireEvent.click(button(container, 'Set 1')));
     await waitFor(() => expect(container.querySelector('figure.chart')).not.toBeNull());
-    expect(container.querySelector('figcaption')?.textContent).toContain('Set 1 Play Booster Box');
+    expect(container.querySelector('.chart__title')?.textContent).toContain('Set 1 Play Booster Box');
     await act(() => fireEvent.click(button(container, 'Set 1'))); // close
     expect(container.querySelector('figure.chart')).toBeNull();
     await act(() => fireEvent.click(button(container, 'Set 1'))); // reopen, cached
@@ -152,7 +152,7 @@ describe('Trends page', () => {
     await waitFor(() => expect(container.querySelector('table')).not.toBeNull());
     expect(container.querySelector('.watch')).toBeNull();
     expect(container.textContent).toContain('3 of 10 products so far');
-    expect(container.querySelector('.explain')?.textContent).toContain('at least 20% below its release price');
+    expect(container.querySelector('.explain')?.textContent?.replace(/\s+/g, ' ')).toContain('released at least 150 days ago, at least 10% below its release price');
   });
 
   it('says so when nothing matches, and survives a failed load', async () => {

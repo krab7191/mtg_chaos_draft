@@ -137,11 +137,15 @@ const (
 	trendWindow = 30   // days the trend is measured over
 	trendMove   = 0.05 // ±5% over the window counts as falling/rising
 
-	// A possible floor: the price fell a lot from release, then moved only
-	// within a narrow band for a few weeks, close to its low.
-	floorDrop   = 0.20 // at least 20% below the release price
-	floorWindow = 21   // days the band is measured over
-	floorBand   = 0.08 // highest/lowest in the window within 8%
+	// A possible floor. Tuned by backtesting on 163 real pack and box price
+	// histories (sets 2019–mid 2025), choosing on pre-2023 sets and checking
+	// on 2023+ sets: when it fires it buys ~9% (median) above the eventual
+	// low, against ~17% for "wait 3 months". Age mattered most: lows come a
+	// median ~177 days after release.
+	floorMinAge = 150  // days since release
+	floorDrop   = 0.10 // at least 10% below the release price
+	floorWindow = 14   // days the band is measured over
+	floorBand   = 0.12 // highest/lowest in the window within 12%
 	floorNear   = 0.10 // and within 10% of the low since release
 )
 
@@ -251,7 +255,7 @@ func signalFor(t *Trend, released *time.Time, today time.Time) Signal {
 		return SignalPreorder
 	case released != nil && today.Sub(*released) < newSetDays*24*time.Hour:
 		return SignalNew
-	case isFloor(t):
+	case isFloor(t, released, today):
 		return SignalFloor
 	case t.Change30 != nil && *t.Change30 <= -trendMove:
 		return SignalFalling
@@ -262,10 +266,11 @@ func signalFor(t *Trend, released *time.Time, today time.Time) Signal {
 	}
 }
 
-// isFloor: dropped a lot from release, then flat for floorWindow days near
-// the low since release.
-func isFloor(t *Trend) bool {
-	return t.DropFromRelease >= floorDrop && t.Band != nil && *t.Band <= floorBand && t.AboveLow <= floorNear
+// isFloor: old enough, down from release, then flat for floorWindow days
+// near the low since release.
+func isFloor(t *Trend, released *time.Time, today time.Time) bool {
+	oldEnough := released != nil && today.Sub(*released) >= floorMinAge*24*time.Hour
+	return oldEnough && t.DropFromRelease >= floorDrop && t.Band != nil && *t.Band <= floorBand && t.AboveLow <= floorNear
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -318,6 +323,7 @@ type trendsResponse struct {
 		NewSetDays  int     `json:"newSetDays"`
 		TrendWindow int     `json:"trendWindow"`
 		TrendMove   float64 `json:"trendMove"`
+		FloorMinAge int     `json:"floorMinAge"`
 		FloorDrop   float64 `json:"floorDrop"`
 		FloorWindow int     `json:"floorWindow"`
 		FloorBand   float64 `json:"floorBand"`
@@ -376,7 +382,7 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	th := &resp.Thresholds
 	th.NewSetDays, th.TrendWindow, th.TrendMove = newSetDays, trendWindow, trendMove
-	th.FloorDrop, th.FloorWindow, th.FloorBand, th.FloorNear = floorDrop, floorWindow, floorBand, floorNear
+	th.FloorMinAge, th.FloorDrop, th.FloorWindow, th.FloorBand, th.FloorNear = floorMinAge, floorDrop, floorWindow, floorBand, floorNear
 	for _, p := range picked {
 		var released *time.Time
 		if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err == nil {

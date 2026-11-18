@@ -31,12 +31,20 @@ describe('PriceChart', () => {
 
   it('shows axes, the release marker, the low line, and a tooltip on hover', async () => {
     const { container } = render(PriceChart, {
-      props: { points: points(800, i => 10 - i / 200), released: day(100), low: 6, perPackDivisor: 36, title: 'Box price' },
+      props: { points: points(800, i => 10 - i / 200), released: day(100), low: 6.5, perPackDivisor: 36, title: 'Box price' },
     });
-    expect(container.querySelector('figcaption')?.textContent).toBe('Box price');
+    expect(container.querySelector('.chart__title')?.textContent).toBe('Box price');
+    // Opens on the past year: release (day 100 of 800) is out of view until "3Y".
+    expect(container.textContent).not.toContain('release');
+    await act(() => fireEvent.click(Array.from(container.querySelectorAll('.chart__ranges button')).find(b => b.textContent === '3Y')!));
     expect(container.querySelectorAll('text.axis').length).toBeGreaterThan(3);
     expect(container.textContent).toContain('release');
-    expect(container.textContent).toContain('low $6.00');
+    // Before release is shaded as preorder; ~2 years of data gets quarterly labels.
+    expect(container.querySelector('rect.preorder')).not.toBeNull();
+    expect(container.textContent).toContain('preorder');
+    const labels = Array.from(container.querySelectorAll('text.axis')).map(t => t.textContent ?? '').filter(t => !t.startsWith('$'));
+    expect(labels.length).toBeGreaterThanOrEqual(6);
+    expect(container.textContent).toContain('low $6.50');
 
     svgRect(container);
     await act(() => fireEvent.pointerMove(container.querySelector('.hit')!, { clientX: 400, clientY: 100 }));
@@ -59,6 +67,13 @@ describe('PriceChart', () => {
     expect(container.querySelector('.tip')).toBeNull();
   });
 
+  it('uses year labels for long histories', async () => {
+    const long = render(PriceChart, { props: { points: points(1500, () => 4), title: 'Pack' } });
+    await act(() => fireEvent.click(Array.from(long.container.querySelectorAll('.chart__ranges button')).find(b => b.textContent === 'All')!));
+    const labels = Array.from(long.container.querySelectorAll('text.axis')).map(t => t.textContent ?? '').filter(t => !t.startsWith('$'));
+    expect(labels).toEqual(['2024', '2025', '2026', '2027', '2028']); // Jan 2024 → Feb 2028
+  });
+
   it('uses month labels for short histories and copes with too little data', () => {
     const short = render(PriceChart, { props: { points: points(120, () => 4), title: 'Pack' } });
     expect(Array.from(short.container.querySelectorAll('text.axis')).some(t => /[A-Za-z]/.test(t.textContent ?? ''))).toBe(true);
@@ -75,5 +90,24 @@ describe('PriceChart', () => {
     const wideTicks = Array.from(wide.container.querySelectorAll('text.axis')).map(t => t.textContent ?? '').filter(t => t.startsWith('$'));
     expect(wideTicks.length).toBeGreaterThanOrEqual(3);
     expect(wideTicks.every(t => /^\$\d+$/.test(t))).toBe(true); // whole dollars above $10
+  });
+
+  it('defaults to the past year with quarterly labels, and offers only useful ranges', async () => {
+    const twoYears = render(PriceChart, { props: { points: points(730, i => 10 + (i % 50) / 10), low: 3, title: 'Box' } });
+    const buttons = () => Array.from(twoYears.container.querySelectorAll('.chart__ranges button')).map(b => b.textContent);
+    expect(buttons()).toEqual(['1Y', '3Y']); // 2 years of data: "All" would equal 3Y
+    expect(twoYears.container.querySelector('.chart__ranges .on')?.textContent).toBe('1Y');
+    const labels = () => Array.from(twoYears.container.querySelectorAll('text.axis')).map(t => t.textContent ?? '').filter(t => !t.startsWith('$'));
+    expect(labels().length).toBeGreaterThanOrEqual(3);
+    expect(labels().length).toBeLessThanOrEqual(5); // quarters in a year
+    // A low far outside the visible prices isn't drawn off-chart.
+    expect(twoYears.container.textContent).not.toContain('low $3.00');
+
+    await act(() => fireEvent.click(Array.from(twoYears.container.querySelectorAll('.chart__ranges button')).find(b => b.textContent === '3Y')!));
+    expect(twoYears.container.querySelector('.chart__ranges .on')?.textContent).toBe('3Y');
+    expect(labels().length).toBeGreaterThan(5);
+
+    const short = render(PriceChart, { props: { points: points(200, () => 4), title: 'New' } });
+    expect(short.container.querySelector('.chart__ranges')).toBeNull(); // under a year: nothing to choose
   });
 });

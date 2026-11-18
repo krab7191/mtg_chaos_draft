@@ -38,6 +38,7 @@ export interface Thresholds {
   newSetDays: number;
   trendWindow: number;
   trendMove: number;
+  floorMinAge: number;
   floorDrop: number;
   floorWindow: number;
   floorBand: number;

@@ -122,6 +122,9 @@ func TestSignals(t *testing.T) {
 		{"new set", repeat(10, 30), ptrTime(day("2025-12-15")), today, SignalNew},
 		{"fell, then flat near the low", append(append(append(hype, slide...), repeat(6.0, 300)...), wiggle...), &rel, today, SignalFloor},
 		{"still falling", append(append(hype, repeat(8, 300)...), slide...), &rel, today, SignalFalling},
+		// Same shape as a floor, but only ~100 days after release: too early
+		// (the backtest found lows a median ~6 months after release).
+		{"too young for a floor", append(append(hype, slide...), repeat(6.0, 70)...), ptrTime(today.AddDate(0, 0, -100)), today, SignalStable},
 		{"rising after a low", append(append(hype, repeat(6, 300)...), 6.5, 7, 7.5, 8), &rel, today, SignalRising},
 		{"flat but never dropped much", append(hype, repeat(9.5, 320)...), &rel, today, SignalStable},
 		{"no release date", repeat(5, 40), nil, today, SignalStable},

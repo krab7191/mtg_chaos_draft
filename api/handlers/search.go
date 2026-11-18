@@ -75,11 +75,11 @@ func isSingleBoosterName(nameLower string) bool {
 	if strings.Contains(nameLower, "booster pack") {
 		return true
 	}
-	// Drop a "<Set> - " prefix and a "Sleeved" marker before matching.
+	// Drop a "<Set> - " prefix before matching.
 	if i := strings.LastIndex(nameLower, " - "); i >= 0 {
 		nameLower = nameLower[i+3:]
 	}
-	nameLower = strings.TrimPrefix(strings.TrimSpace(nameLower), "sleeved ")
+	nameLower = strings.TrimSpace(nameLower)
 	return plainBoosterNames[nameLower]
 }
 
@@ -96,14 +96,16 @@ func words(s string) map[string]bool {
 func deriveProductType(p msProduct) (string, bool) {
 	nameLower := strings.ToLower(p.Name)
 	w := words(nameLower)
-	sleevedPrefix := ""
+	// Sleeved packs are big-box retail exclusives (Target, Walmart; the sleeve
+	// hides an anti-theft tag) that sell out within weeks of release, so
+	// they're left out of search, cheapest packs and price trends.
 	if w["sleeved"] {
-		sleevedPrefix = "Sleeved "
+		return "", false
 	}
 
 	if p.Type != nil {
 		if label, ok := knownPackTypes[*p.Type]; ok {
-			return sleevedPrefix + label, true
+			return label, true
 		}
 		if excludePackTypes[*p.Type] {
 			return "", false
@@ -116,15 +118,15 @@ func deriveProductType(p msProduct) (string, bool) {
 	}
 	switch {
 	case w["jumpstart"]:
-		return sleevedPrefix + "Jumpstart Booster", true
+		return "Jumpstart Booster", true
 	case w["play"]:
-		return sleevedPrefix + "Play Booster", true
+		return "Play Booster", true
 	case w["set"]:
-		return sleevedPrefix + "Set Booster", true
+		return "Set Booster", true
 	case w["draft"]:
-		return sleevedPrefix + "Draft Booster", true
+		return "Draft Booster", true
 	case w["collector"], w["collectors"]:
-		return sleevedPrefix + "Collector Booster", true
+		return "Collector Booster", true
 	default:
 		return p.Name, true
 	}
@@ -151,12 +153,6 @@ func CheapestPacks(w http.ResponseWriter, r *http.Request) {
 	var priced []SearchResult
 	for _, p := range products {
 		if p.MarketPrice == nil || *p.MarketPrice <= 0 {
-			continue
-		}
-		// Sleeved packs were big-box retail exclusives (Target, Walmart):
-		// out of print and priced differently from the regular booster, so
-		// they don't belong in a "cheapest packs to buy" list.
-		if strings.HasPrefix(p.ProductType, "Sleeved ") {
 			continue
 		}
 		if !beforeTime.IsZero() {

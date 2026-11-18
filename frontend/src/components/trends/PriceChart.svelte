@@ -18,7 +18,27 @@
   const M = { top: 12, right: 12, bottom: 24, left: 52 };
   const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
 
-  const data = $derived(points.map(p => ({ t: new Date(p.day).getTime(), v: p.price })));
+  const DAY = 86_400_000;
+  const all = $derived(points.map(p => ({ t: new Date(p.day).getTime(), v: p.price })));
+  const spanDays = $derived(all.length > 1 ? (all[all.length - 1].t - all[0].t) / DAY : 0);
+
+  // Visible range: the past year by default, with 3 years or everything a click away.
+  type Range = '1y' | '3y' | 'all';
+  const RANGES: { id: Range; label: string; days: number }[] = [
+    { id: '1y', label: '1Y', days: 365 },
+    { id: '3y', label: '3Y', days: 1095 },
+    { id: 'all', label: 'All', days: Infinity },
+  ];
+  let range = $state<Range>('1y');
+  // Only offer ranges that show something different.
+  const ranges = $derived(RANGES.filter((r, i) => i === 0 || spanDays > RANGES[i - 1].days));
+  const data = $derived.by(() => {
+    const days = RANGES.find(r => r.id === range)!.days;
+    if (!all.length || !Number.isFinite(days)) return all;
+    const cutoff = all[all.length - 1].t - days * DAY;
+    return all.filter(p => p.t >= cutoff);
+  });
+  function pickRange(r: Range) { range = r; hover = null; }
 
   const scale = $derived.by(() => {
     if (data.length < 2) return null;
@@ -32,24 +52,28 @@
     const step = niceStep((hi - lo) / 4);
     const ticks: number[] = [];
     for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
-    // Year (or month, for short histories) ticks along the bottom.
+    // Time ticks: monthly for short histories, quarterly up to ~3 years,
+    // then yearly. Months start on calendar quarters (Jan, Apr, Jul, Oct).
     const spanDays = (t1 - t0) / 86_400_000;
+    const months = spanDays <= 200 ? 1 : spanDays <= 1100 ? 3 : 12;
     const xticks: { t: number; label: string }[] = [];
     const d = new Date(t0);
     d.setUTCDate(1);
-    if (spanDays > 540) d.setUTCMonth(0);
-    for (; d.getTime() <= t1; spanDays > 540 ? d.setUTCFullYear(d.getUTCFullYear() + 1) : d.setUTCMonth(d.getUTCMonth() + (spanDays > 180 ? 3 : 1))) {
+    d.setUTCMonth(Math.floor(d.getUTCMonth() / months) * months);
+    for (; d.getTime() <= t1; d.setUTCMonth(d.getUTCMonth() + months)) {
       if (d.getTime() >= t0) {
         xticks.push({
           t: d.getTime(),
-          label: spanDays > 540 ? String(d.getUTCFullYear()) : d.toLocaleDateString(undefined, { month: 'short', year: '2-digit', timeZone: 'UTC' }),
+          label: months === 12
+            ? String(d.getUTCFullYear())
+            : d.toLocaleDateString(undefined, { month: 'short', year: '2-digit', timeZone: 'UTC' }),
         });
       }
     }
     const path = data.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
     // Whole dollars once ticks are a dollar or more apart.
     const tickLabel = (v: number) => `$${step >= 1 ? v.toFixed(0) : v.toFixed(2)}`;
-    return { x, y, ticks, xticks, path, t0, t1, tickLabel };
+    return { x, y, ticks, xticks, path, t0, t1, tickLabel, lo, hi };
   });
 
   function niceStep(raw: number): number {
@@ -90,7 +114,16 @@
 </script>
 
 <figure class="chart">
-  <figcaption class="chart__title">{title}</figcaption>
+  <figcaption class="chart__head">
+    <span class="chart__title">{title}</span>
+    {#if ranges.length > 1}
+      <div class="chart__ranges" role="group" aria-label="Time range">
+        {#each ranges as r (r.id)}
+          <button class:on={range === r.id} aria-pressed={range === r.id} onclick={() => pickRange(r.id)}>{r.label}</button>
+        {/each}
+      </div>
+    {/if}
+  </figcaption>
   {#if scale}
     <!-- The chart is focusable so arrow keys can read prices day by day. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -111,10 +144,15 @@
       {/each}
 
       {#if releasedT != null && releasedT >= scale.t0 && releasedT <= scale.t1}
+        <!-- Prices before release are preorders: shaded, and not used for the low. -->
+        {#if releasedT > scale.t0}
+          <rect class="preorder" x={M.left} y={M.top} width={scale.x(releasedT) - M.left} height={ih} />
+          <text class="marker__label" x={M.left + 4} y={M.top + 10}>preorder</text>
+        {/if}
         <line class="marker" x1={scale.x(releasedT)} x2={scale.x(releasedT)} y1={M.top} y2={H - M.bottom} />
         <text class="marker__label" x={scale.x(releasedT) + 4} y={M.top + 10}>release</text>
       {/if}
-      {#if low != null}
+      {#if low != null && low >= scale.lo && low <= scale.hi}
         <line class="low" x1={M.left} x2={W - M.right} y1={scale.y(low)} y2={scale.y(low)} />
         <text class="marker__label" x={W - M.right} y={scale.y(low) - 4} text-anchor="end">low {money(low)}</text>
       {/if}
@@ -150,7 +188,15 @@
 
 <style>
   .chart { position: relative; margin: 0; }
-  .chart__title { font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 0.25rem; }
+  .chart__head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+  .chart__title { font-size: 0.8rem; color: var(--color-text-muted); }
+  .chart__ranges { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+  .chart__ranges button {
+    background: none; border: none; color: var(--color-text-muted); font: inherit; font-size: 0.75rem;
+    padding: 0.15rem 0.55rem; cursor: pointer;
+  }
+  .chart__ranges button + button { border-left: 1px solid var(--color-border); }
+  .chart__ranges button.on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
   .chart__empty { font-size: 0.85rem; color: var(--color-text-muted); }
   svg { display: block; width: 100%; height: auto; outline: none; }
   svg:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius); }
@@ -159,6 +205,7 @@
   .line { fill: none; stroke: var(--chart-line); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
   .low { stroke: var(--color-text-muted); stroke-width: 1; stroke-dasharray: 4 3; }
   .marker { stroke: var(--color-text-muted); stroke-width: 1; stroke-dasharray: 2 3; }
+  .preorder { fill: var(--color-text-muted); opacity: 0.07; }
   .marker__label { fill: var(--color-text-muted); font-size: 10px; }
   .crosshair { stroke: var(--color-text); stroke-width: 1; opacity: 0.5; }
   .dot { fill: var(--chart-line); stroke: var(--color-surface); stroke-width: 2; }
