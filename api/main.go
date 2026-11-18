@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -26,10 +27,12 @@ import (
 
 var Version string
 
-// Overridable in tests: the background maintenance job and how often it runs.
+// Overridable in tests: the background jobs and how often they run.
 var (
 	refreshPrices       = handlers.RefreshPrices
 	maintenanceInterval = 24 * time.Hour
+	backfillPrices      = handlers.BackfillPriceHistory
+	backfillInterval    = time.Hour
 )
 
 const viewerEmailsPath = "/etc/mtg-chaos-draft/viewer_emails"
@@ -65,6 +68,7 @@ func run(ctx context.Context, getenv func(string) string, viewerPath string) err
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
 	go runMaintenance(bgCtx, pool, maintenanceInterval)
+	go runBackfill(bgCtx, pool, backfillInterval)
 
 	redirectURL := env["GOOGLE_REDIRECT_URL"]
 	oauthConfig := &oauth2.Config{
@@ -74,6 +78,8 @@ func run(ctx context.Context, getenv func(string) string, viewerPath string) err
 		Scopes:       []string{"openid", "email", "profile"},
 		Endpoint:     google.Endpoint,
 	}
+
+	handlers.ConfigureNotifications(getenv("NTFY_URL"), siteOrigin(redirectURL))
 
 	viewerEmails := loadViewerEmails(viewerPath, getenv("VIEWER_EMAILS"))
 	secureCookies := strings.HasPrefix(redirectURL, "https://")
@@ -123,6 +129,34 @@ func runMaintenance(ctx context.Context, pool *pgxpool.Pool, interval time.Durat
 			return
 		}
 	}
+}
+
+// runBackfill fetches price history for products that don't have it yet,
+// now and then every interval: after a restart, a tunnel outage, or when a
+// new set appears. Once everything is backfilled each run is a no-op.
+func runBackfill(ctx context.Context, pool *pgxpool.Pool, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if _, err := backfillPrices(ctx, pool); err != nil && ctx.Err() == nil {
+			log.Printf("price history backfill paused: %v", err)
+		}
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// siteOrigin is the scheme and host of a URL, e.g. the public site from the
+// OAuth redirect URL; empty if it can't be parsed.
+func siteOrigin(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 // requireEnv reads the named variables, failing if any is empty.
@@ -189,6 +223,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 	purchaseHandler := handlers.NewPurchaseHandler(pool)
 	saleHandler := handlers.NewSaleHandler(pool)
 	catalogHandler := handlers.NewCatalogHandler(pool)
+	trendsHandler := handlers.NewTrendsHandler(pool)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -224,6 +259,8 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 
 			r.Get("/api/search", handlers.Search)
 			r.Get("/api/catalog", catalogHandler.Status)
+			r.Get("/api/trends", trendsHandler.List)
+			r.Get("/api/trends/{mtgstocksId}/history", trendsHandler.History)
 			r.Get("/api/cheapest", handlers.CheapestPacks)
 			r.Get("/api/price/{mtgstocksId}", handlers.Price)
 			r.Get("/api/drafts", draftHandler.List)
@@ -248,6 +285,9 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Put("/api/drafts/{id}/collected", saleHandler.SetDraftCollected)
 			r.Put("/api/settings", settingsHandler.Update)
 			r.Put("/api/catalog", catalogHandler.Upload)
+			r.Put("/api/trends/watch", trendsHandler.SetWatchMany)
+			r.Post("/api/trends/notify-test", trendsHandler.NotifyTest)
+			r.Put("/api/trends/{mtgstocksId}/watch", trendsHandler.SetWatch)
 			r.Post("/api/drafts", draftHandler.Create)
 			r.Delete("/api/drafts/{id}", draftHandler.Delete)
 			r.Post("/api/drafts/{id}/approve", draftHandler.Approve)

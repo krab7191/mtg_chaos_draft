@@ -26,4 +26,9 @@ func RefreshPrices(ctx context.Context, pool *pgxpool.Pool) {
 
 	log.Printf("price refresh: updated prices for up to %d products (%s catalog from %s)",
 		len(prices), c.source, c.fetchedAt.Format("2006-01-02 15:04"))
+
+	recordDailyPrices(ctx, pool, c)
+	if _, err := NotifyAlerts(ctx, pool); err != nil {
+		log.Printf("price alerts: %v", err)
+	}
 }

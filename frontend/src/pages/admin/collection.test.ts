@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderPage } from '../../tests/astro';
 import CollectionPage from './collection.astro';
 
+// Islands have their own tests; stubs show what the page passes them.
+vi.mock('../../components/collection/CollectionList.svelte', () => import('../../tests/IslandStub.svelte'));
+vi.mock('../../components/collection/CatalogStatus.svelte', () => import('../../tests/IslandStub.svelte'));
+
 beforeEach(() => vi.unstubAllGlobals());
 
 function mockFetch(responses: Array<{ ok: boolean; json?: () => Promise<unknown> }>) {

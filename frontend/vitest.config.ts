@@ -11,7 +11,7 @@ export default getViteConfig({
       reporter: ['text', 'json-summary', 'html'],
       include: ['src/**/*.ts', 'src/**/*.astro', 'src/**/*.svelte'],
       exclude: ['src/**/*.d.ts'],
-      thresholds: { lines: 95, functions: 95, branches: 84, statements: 95 },
+      thresholds: { lines: 95, functions: 95, branches: 87, statements: 95 },
     },
   },
 });

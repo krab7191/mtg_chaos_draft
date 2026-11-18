@@ -30,6 +30,7 @@ const maxCatalogUpload = 32 << 20
 
 type catalog struct {
 	products  []SearchResult  // one per set + pack type, for search
+	boxes     []SearchResult  // one per set + box type, for price trends
 	prices    map[int]float64 // every priced product by MTGStocks id
 	fetchedAt time.Time
 	source    string // "live" or "upload"
@@ -208,6 +209,24 @@ func parseCatalog(raw []byte) (*catalog, error) {
 				}
 			}
 			addProduct(s, p)
+		}
+
+		// Booster boxes, one per set and kind.
+		seenBox := map[string]bool{}
+		for _, p := range s.Products {
+			label, packs, ok := deriveBoxType(p)
+			if !ok || seenBox[label] {
+				continue
+			}
+			seenBox[label] = true
+			box := SearchResult{
+				MTGStocksID: p.ID, Name: p.Name, SetName: s.Name, SetCode: s.Abbreviation,
+				ReleasedAt: s.Date, ProductType: label, PacksPerBox: packs,
+			}
+			if price, ok := c.prices[p.ID]; ok {
+				box.MarketPrice = &price
+			}
+			c.boxes = append(c.boxes, box)
 		}
 	}
 	return c, nil

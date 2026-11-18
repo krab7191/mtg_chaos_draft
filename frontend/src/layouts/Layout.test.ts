@@ -50,4 +50,12 @@ describe('Layout', () => {
     });
     expect(html).toContain('id="slot-content"');
   });
+
+  it('pages can opt into the wide layout for big tables', async () => {
+    const container = await createContainer();
+    const narrow = await container.renderToString(Layout, { props: { title: 'T' } });
+    const wide = await container.renderToString(Layout, { props: { title: 'T', wide: true } });
+    expect(narrow).not.toContain('main--wide');
+    expect(wide).toMatch(/class="main main--wide/);
+  });
 });

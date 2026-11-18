@@ -1,0 +1,347 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import Sparkline from './Sparkline.svelte';
+  import PriceChart from './PriceChart.svelte';
+  import { getJSON } from '../../lib/api';
+  import { send } from '../../lib/send';
+  import { toast } from '../../lib/toast.svelte';
+  import {
+    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback,
+    type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter,
+  } from '../../lib/trends';
+
+  let { canEdit = false }: { canEdit?: boolean } = $props();
+
+  let data = $state<TrendsResponse | null>(null);
+  let loading = $state(true);
+  let years = $state(2);
+  let kind = $state<KindFilter>('box');
+  let show = $state<ShowFilter>('all');
+  let open = $state<number | null>(null);
+  let history = $state<Record<number, PricePoint[]>>({});
+
+  async function load() {
+    loading = true;
+    const res = await getJSON<TrendsResponse>(`/api/trends?years=${years}`, "Couldn't load price trends");
+    if (res) data = res;
+    loading = false;
+  }
+  onMount(load);
+
+  const rows = $derived(data ? filterRows(data.products, kind, show) : []);
+  const alerting = $derived(data ? data.products.filter(r => r.alerts.length > 0) : []);
+  const th = $derived(data?.thresholds);
+
+  async function toggle(r: TrendRow) {
+    open = open === r.mtgstocksId ? null : r.mtgstocksId;
+    if (open != null && !history[open]) {
+      const pts = await getJSON<PricePoint[]>(`/api/trends/${r.mtgstocksId}/history`, "Couldn't load price history");
+      if (pts) history[r.mtgstocksId] = pts;
+    }
+  }
+
+  async function setWatch(r: TrendRow, watch: boolean, dropAlert: number | null = r.watch?.dropAlert ?? null) {
+    const ok = await send(`/api/trends/${r.mtgstocksId}/watch`, 'PUT', { watch, dropAlert }, "Couldn't update the watch");
+    if (!ok) return;
+    const wasWatched = r.watch != null;
+    const hadAlert = r.alerts.length > 0;
+    r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert } : null;
+    // Recompute this row's alerts locally; the next load confirms them.
+    r.alerts = alertsFor(r.trend, r.watch);
+    // Say right away whether it would alert: on a new watch, or when a
+    // changed drop alert starts firing.
+    if (watch && (!wasWatched || (!hadAlert && r.alerts.length > 0))) {
+      const f = watchFeedback(r);
+      toast.show(f.msg, f.alerting ? 'success' : 'info');
+    }
+  }
+
+  // ── Watch / unwatch every row shown ──────────────────────────
+  const allWatched = $derived(rows.length > 0 && rows.every(r => r.watch != null));
+  const someWatched = $derived(rows.some(r => r.watch != null));
+
+  async function setWatchAll(watch: boolean) {
+    const targets = rows.filter(r => (r.watch != null) !== watch);
+    if (targets.length === 0) return;
+    const ok = await send('/api/trends/watch', 'PUT', { ids: targets.map(r => r.mtgstocksId), watch }, "Couldn't update the watches");
+    if (!ok) return;
+    for (const r of targets) {
+      r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert: null } : null;
+      r.alerts = alertsFor(r.trend, r.watch);
+    }
+    if (watch) {
+      const alerting = targets.filter(r => r.alerts.length > 0).length;
+      toast.show(
+        `Watching ${targets.length}${alerting ? ` · ${alerting} already alerting (see the top of the page)` : ' · none alerting right now'}`,
+        alerting ? 'success' : 'info',
+      );
+    } else {
+      toast.show(`Stopped watching ${targets.length}`, 'info');
+    }
+  }
+
+  let testing = $state(false);
+  async function sendTest() {
+    testing = true;
+    if (await send('/api/trends/notify-test', 'POST', null, "Test alert failed")) {
+      toast.show('Test alert sent: check your phone', 'success');
+    }
+    testing = false;
+  }
+
+  /** Mixed selection shows as the checkbox's in-between state. */
+  function indeterminate(node: HTMLInputElement, value: boolean) {
+    node.indeterminate = value;
+    return { update(v: boolean) { node.indeterminate = v; } };
+  }
+
+  function onDropInput(r: TrendRow, value: string) {
+    const n = Number(value);
+    const dropAlert = value.trim() === '' ? null : n > 0 && n < 100 ? n / 100 : undefined;
+    if (dropAlert === undefined) return; // ignore out-of-range input
+    void setWatch(r, true, dropAlert);
+  }
+
+  const kindLabel = (r: TrendRow) => r.productType;
+</script>
+
+<!-- ── Alerts ─────────────────────────────────────────────── -->
+{#if alerting.length > 0}
+  <section class="alerts" aria-label="Alerts">
+    <h2 class="alerts__title">◆ {alerting.length} watched {alerting.length === 1 ? 'product needs' : 'products need'} a look</h2>
+    <ul>
+      {#each alerting as r (r.mtgstocksId)}
+        <li>
+          <button class="link" onclick={() => { kind = isBox(r) ? 'box' : 'pack'; show = 'all'; toggle(r); }}>
+            {r.setName} {kindLabel(r)}
+          </button>
+          — {r.alerts.map(a => alertText(r, a)).join('; ')}
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
+<!-- ── Filters ────────────────────────────────────────────── -->
+<div class="filters">
+  <div class="seg" role="group" aria-label="Product kind">
+    <button class:on={kind === 'box'} aria-pressed={kind === 'box'} onclick={() => (kind = 'box')}>Booster boxes</button>
+    <button class:on={kind === 'pack'} aria-pressed={kind === 'pack'} onclick={() => (kind = 'pack')}>Single packs</button>
+  </div>
+  <div class="seg" role="group" aria-label="Show">
+    <button class:on={show === 'all'} aria-pressed={show === 'all'} onclick={() => (show = 'all')}>All</button>
+    <button class:on={show === 'floor'} aria-pressed={show === 'floor'} onclick={() => (show = 'floor')}>◆ Possible floors</button>
+    <button class:on={show === 'watched'} aria-pressed={show === 'watched'} onclick={() => (show = 'watched')}>Watched</button>
+  </div>
+  <label class="years">
+    Released in the last
+    <select bind:value={years} onchange={load}>
+      <option value={1}>year</option>
+      <option value={2}>2 years</option>
+      <option value={5}>5 years</option>
+    </select>
+  </label>
+</div>
+
+{#if data && canEdit}
+  <p class="phone">
+    {#if data.notifications}
+      📱 Phone alerts are on: watched products notify you through ntfy when a new alert appears (checked daily).
+      <button class="link link--btn" onclick={sendTest} disabled={testing}>{testing ? 'Sending…' : 'Send test alert'}</button>
+    {:else}
+      📱 Phone alerts are off. Install the free ntfy app, subscribe to a long random topic, and set
+      <code>NTFY_URL=https://ntfy.sh/&lt;topic&gt;</code> in the server's <code>.env</code>.
+    {/if}
+  </p>
+{/if}
+
+{#if data && data.backfilled < data.tracked}
+  <p class="note">
+    Loading price history from MTGStocks: {data.backfilled} of {data.tracked} products so far. Rows without
+    history fill in over the next few hours.
+  </p>
+{/if}
+
+<!-- ── Table ──────────────────────────────────────────────── -->
+{#if loading && !data}
+  <p class="note">Loading…</p>
+{:else if rows.length === 0}
+  <p class="note">Nothing matches these filters.</p>
+{:else}
+  <div class="table-wrap">
+    <table class="trends">
+      <thead>
+        <tr>
+          <th>Set</th>
+          <th class="num">Price</th>
+          <th class="num">Since release</th>
+          <th class="num">Low since release</th>
+          <th class="num">{th?.trendWindow ?? 30} days</th>
+          <th>Signal</th>
+          <th>Trend</th>
+          {#if canEdit}
+            <th>
+              <label class="watch__all" title={allWatched ? 'Stop watching every row shown' : 'Watch every row shown'}>
+                <input
+                  type="checkbox"
+                  checked={allWatched}
+                  use:indeterminate={someWatched && !allWatched}
+                  onchange={async e => {
+                    const box = e.currentTarget;
+                    await setWatchAll(!allWatched);
+                    box.checked = allWatched; // snap back if saving failed
+                  }}
+                />
+                Watch
+              </label>
+            </th>
+          {/if}
+        </tr>
+      </thead>
+      <tbody>
+        {#each rows as r (r.mtgstocksId)}
+          {@const t = r.trend}
+          {@const s = t ? SIGNALS[t.signal] : null}
+          <tr class:open={open === r.mtgstocksId} class:alerting={r.alerts.length > 0}>
+            <td class="name">
+              <button class="link" aria-expanded={open === r.mtgstocksId} onclick={() => toggle(r)}>{r.setName}</button>
+              <span class="muted">{kindLabel(r)}</span>
+              <span class="sub">{r.releasedAt} · {age(r.releasedAt)}</span>
+            </td>
+            <td class="num">
+              {money(t?.current ?? r.marketPrice)}
+              {#if isBox(r)}<span class="sub">{money(perPack(r))} / pack · {r.packsPerBox} packs</span>{/if}
+            </td>
+            <td class="num">{t ? pct(-t.dropFromRelease) : '—'}</td>
+            <td class="num">
+              {t ? money(t.low) : '—'}
+              {#if t}<span class="sub">{t.aboveLow < 0.005 ? 'at the low' : `${pct(t.aboveLow)} above`}</span>{/if}
+            </td>
+            <td class="num">{t ? pct(t.change30) : '—'}</td>
+            <td>
+              {#if s}
+                <span class="signal signal--{t!.signal}" title={s.hint}><span aria-hidden="true">{s.icon}</span> {s.label}</span>
+              {:else}
+                <span class="muted">no history yet</span>
+              {/if}
+            </td>
+            <td>{#if t}<Sparkline values={t.spark} />{/if}</td>
+            {#if canEdit}
+              <td class="watch">
+                <label class="watch__box">
+                  <input type="checkbox" checked={r.watch != null} onchange={async e => {
+                    const box = e.currentTarget;
+                    await setWatch(r, box.checked, null);
+                    box.checked = r.watch != null; // snap back if saving failed
+                  }} />
+                  <span class="sr-only">Watch {r.setName} {kindLabel(r)}</span>
+                </label>
+                {#if r.watch}
+                  <label class="watch__drop" title="Also alert when the price is this far below its release price">
+                    <input
+                      type="number" min="1" max="99" step="1" inputmode="numeric" placeholder="−%"
+                      value={r.watch.dropAlert != null ? Math.round(r.watch.dropAlert * 100) : ''}
+                      onchange={e => onDropInput(r, (e.target as HTMLInputElement).value)}
+                    />
+                    <span class="sr-only">Drop alert, percent below release</span>
+                  </label>
+                {/if}
+              </td>
+            {/if}
+          </tr>
+          {#if open === r.mtgstocksId}
+            <tr class="detail">
+              <td colspan={canEdit ? 8 : 7}>
+                {#if history[r.mtgstocksId]}
+                  <PriceChart
+                    points={history[r.mtgstocksId]}
+                    released={r.releasedAt}
+                    low={t?.low ?? null}
+                    perPackDivisor={r.packsPerBox ?? 1}
+                    title="{r.setName} {kindLabel(r)}: daily market price"
+                  />
+                {:else}
+                  <p class="note">Loading history…</p>
+                {/if}
+              </td>
+            </tr>
+          {/if}
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/if}
+
+{#if th}
+  <details class="explain">
+    <summary>How the signals work</summary>
+    <ul>
+      <li><strong>◆ Possible floor</strong>: at least {Math.round(th.floorDrop * 100)}% below its release price,
+        moving within a {Math.round(th.floorBand * 100)}% range for the last {th.floorWindow} days, and within
+        {Math.round(th.floorNear * 100)}% of its lowest price since release. Watched products that hit this raise an alert.</li>
+      <li><strong>↓ Falling / ↑ Rising</strong>: moved more than {Math.round(th.trendMove * 100)}% over {th.trendWindow} days.</li>
+      <li><strong>★ New</strong>: released under {th.newSetDays} days ago, when prices still carry release hype.</li>
+      <li>Prices are TCGplayer market prices via MTGStocks. A box's per-pack price assumes its standard pack count.</li>
+    </ul>
+  </details>
+{/if}
+
+<style>
+  .alerts {
+    border: 1px solid var(--color-success);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .alerts__title { font-size: 0.95rem; margin: 0 0 0.4rem; }
+  .alerts ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: center; margin-bottom: 0.9rem; }
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
+  .seg button {
+    background: none; border: none; color: var(--color-text-muted); font: inherit; font-size: 0.85rem;
+    padding: 0.35rem 0.75rem; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--color-border); }
+  .seg button.on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
+  .years { font-size: 0.85rem; color: var(--color-text-muted); display: inline-flex; gap: 0.4rem; align-items: center; }
+  .years select { font: inherit; }
+
+  .note { font-size: 0.85rem; color: var(--color-text-muted); }
+  .phone { font-size: 0.82rem; color: var(--color-text-muted); margin: 0 0 0.9rem; }
+  .phone code { font-size: 0.78rem; }
+  .link--btn { color: var(--color-accent); margin-left: 0.4rem; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius); }
+  .trends { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  .trends th {
+    text-align: left; font-size: 0.72rem; font-weight: 500; color: var(--color-text-muted);
+    background: var(--color-surface); padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--color-border); white-space: nowrap;
+  }
+  .trends td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--color-border); white-space: nowrap; vertical-align: middle; }
+  .trends .num { text-align: right; }
+  .trends tr.alerting td:first-child { box-shadow: inset 3px 0 0 var(--color-success); }
+  .name { white-space: normal !important; min-width: 11rem; }
+  .muted { color: var(--color-text-muted); font-size: 0.85em; white-space: nowrap; }
+  .sub { display: block; font-size: 0.7rem; color: var(--color-text-muted); }
+  .link { background: none; border: none; padding: 0; font: inherit; color: var(--color-text); cursor: pointer; text-align: left; }
+  .link:hover, .link:focus-visible { text-decoration: underline; }
+
+  .signal { font-size: 0.78rem; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid var(--color-border); white-space: nowrap; }
+  .signal--floor { border-color: var(--color-success); color: var(--color-text); font-weight: 600; }
+  .signal--falling { color: var(--color-text-muted); }
+
+  .watch { display: flex; gap: 0.4rem; align-items: center; }
+  .watch__all { display: inline-flex; gap: 0.35rem; align-items: center; cursor: pointer; }
+  .watch__drop input { width: 3.6rem; font: inherit; font-size: 0.8rem; }
+  .detail td { background: var(--color-bg); padding: 0.75rem 1rem 1rem; white-space: normal; }
+
+  .explain { margin-top: 1rem; font-size: 0.85rem; color: var(--color-text-muted); }
+  .explain summary { cursor: pointer; }
+  .explain ul { padding-left: 1.1rem; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Price line color for the charts (a calm blue, distinct from signal colors). */
+  :global(:root) { --chart-line: #7aa2f7; }
+</style>

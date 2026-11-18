@@ -42,10 +42,11 @@ func getenvFrom(env map[string]string) func(string) string {
 func stubMaintenance(t *testing.T, interval time.Duration) *atomic.Int32 {
 	t.Helper()
 	var calls atomic.Int32
-	origRefresh, origInterval := refreshPrices, maintenanceInterval
+	origRefresh, origInterval, origBackfill := refreshPrices, maintenanceInterval, backfillPrices
 	refreshPrices = func(context.Context, *pgxpool.Pool) { calls.Add(1) }
+	backfillPrices = func(context.Context, *pgxpool.Pool) (int, error) { return 0, nil }
 	maintenanceInterval = interval
-	t.Cleanup(func() { refreshPrices, maintenanceInterval = origRefresh, origInterval })
+	t.Cleanup(func() { refreshPrices, maintenanceInterval, backfillPrices = origRefresh, origInterval, origBackfill })
 	return &calls
 }
 
@@ -143,5 +144,29 @@ func TestRunMaintenance_LogsSessionCleanupErrors(t *testing.T) {
 	<-done
 	if calls.Load() != 1 {
 		t.Errorf("want one refresh, got %d", calls.Load())
+	}
+}
+
+func TestRunBackfill_RetriesUntilCancelled(t *testing.T) {
+	var calls atomic.Int32
+	orig := backfillPrices
+	backfillPrices = func(context.Context, *pgxpool.Pool) (int, error) {
+		if calls.Add(1) == 1 {
+			return 0, fmt.Errorf("tunnel down") // logged, retried next tick
+		}
+		return 2, nil
+	}
+	t.Cleanup(func() { backfillPrices = orig })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { runBackfill(ctx, nil, 5*time.Millisecond); close(done) }()
+	for i := 0; i < 200 && calls.Load() < 3; i++ {
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	if calls.Load() < 3 {
+		t.Errorf("want repeated runs after a failure, got %d", calls.Load())
 	}
 }

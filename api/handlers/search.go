@@ -38,6 +38,8 @@ type SearchResult struct {
 	ReleasedAt  string   `json:"releasedAt"`
 	ProductType string   `json:"productType"`
 	MarketPrice *float64 `json:"marketPrice"`
+	// PacksPerBox is set only for booster boxes.
+	PacksPerBox int `json:"packsPerBox,omitempty"`
 }
 
 var knownPackTypes = map[string]string{

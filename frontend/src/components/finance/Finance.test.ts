@@ -62,7 +62,7 @@ describe('Finance overview', () => {
   it('values stock and splits gains into realized and unrealized', () => {
     const { container } = setup();
     // 30 bought at $4.05 (121.50 without fees); 18 drafted, 2 sold → 10 logged left; 12 in stock.
-    expect(text(container.querySelector('.invested'))).toContain('Invested $132.18 in 30 packs logged (incl. $10.68 tax & shipping)');
+    expect(text(container.querySelector('.invested'))).toContain('All purchases: $132.18 for 30 packs (incl. $10.68 tax & shipping). Of those, 10 in stock · 20 sold or drafted.');
     const cards = Array.from(container.querySelectorAll('.card')).map(text);
     expect(cards[0]).toContain('$60.00');            // all 12 in stock × $5
     expect(cards[0]).toContain('12 packs in stock');

@@ -37,6 +37,8 @@ services:
       VIEWER_EMAILS: ${VIEWER_EMAILS:-}
       # Optional HTTP proxy for MTGStocks requests only (e.g. over WireGuard).
       MTGSTOCKS_PROXY: ${MTGSTOCKS_PROXY:-}
+      # Optional phone alerts for watched packs: an ntfy topic URL.
+      NTFY_URL: ${NTFY_URL:-}
       PORT: "8080"
     volumes:
       - /etc/mtg-chaos-draft/viewer_emails:/etc/mtg-chaos-draft/viewer_emails:ro

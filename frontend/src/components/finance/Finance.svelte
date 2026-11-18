@@ -133,7 +133,12 @@
   <!-- ── Overview ─────────────────────────────────────────── -->
   {#if pf.boughtPacks > 0}
     <p class="invested">
-      Invested <strong>{money(pf.invested)}</strong> in {packsLabel(pf.boughtPacks)} logged{#if pf.purchaseFees > 0}&nbsp;(incl. {money(pf.purchaseFees)} tax & shipping){/if}
+      All purchases: <strong>{money(pf.invested)}</strong> for {packsLabel(pf.boughtPacks)}{#if pf.purchaseFees > 0}&nbsp;(incl. {money(pf.purchaseFees)} tax & shipping){/if}.
+      Of those, {[
+        `${pf.stockPacks - pf.uncostedPacks} in stock`,
+        pf.openedPacks > 0 ? `${pf.openedPacks} opened` : '',
+        pf.disposedPacks > 0 ? `${pf.disposedPacks} sold or drafted` : '',
+      ].filter(Boolean).join(' · ')}.
     </p>
   {/if}
   <div class="summary">

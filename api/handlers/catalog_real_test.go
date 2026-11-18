@@ -23,7 +23,10 @@ import (
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files")
 
-const goldenProductsPath = "testdata/sealed_products.golden.json"
+const (
+	goldenProductsPath = "testdata/sealed_products.golden.json"
+	goldenBoxesPath    = "testdata/sealed_boxes.golden.json"
+)
 
 func loadRealCatalog(t *testing.T) (*catalog, []msSet) {
 	t.Helper()
@@ -55,17 +58,23 @@ func loadRealCatalog(t *testing.T) (*catalog, []msSet) {
 // snapshot. Any filter change shows up as a reviewable diff of this file.
 func TestRealCatalog_Golden(t *testing.T) {
 	c, _ := loadRealCatalog(t)
+	checkGolden(t, goldenProductsPath, c.products)
+	checkGolden(t, goldenBoxesPath, c.boxes)
+}
 
+func checkGolden(t *testing.T, path string, items []SearchResult) {
+	t.Helper()
 	type row struct {
 		Set   string   `json:"set"`
 		Type  string   `json:"type"`
 		Name  string   `json:"name"`
 		ID    int      `json:"id"`
+		Packs int      `json:"packs,omitempty"`
 		Price *float64 `json:"price"`
 	}
-	rows := make([]row, len(c.products))
-	for i, p := range c.products {
-		rows[i] = row{p.SetName, p.ProductType, p.Name, p.MTGStocksID, p.MarketPrice}
+	rows := make([]row, len(items))
+	for i, p := range items {
+		rows[i] = row{p.SetName, p.ProductType, p.Name, p.MTGStocksID, p.PacksPerBox, p.MarketPrice}
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -75,17 +84,17 @@ func TestRealCatalog_Golden(t *testing.T) {
 	}
 
 	if *updateGolden {
-		if err := os.WriteFile(goldenProductsPath, buf.Bytes(), 0o644); err != nil {
+		if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		return
 	}
-	want, err := os.ReadFile(goldenProductsPath)
+	want, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("%v (run with -update to create it)", err)
 	}
 	if !bytes.Equal(want, buf.Bytes()) {
-		t.Errorf("search catalog changed; review with -update and git diff %s", goldenProductsPath)
+		t.Errorf("catalog changed; review with -update and git diff %s", path)
 	}
 }
 
@@ -144,6 +153,39 @@ func TestRealCatalog_KnownSets(t *testing.T) {
 			if !found {
 				t.Errorf("%s %s missing or unpriced", set, typ)
 			}
+		}
+	}
+}
+
+// TestRealCatalog_BoxesAreSingleEnglishBoosterBoxes: no cases, deck displays
+// or foreign-language boxes, and every box knows its pack count.
+func TestRealCatalog_BoxesAreSingleEnglishBoosterBoxes(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	banned := []string{"case", "deck", "theme", "japanese", "commander", "starter"}
+	for _, b := range c.boxes {
+		name := strings.ToLower(b.Name)
+		for _, w := range banned {
+			if strings.Contains(name, w) {
+				t.Errorf("%s: %q should not be a booster box", b.SetName, b.Name)
+			}
+		}
+		if b.PacksPerBox < 2 {
+			t.Errorf("%s %s: packs per box %d", b.SetName, b.Name, b.PacksPerBox)
+		}
+	}
+	want := map[string]string{
+		"Teenage Mutant Ninja Turtles|Collector Booster Box": "Collector Booster Display",
+		"Bloomburrow|Play Booster Box":                       "Play Booster Display",
+		"Wilds of Eldraine|Set Booster Box":                  "",
+	}
+	have := map[string]string{}
+	for _, b := range c.boxes {
+		have[b.SetName+"|"+b.ProductType] = b.Name
+	}
+	for k, name := range want {
+		got, ok := have[k]
+		if !ok || (name != "" && got != name) {
+			t.Errorf("%s: want %q, got %q (found=%v)", k, name, got, ok)
 		}
 	}
 }

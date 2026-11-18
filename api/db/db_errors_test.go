@@ -63,6 +63,16 @@ func TestDB_DatabaseDown(t *testing.T) {
 		"GetOrCreateUser":       func() error { return errOnly(db.GetOrCreateUser(ctx, pool, "g", "e@x", "N", "")) },
 		"GetUserByID":           func() error { return errOnly(db.GetUserByID(ctx, pool, 1)) },
 		"SetUserRole":           func() error { return db.SetUserRole(ctx, pool, 1, "admin") },
+		"RecordPrices":          func() error { return db.RecordPrices(ctx, pool, time.Now(), map[int]float64{1: 1}) },
+		"StoreHistory":          func() error { return db.StoreHistory(ctx, pool, 1, []db.PricePoint{{Day: time.Now(), Price: 1}}) },
+		"BackfilledIDs":         func() error { return errOnly(db.BackfilledIDs(ctx, pool)) },
+		"PriceHistory":          func() error { return errOnly(db.PriceHistory(ctx, pool, []int{1}, time.Now())) },
+		"SetWatch":              func() error { return db.SetWatch(ctx, pool, db.Watch{MTGStocksID: 1}) },
+		"DeleteWatch":           func() error { return db.DeleteWatch(ctx, pool, 1) },
+		"ListWatches":           func() error { return errOnly(db.ListWatches(ctx, pool)) },
+		"WatchMany":             func() error { return db.WatchMany(ctx, pool, []int{1}) },
+		"SetNotified":           func() error { return db.SetNotified(ctx, pool, 1, nil) },
+		"UnwatchMany":           func() error { return db.UnwatchMany(ctx, pool, []int{1}) },
 	}
 	for name, call := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -177,3 +177,16 @@ func TestClientIPKey_FallsBackToRemoteAddr(t *testing.T) {
 		t.Errorf("want 192.0.2.1, got %q (%v)", key, err)
 	}
 }
+
+func TestSiteOrigin(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://cards.example/api/auth/callback": "https://cards.example",
+		"http://localhost:4321/api/auth/callback": "http://localhost:4321",
+		"not a url": "",
+		"::bad":     "",
+	} {
+		if got := siteOrigin(in); got != want {
+			t.Errorf("%q: want %q, got %q", in, want, got)
+		}
+	}
+}

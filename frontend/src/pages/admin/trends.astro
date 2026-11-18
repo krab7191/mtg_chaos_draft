@@ -1,0 +1,33 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Trends from '../../components/trends/Trends.svelte';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+let meRes: Response;
+try {
+  meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+} catch {
+  return Astro.redirect('/login');
+}
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+const ADMIN_ROLES = ['admin', 'viewer'];
+if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
+---
+
+<Layout title="Price Trends" user={user} wide>
+  <div class="page">
+    <h1 class="page__title">Price Trends</h1>
+    <p class="page__sub">How each recent set's packs and boxes have moved since release, to spot when prices stop falling.</p>
+    <Trends client:load canEdit={user.role === 'admin'} />
+  </div>
+</Layout>
+
+<style>
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    &__sub   { color: var(--color-text-muted); margin-bottom: 1.25rem; font-size: 0.9rem; }
+  }
+</style>

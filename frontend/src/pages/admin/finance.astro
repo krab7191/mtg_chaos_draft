@@ -29,10 +29,10 @@ const [purchases, disposals, packs] = await Promise.all([
 ]);
 ---
 
-<Layout title="Finance" user={user}>
+<Layout title="Finance" user={user} wide>
   <div class="page">
     <h1 class="page__title">Finance</h1>
-    <p class="page__sub">Your packs as a portfolio: what you paid, what drafts and sales brought in, and what's left is worth today.</p>
+    <p class="page__sub">What you've spent on packs, what drafts and sales brought back, and what your stock is worth today.</p>
     <Finance client:load {purchases} {disposals} {packs} canEdit={user.role === 'admin'} />
   </div>
 </Layout>

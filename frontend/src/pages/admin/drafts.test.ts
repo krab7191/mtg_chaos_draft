@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderPage } from '../../tests/astro';
 import DraftsPage from './drafts.astro';
 
+// Islands have their own tests; stubs show what the page passes them.
+vi.mock('../../components/drafts/DraftsList.svelte', () => import('../../tests/IslandStub.svelte'));
+
 beforeEach(() => vi.unstubAllGlobals());
 
 function mockFetch(responses: Array<{ ok: boolean; json?: () => Promise<unknown> }>) {

@@ -40,6 +40,7 @@
   let open     = $state(false);
   let catalog  = $state<CatalogProduct[]>([]);
   let searching = $state(false);
+  const listId = $props.id();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let seq = 0;
 
@@ -108,6 +109,7 @@
     type="search"
     role="combobox"
     aria-expanded={open}
+    aria-controls={listId}
     aria-autocomplete="list"
     autocomplete="off"
     placeholder={searchCatalog ? 'Search your collection or any set…' : 'Search…'}
@@ -121,7 +123,7 @@
     <span class="picker__note">Not in your collection yet: it'll be added.</span>
   {/if}
   {#if open}
-    <ul class="picker__list" role="listbox">
+    <ul class="picker__list" role="listbox" id={listId}>
       {#each matches as p (p.id)}
         <li role="option" aria-selected={value?.kind === 'pack' && value.pack.id === p.id}>
           <button type="button" class="picker__item" onmousedown={(e) => e.preventDefault()}

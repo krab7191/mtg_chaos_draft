@@ -83,6 +83,8 @@ export interface Portfolio {
   purchaseFees: number;
   boughtPacks: number;
   stockPacks: number;
+  /** Packs gone through recorded drafts and sales. */
+  disposedPacks: number;
   uncostedPacks: number;
   /** Cost of the costed packs in stock. */
   cost: number;
@@ -189,12 +191,13 @@ export function portfolio(purchases: Purchase[], disposals: Disposal[], stock: S
   positions.sort((a, b) => (b.value ?? 0) - (a.value ?? 0) || b.cost - a.cost || b.realized - a.realized);
 
   const t = {
-    boughtPacks: 0, stockPacks: 0, uncostedPacks: 0, cost: 0, value: 0, pricedCost: 0,
+    boughtPacks: 0, stockPacks: 0, disposedPacks: 0, uncostedPacks: 0, cost: 0, value: 0, pricedCost: 0,
     costedValue: 0, realized: 0, openedPacks: 0, openedCost: 0,
   };
   for (const p of positions) {
     t.boughtPacks += p.bought;
     t.stockPacks += p.stock;
+    t.disposedPacks += p.disposed;
     t.uncostedPacks += p.uncosted;
     t.cost += p.cost;
     t.realized += p.realized;
@@ -216,6 +219,7 @@ export function portfolio(purchases: Purchase[], disposals: Disposal[], stock: S
     purchaseFees: purchases.reduce((s, p) => s + (p.fees ?? 0), 0),
     boughtPacks: t.boughtPacks,
     stockPacks: t.stockPacks,
+    disposedPacks: t.disposedPacks,
     uncostedPacks: t.uncostedPacks,
     cost: t.cost,
     value: t.value,

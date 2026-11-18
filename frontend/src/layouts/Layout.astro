@@ -5,9 +5,11 @@ import Toast from '../components/Toast.svelte';
 interface Props {
   title: string;
   user?: { name: string; email: string; role: string; picture?: string } | null;
+  /** Let wide tables use the screen: up to 1200px instead of 768px. */
+  wide?: boolean;
 }
 
-const { title, user } = Astro.props;
+const { title, user, wide = false } = Astro.props;
 const version = import.meta.env.PUBLIC_APP_VERSION;
 ---
 
@@ -44,6 +46,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
           <a href="/select" class="nav-menu__item">Pick a Pack</a>
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/collection" class="nav-menu__item">Manage Collection</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/cheappacks" class="nav-menu__item">Cheap Packs</a>}
+          {['admin', 'viewer'].includes(user.role) && <a href="/admin/trends" class="nav-menu__item">Price Trends</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/weights" class="nav-menu__item">Weights</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/drafts" class="nav-menu__item">Drafts</a>}
           {['admin', 'viewer'].includes(user.role) && <a href="/admin/finance" class="nav-menu__item">Finance</a>}
@@ -60,7 +63,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
       </>
     )}
 
-    <main class="main">
+    <main class:list={["main", { "main--wide": wide }]}>
       <slot />
     </main>
 
@@ -233,6 +236,8 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
     @media (min-width: 500px) {
       padding: 2rem 1.5rem;
     }
+
+    &--wide { max-width: 1200px; }
   }
 </style>
 
