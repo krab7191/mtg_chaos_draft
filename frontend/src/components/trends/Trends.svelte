@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback,
+    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter,
   } from '../../lib/trends';
 
@@ -116,6 +116,7 @@
             {r.setName} {kindLabel(r)}
           </button>
           — {r.alerts.map(a => alertText(r, a)).join('; ')}
+          {#if stockNote(r)}<span class="stock-note">{stockNote(r)}</span>{/if}
         </li>
       {/each}
     </ul>
@@ -141,6 +142,9 @@
       <option value={5}>5 years</option>
     </select>
   </label>
+  {#if data && data.backfilled < data.tracked}
+    <span class="history" title="Products with price history loaded">History {data.backfilled}/{data.tracked}</span>
+  {/if}
 </div>
 
 {#if data && canEdit}
@@ -152,13 +156,6 @@
       📱 Phone alerts are off. Install the free ntfy app, subscribe to a long random topic, and set
       <code>NTFY_URL=https://ntfy.sh/&lt;topic&gt;</code> in the server's <code>.env</code>.
     {/if}
-  </p>
-{/if}
-
-{#if data && data.backfilled < data.tracked}
-  <p class="note">
-    Loading price history from MTGStocks: {data.backfilled} of {data.tracked} products so far. Rows without
-    history fill in over the next few hours.
   </p>
 {/if}
 
@@ -299,6 +296,10 @@
   }
   .alerts__title { font-size: 0.95rem; margin: 0 0 0.4rem; }
   .alerts ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; }
+  .stock-note {
+    margin-left: 0.4rem; font-size: 0.75rem; padding: 0 0.4rem; border-radius: 999px;
+    border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap;
+  }
 
   .filters { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; align-items: center; margin-bottom: 0.9rem; }
   .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
@@ -310,6 +311,7 @@
   .seg button.on { background: var(--color-surface); color: var(--color-text); font-weight: 600; }
   .years { font-size: 0.85rem; color: var(--color-text-muted); display: inline-flex; gap: 0.4rem; align-items: center; }
   .years select { font: inherit; }
+  .history { font-size: 0.8rem; color: var(--color-text-muted); margin-left: auto; font-variant-numeric: tabular-nums; }
 
   .note { font-size: 0.85rem; color: var(--color-text-muted); }
   .phone { font-size: 0.82rem; color: var(--color-text-muted); margin: 0 0 0.9rem; }

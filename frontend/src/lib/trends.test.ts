@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perPack, money, pct, age, filterRows, alertText, alertsFor, watchFeedback, isBox, type TrendRow, type Trend } from './trends';
+import { perPack, money, pct, age, filterRows, alertText, alertsFor, watchFeedback, stockNote, isBox, type TrendRow, type Trend } from './trends';
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 120, low: 100, lowDay: '2026-03-01', aboveLow: 0.2, change30: -0.02, releasePrice: 150,
@@ -73,5 +73,12 @@ describe('trends helpers', () => {
     expect(watchFeedback(row({ trend: trend({ signal: 'rising' }) }))).toEqual({
       msg: 'Watching Set Play Booster Box. No alert right now (rising).', alerting: false,
     });
+  });
+
+  it('notes low stock only', () => {
+    expect(stockNote(row({ stock: 0 }))).toBe('none in stock');
+    expect(stockNote(row({ stock: undefined }))).toBe('none in stock');
+    expect(stockNote(row({ stock: 6 }))).toBe('6 in stock');
+    expect(stockNote(row({ stock: 10 }))).toBeNull();
   });
 });

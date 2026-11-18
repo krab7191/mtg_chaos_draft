@@ -32,6 +32,8 @@ export interface TrendRow {
   trend: Trend | null;
   watch: Watch | null;
   alerts: ('floor' | 'drop')[];
+  /** Packs of this set and kind in the collection (loose packs for a box row). */
+  stock?: number;
 }
 
 export interface Thresholds {
@@ -128,4 +130,14 @@ export function watchFeedback(r: TrendRow): { msg: string; alerting: boolean } {
   }
   const now = r.trend ? SIGNALS[r.trend.signal].label.toLowerCase() : 'no price history yet';
   return { msg: `Watching ${name}. No alert right now (${now}).`, alerting: false };
+}
+
+/** Below this many packs, an alert notes how many you have. */
+export const LOW_STOCK = 10;
+
+/** "none in stock" / "6 in stock" when stock is low; null otherwise. */
+export function stockNote(r: TrendRow): string | null {
+  const n = r.stock ?? 0;
+  if (n >= LOW_STOCK) return null;
+  return n === 0 ? 'none in stock' : `${n} in stock`;
 }

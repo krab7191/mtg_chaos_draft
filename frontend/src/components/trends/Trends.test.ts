@@ -151,7 +151,7 @@ describe('Trends page', () => {
     const { container } = render(Trends, { props: {} });
     await waitFor(() => expect(container.querySelector('table')).not.toBeNull());
     expect(container.querySelector('.watch')).toBeNull();
-    expect(container.textContent).toContain('3 of 10 products so far');
+    expect(container.querySelector('.history')?.textContent).toBe('History 3/10');
     expect(container.querySelector('.explain')?.textContent?.replace(/\s+/g, ' ')).toContain('released at least 150 days ago, at least 10% below its release price');
   });
 
@@ -283,5 +283,14 @@ describe('Trends page', () => {
     const { container } = render(Trends, { props: {} });
     await waitFor(() => expect(container.querySelector('table')).not.toBeNull());
     expect(container.querySelector('.phone')).toBeNull();
+  });
+
+  it('notes low or no stock on alerts, and nothing when well stocked', async () => {
+    const alerting = (id: number, stock: number) => row(id, {
+      setName: `Set ${id}`, stock, trend: trend({ signal: 'floor' }), watch: { mtgstocksId: id, dropAlert: null }, alerts: ['floor'],
+    });
+    const { container } = await mount([alerting(1, 0), alerting(2, 6), alerting(3, 24)]);
+    const items = Array.from(container.querySelectorAll('.alerts li')).map(li => li.querySelector('.stock-note')?.textContent ?? null);
+    expect(items).toEqual(['none in stock', '6 in stock', null]);
   });
 });

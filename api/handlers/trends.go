@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"mtg-chaos-draft/db"
@@ -294,6 +295,46 @@ type trendRow struct {
 	Trend  *Trend    `json:"trend"`
 	Watch  *db.Watch `json:"watch"`
 	Alerts []string  `json:"alerts"`
+	// Stock is how many packs of this set and pack type are in the
+	// collection (a box row counts loose packs of the kind it holds).
+	Stock int `json:"stock"`
+}
+
+// packKind normalizes a product type to the pack it is or holds, so boxes,
+// loose packs and sleeved packs of one kind match: "Play Booster Box",
+// "Play Booster" and "Sleeved Play Booster" → "play booster".
+func packKind(productType string) string {
+	k := strings.ToLower(strings.TrimSpace(productType))
+	k = strings.TrimPrefix(k, "sleeved ")
+	for _, suffix := range []string{" box", " pack"} {
+		k = strings.TrimSuffix(k, suffix)
+	}
+	return k
+}
+
+// stockIndex counts collection packs by set (code and name) and pack kind.
+type stockIndex map[string]int
+
+func newStockIndex(packs []db.CollectionPack) stockIndex {
+	idx := stockIndex{}
+	for _, p := range packs {
+		kind := packKind(p.ProductType)
+		if p.SetCode != "" {
+			idx["code|"+strings.ToLower(p.SetCode)+"|"+kind] += p.Quantity
+		}
+		idx["name|"+strings.ToLower(p.SetName)+"|"+kind] += p.Quantity
+	}
+	return idx
+}
+
+func (idx stockIndex) of(p SearchResult) int {
+	kind := packKind(p.ProductType)
+	if p.SetCode != "" {
+		if n, ok := idx["code|"+strings.ToLower(p.SetCode)+"|"+kind]; ok {
+			return n
+		}
+	}
+	return idx["name|"+strings.ToLower(p.SetName)+"|"+kind]
 }
 
 // Alert reasons for watched products.
@@ -377,6 +418,12 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	collection, err := db.ListCollection(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	stock := newStockIndex(collection)
 
 	resp := trendsResponse{Products: make([]trendRow, 0, len(picked)), Tracked: len(all), Notifications: notificationsOn()}
 	for _, p := range all {
@@ -392,7 +439,7 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err == nil {
 			released = &rel
 		}
-		row := trendRow{SearchResult: p, Trend: summarize(history[p.MTGStocksID], released, today)}
+		row := trendRow{SearchResult: p, Trend: summarize(history[p.MTGStocksID], released, today), Stock: stock.of(p)}
 		if wt, ok := watches[p.MTGStocksID]; ok {
 			row.Watch = &wt
 		}

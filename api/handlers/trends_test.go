@@ -339,6 +339,10 @@ func TestTrendsList(t *testing.T) {
 	_ = db.StoreHistory(ctx, pool, 1, series("2023-01-01", append(repeat(10, 20), repeat(6, 300)...)...))
 	drop := 0.3
 	_ = db.SetWatch(ctx, pool, db.Watch{MTGStocksID: 1, DropAlert: &drop})
+	testhelper.Truncate(t, pool, "collection_packs")
+	if _, err := db.AddPack(ctx, pool, 999, "x", "Test Set", "TST", "Draft Booster", 3, 1, nil, 15); err != nil {
+		t.Fatal(err)
+	}
 
 	h := newTestTrendsHandler(t)
 	get := func(url string) trendsResponse {
@@ -371,6 +375,9 @@ func TestTrendsList(t *testing.T) {
 		t.Error("thresholds should be reported")
 	}
 
+	if watched.Stock != 3 {
+		t.Errorf("stock of the watched pack: want 3, got %d", watched.Stock)
+	}
 	if all := get("/api/trends?years=junk"); len(all.Products) != 3 {
 		t.Errorf("default 2 years should include both sets, got %d", len(all.Products))
 	}
@@ -470,5 +477,35 @@ func TestTrendsSetWatchMany(t *testing.T) {
 	}
 	if code := put(&TrendsHandler{pool: closedPool(t), now: time.Now}, `{"ids":[1],"watch":true}`); code != 500 {
 		t.Errorf("db down: %d", code)
+	}
+}
+
+func TestPackKindAndStock(t *testing.T) {
+	for in, want := range map[string]string{
+		"Play Booster Box": "play booster", "Play Booster": "play booster", "Sleeved Play Booster": "play booster",
+		"Booster Box": "booster", "Booster Pack": "booster", "Collector Booster Box": "collector booster",
+	} {
+		if got := packKind(in); got != want {
+			t.Errorf("%q: want %q, got %q", in, want, got)
+		}
+	}
+	idx := newStockIndex([]db.CollectionPack{
+		{SetName: "Bloomburrow", SetCode: "BLB", ProductType: "Play Booster", Quantity: 7},
+		{SetName: "Bloomburrow", SetCode: "BLB", ProductType: "Sleeved Play Booster", Quantity: 1},
+		{SetName: "Old Set", ProductType: "Booster Pack", Quantity: 4},
+	})
+	cases := []struct {
+		p    SearchResult
+		want int
+	}{
+		{SearchResult{SetName: "Bloomburrow", SetCode: "BLB", ProductType: "Play Booster Box"}, 8},
+		{SearchResult{SetName: "Bloomburrow", SetCode: "blb", ProductType: "Play Booster"}, 8},
+		{SearchResult{SetName: "Bloomburrow", SetCode: "BLB", ProductType: "Collector Booster Box"}, 0},
+		{SearchResult{SetName: "Old Set", SetCode: "OLD", ProductType: "Booster Box"}, 4}, // matched by name
+	}
+	for _, tc := range cases {
+		if got := idx.of(tc.p); got != tc.want {
+			t.Errorf("%s %s: want %d, got %d", tc.p.SetName, tc.p.ProductType, tc.want, got)
+		}
 	}
 }
