@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"mtg-chaos-draft/db"
 	"mtg-chaos-draft/testhelper"
 
+	"github.com/go-chi/chi/v5"
 	"golang.org/x/oauth2"
 )
 
@@ -189,4 +191,45 @@ func TestSiteOrigin(t *testing.T) {
 			t.Errorf("%q: want %q, got %q", in, want, got)
 		}
 	}
+}
+
+// TestRouter_ViewersCannotWrite walks every route, so a new write endpoint
+// can't accidentally be opened to viewers or players: anything that isn't a
+// GET must be admin-only, except the two any signed-in user needs.
+func TestRouter_ViewersCannotWrite(t *testing.T) {
+	pool := testhelper.Pool(t)
+	testhelper.Truncate(t, pool, "users")
+	router := newRouter(pool, &oauth2.Config{}, "admin@example.com", nil, false)
+	viewer := sessionFor(t, "viewer")
+	user := sessionFor(t, "user")
+
+	openToSignedIn := map[string]bool{
+		"POST /api/auth/logout":                   true, // ends your own session
+		"POST /api/collection/{id}/refresh-price": true, // re-prices a rolled pack
+	}
+	checked := 0
+	err := chi.Walk(router.(chi.Routes), func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		if method == http.MethodGet || method == http.MethodHead || openToSignedIn[method+" "+route] {
+			return nil
+		}
+		path := regexp.MustCompile(`\{[^}]+\}`).ReplaceAllString(route, "1")
+		for _, who := range []*http.Cookie{viewer, user} {
+			req := httptest.NewRequest(method, path, strings.NewReader("{}"))
+			req.AddCookie(who)
+			rr := httptest.NewRecorder()
+			router.ServeHTTP(rr, req)
+			if rr.Code != http.StatusForbidden {
+				t.Errorf("%s %s as %s: want 403, got %d", method, route, who.Value, rr.Code)
+			}
+		}
+		checked++
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked < 19 { // 19 admin-only write routes as of 2026-11-18
+		t.Errorf("only %d write routes checked; did routing change?", checked)
+	}
+	t.Logf("checked %d write routes: all admin-only", checked)
 }
