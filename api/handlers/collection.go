@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -89,7 +90,8 @@ func (h *CollectionHandler) Add(w http.ResponseWriter, r *http.Request) {
 		pack, err = db.AddPack(r.Context(), h.pool, body.MTGStocksID, body.Name, body.SetName, body.SetCode, body.ProductType, stock, body.Weight, body.MarketPrice, cardsPerPack)
 	}
 	if err != nil {
-		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("collection add: %v", err) // details stay in the server log
+		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

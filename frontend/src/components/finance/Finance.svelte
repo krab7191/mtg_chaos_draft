@@ -136,7 +136,7 @@
       All purchases: <strong>{money(pf.invested)}</strong> for {packsLabel(pf.boughtPacks)}{#if pf.purchaseFees > 0}&nbsp;(incl. {money(pf.purchaseFees)} tax & shipping){/if}.
       Of those, {[
         `${pf.stockPacks - pf.uncostedPacks} in stock`,
-        pf.openedPacks > 0 ? `${pf.openedPacks} opened` : '',
+        pf.openedPacks > 0 ? `${pf.openedPacks} opened or given away` : '',
         pf.disposedPacks > 0 ? `${pf.disposedPacks} sold or drafted` : '',
       ].filter(Boolean).join(' · ')}.
     </p>
@@ -164,9 +164,9 @@
       </span>
     </div>
     <div class="card">
-      <span class="card__label">Opened & kept</span>
+      <span class="card__label">Opened or given away</span>
       <span class="card__value">{money(pf.openedCost)}</span>
-      <span class="card__sub">cost of {packsLabel(pf.openedPacks)} logged but no longer in stock · not a loss</span>
+      <span class="card__sub">cost of {packsLabel(pf.openedPacks)} that left stock without a sale: opened, free drafts, prizes or gifts</span>
     </div>
   </div>
 
@@ -218,7 +218,7 @@
                       {[
                         h.bought > 0 ? `${h.bought} bought` : '',
                         h.disposed > 0 ? `${h.disposed} sold/drafted` : '',
-                        h.opened > 0 ? `${h.opened} opened` : '',
+                        h.opened > 0 ? `${h.opened} opened or given away` : '',
                         h.uncosted > 0 && h.bought > 0 ? `${h.uncosted} with no logged cost` : '',
                       ].filter(Boolean).join(' · ')}
                     </span>
@@ -238,8 +238,9 @@
       </div>
       <p class="note">
         In stock is what Manage Collection shows. Avg cost and unrealized cover packs with a logged purchase,
-        without tax & shipping (market prices don't include them). Logged packs that are no longer in stock and
-        weren't recorded as sold or drafted count as opened.
+        without tax & shipping (market prices don't include them). Logged packs that left stock without being
+        recorded as sold or drafted (opened yourself, used in a free draft, given as prizes or gifts) count as
+        "opened or given away".
       </p>
     </section>
   {/if}

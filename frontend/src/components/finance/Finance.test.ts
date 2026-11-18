@@ -80,9 +80,10 @@ describe('Finance overview', () => {
     const { container } = setup({ disposals: [], packs: [{ ...packs[0], quantity: 8 }] });
     const cards = Array.from(container.querySelectorAll('.card')).map(text);
     expect(cards[3]).toContain('$89.10');            // 22 × $4.05
-    expect(cards[3]).toContain('cost of 22 packs logged but no longer in stock');
+    expect(cards[3]).toContain('cost of 22 packs that left stock without a sale: opened, free drafts, prizes or gifts');
+    expect(cards[3]).not.toContain('not a loss');
     expect(cards[2]).toContain('+$0.00');            // opening isn't a loss
-    expect(text(container.querySelector('.holdings tbody tr'))).toContain('30 bought · 22 opened');
+    expect(text(container.querySelector('.holdings tbody tr'))).toContain('30 bought · 22 opened or given away');
   });
 
   it('shows holdings per pack from stock', () => {

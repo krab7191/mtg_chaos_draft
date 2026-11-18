@@ -10,6 +10,22 @@ interface Props {
 }
 
 const { title, user, wide = false } = Astro.props;
+
+// Menu: pick a pack for everyone; admin pages grouped for admins & viewers.
+const NAV_GROUPS = [
+  { heading: 'Drafts & collection', links: [
+    { href: '/admin/collection', label: 'Manage Collection' },
+    { href: '/admin/weights', label: 'Weights' },
+    { href: '/admin/drafts', label: 'Drafts' },
+  ] },
+  { heading: 'Prices & finance', links: [
+    { href: '/admin/finance', label: 'Finance' },
+    { href: '/admin/trends', label: 'Price Trends' },
+    { href: '/admin/cheappacks', label: 'Cheap Packs' },
+  ] },
+];
+const isAdminish = !!user && ['admin', 'viewer'].includes(user.role);
+const current = Astro.url.pathname.replace(/\/$/, '') || '/';
 const version = import.meta.env.PUBLIC_APP_VERSION;
 ---
 
@@ -43,13 +59,15 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
       <>
         <div class="nav-overlay" id="nav-overlay"></div>
         <div class="nav-menu" id="nav-menu" aria-hidden="true">
-          <a href="/select" class="nav-menu__item">Pick a Pack</a>
-          {['admin', 'viewer'].includes(user.role) && <a href="/admin/collection" class="nav-menu__item">Manage Collection</a>}
-          {['admin', 'viewer'].includes(user.role) && <a href="/admin/cheappacks" class="nav-menu__item">Cheap Packs</a>}
-          {['admin', 'viewer'].includes(user.role) && <a href="/admin/trends" class="nav-menu__item">Price Trends</a>}
-          {['admin', 'viewer'].includes(user.role) && <a href="/admin/weights" class="nav-menu__item">Weights</a>}
-          {['admin', 'viewer'].includes(user.role) && <a href="/admin/drafts" class="nav-menu__item">Drafts</a>}
-          {['admin', 'viewer'].includes(user.role) && <a href="/admin/finance" class="nav-menu__item">Finance</a>}
+          <a href="/select" class="nav-menu__item" aria-current={current === '/select' ? 'page' : undefined}>Pick a Pack</a>
+          {isAdminish && NAV_GROUPS.map(group => (
+            <section class="nav-menu__group" aria-label={group.heading}>
+              <h2 class="nav-menu__heading">{group.heading}</h2>
+              {group.links.map(link => (
+                <a href={link.href} class="nav-menu__item" aria-current={current === link.href ? 'page' : undefined}>{link.label}</a>
+              ))}
+            </section>
+          ))}
           <div class="nav-menu__footer">
             <div class="nav-menu__footer-row">
               <span class="nav-menu__user">{user.name}</span>
@@ -171,7 +189,33 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
         background: var(--color-bg);
         text-decoration: none;
       }
+
+      /* The page you're on. */
+      &[aria-current='page'] {
+        color: var(--color-text);
+        font-weight: 600;
+        border-left-color: var(--color-accent);
+      }
     }
+
+    &__group {
+      border-top: 1px solid var(--color-border);
+      padding-top: 0.35rem;
+      margin-top: 0.35rem;
+    }
+
+    &__heading {
+      margin: 0;
+      padding: 0.5rem 1.25rem 0.2rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-text-muted);
+      opacity: 0.8;
+    }
+
+    &__group &__item { padding: 0.65rem 1.25rem; }
 
     &__footer {
       margin-top: auto;

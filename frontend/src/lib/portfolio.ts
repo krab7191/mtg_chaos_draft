@@ -58,7 +58,7 @@ export interface Position {
   costed: number;
   /** Packs in stock beyond the logged ones: no known cost. */
   uncosted: number;
-  /** Logged packs no longer in stock and not sold or drafted: opened or given away. */
+  /** Logged packs no longer in stock and not sold or drafted: opened, used in a free draft, or given away. */
   opened: number;
   openedCost: number;
   /** Cost of the costed packs in stock. */
