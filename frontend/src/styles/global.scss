@@ -16,6 +16,12 @@
   --color-success: #4caf50;
   /* Price lines in charts and sparklines: a calm blue, distinct from signal colors. */
   --chart-line: #7aa2f7;
+  /* Price vs the value of the cards inside, best to worst (see valueTone). */
+  --tone-great: #22c55e;
+  --tone-good: #86efac;
+  --tone-high: #facc15;
+  --tone-higher: #fb923c;
+  --tone-highest: #f87171;
   --color-danger: #e94560;
   --radius: 6px;
   --font: 'Segoe UI', system-ui, sans-serif;
@@ -55,3 +61,11 @@ input, select, textarea {
     outline-offset: 1px;
   }
 }
+
+/* Price vs contents value colours, shared by Trends and Cheap Packs. */
+.tone--great { color: var(--tone-great); font-weight: 600; }
+.tone--good { color: var(--tone-good); }
+.tone--even { color: var(--color-text); }
+.tone--high { color: var(--tone-high); }
+.tone--higher { color: var(--tone-higher); }
+.tone--highest { color: var(--tone-highest); font-weight: 600; }

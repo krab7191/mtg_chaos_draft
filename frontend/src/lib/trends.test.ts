@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perPack, money, pct, age, evText, contentsTone, filterRows, windowFor, yearsLabel, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
+import { perPack, money, pct, age, evText, contentsTone, valueTone, filterRows, windowFor, yearsLabel, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 120, low: 100, lowDay: '2026-03-01', aboveLow: 0.2, change30: -0.02, releasePrice: 150,
@@ -113,7 +113,12 @@ describe('trends helpers', () => {
     expect(evText(row({ ev: { value: 43.2, change: 0.001, day: '2026-11-19' } }))!.change).toBe('→ flat');
     // Coloured against the row's price.
     expect(contentsTone(row({ trend: trend({ current: 40 }), ev: { value: 43.2, day: 'd' } }))).toBe('good');
-    expect(contentsTone(row({ trend: trend({ current: 50 }), ev: { value: 43.2, day: 'd' } }))).toBe('over');
+    expect(contentsTone(row({ trend: trend({ current: 43 }), ev: { value: 43.2, day: 'd' } }))).toBe('even');
+    expect(contentsTone(row({ trend: trend({ current: 50 }), ev: { value: 43.2, day: 'd' } }))).toBe('high');
+    // One scale for every pack, by price / contents.
+    expect([0.5, 0.9, 1, 1.01, 1.2, 1.5, 2, 3].map(r => valueTone(r * 10, 10)))
+      .toEqual(['great', 'good', 'even', 'even', 'high', 'higher', 'higher', 'highest']);
+    expect(valueTone(10, 0)).toBeNull();
     expect(contentsTone(row({ trend: null, marketPrice: null, ev: { value: 1, day: 'd' } }))).toBeNull();
     expect(contentsTone(row({}))).toBeNull();
   });

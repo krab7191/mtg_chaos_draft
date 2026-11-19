@@ -125,6 +125,20 @@ describe('Trends page', () => {
     await waitFor(() => expect(container.querySelector('.watch__drop')).toBeNull());
   });
 
+  it('the alert box folds away, and stays as left', async () => {
+    const watched = row(1, { trend: trend({ signal: 'floor' }), watch: { mtgstocksId: 1, dropAlert: null }, alerts: ['floor'] });
+    const first = await mount([watched]);
+    const box = first.container.querySelector('details.alerts') as HTMLDetailsElement;
+    expect(box.open).toBe(true);
+    box.open = false;
+    await act(() => box.dispatchEvent(new Event('toggle')));
+    expect(localStorage.getItem('trendsAlertsOpen')).toBe('false');
+    first.unmount();
+    const again = await mount([watched]);
+    expect((again.container.querySelector('details.alerts') as HTMLDetailsElement).open).toBe(false);
+    localStorage.removeItem('trendsAlertsOpen');
+  });
+
   it('widens the release window to cover an older watched pack', async () => {
     const old = row(9, { releasedAt: '2007-02-02', watch: { mtgstocksId: 9, dropAlert: null } });
     const { container, fetchMock } = await mount([row(1), old]);
@@ -166,7 +180,7 @@ describe('Trends page', () => {
     expect(container.querySelector('#trend-1')?.textContent).not.toContain('muted');
     // The value of the contents and its 2-week move.
     expect(container.querySelector('#trend-3')?.textContent).toContain('$43.20↓12% 2 wk');
-    expect(container.querySelector('#trend-3 .ev')?.classList.contains('ev--over')).toBe(true); // $120 for $43.20 of cards
+    expect(container.querySelector('#trend-3 .ev')?.classList.contains('tone--highest')).toBe(true); // $120 for $43.20 of cards
 
     await act(() => fireEvent.click(button(container, 'Needs a look (2)')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);

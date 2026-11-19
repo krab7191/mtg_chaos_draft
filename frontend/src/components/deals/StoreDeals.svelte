@@ -3,7 +3,7 @@
   import { getJSON } from '../../lib/api';
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
-  import { money, pct } from '../../lib/trends';
+  import { money, pct, valueTone } from '../../lib/trends';
   import {
     filterOffers, applyFilters, languagesIn, groupByPack, searchLinks, languageLabel, LANGUAGES, NO_FILTERS,
     type OffersResponse, type OfferView, type StoreOffer, type OfferFilters,
@@ -168,9 +168,9 @@
                 <td class="num">
                   {money(o.price)}
                   {#if o.contents}
-                    <!-- Green: the price is at or under what the cards inside are worth; red: over. -->
-                    <span class="sub" class:warn={o.price > o.contents} class:good={o.price <= o.contents}
-                      title="Value of the cards inside (pull rates × card prices)">
+                    <!-- Coloured by price vs what the cards inside are worth (one scale for all packs). -->
+                    <span class="sub tone--{valueTone(o.price, o.contents)}"
+                      title="Value of the cards inside (pull rates × card prices). Green: price under it; yellow to red: over">
                       {o.premium ? `⚠ ${(o.price / o.contents).toFixed(1)}× contents` : `contents ${money(o.contents)}`}
                     </span>
                   {/if}
@@ -240,8 +240,6 @@
   .offers tr.soldout td { color: var(--color-text-muted); }
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
-  .sub.warn { color: var(--color-danger); }
-  .sub.good { color: var(--color-success); }
   .more { background: none; border: none; padding: 0; margin-top: 0.15rem; font: inherit; font-size: 0.72rem; color: var(--color-accent); cursor: pointer; }
   .others { list-style: none; margin: 0.2rem 0 0; padding: 0; font-size: 0.75rem; color: var(--color-text-muted); }
   .others li { padding: 0.1rem 0; }

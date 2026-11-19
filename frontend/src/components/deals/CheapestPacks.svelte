@@ -125,7 +125,7 @@
               <td class="num">{t ? pct(t.change30) : '—'}</td>
               <td class="num">
                 {#if evText(r)}
-                  <span class="ev ev--{contentsTone(r)}" title="Green: the price is at or under what the cards inside are worth; red: over">{evText(r)!.value}</span>{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
+                  <span class="ev tone--{contentsTone(r)}" title="Price vs what the cards inside are worth: green under, plain about equal, yellow to red over">{evText(r)!.value}</span>{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
                 {:else}—{/if}
               </td>
               <td>{#if t}<Sparkline values={t.spark} />{/if}</td>
@@ -220,6 +220,4 @@
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
-  .ev--good { color: var(--color-success); }
-  .ev--over { color: var(--color-danger); }
 </style>

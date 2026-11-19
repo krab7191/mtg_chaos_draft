@@ -49,7 +49,7 @@ describe('StoreDeals', () => {
     expect(container.querySelector('tbody')?.textContent).toContain('29% under');
     expect(container.querySelector('tbody')?.textContent).toContain('contents $31.00');
     // $40 for $31 of cards: red. Under the contents would be green.
-    expect(Array.from(container.querySelectorAll('tbody .sub')).find(e => e.textContent?.includes('contents $31.00'))?.classList.contains('warn')).toBe(true);
+    expect(Array.from(container.querySelectorAll('tbody .sub')).find(e => e.textContent?.includes('contents $31.00'))?.classList.contains('tone--higher')).toBe(true);
     expect(container.querySelector('tbody a')?.getAttribute('href')).toBe('https://x/1');
     // The store's own name, then what it's priced against.
     expect(container.querySelector('tbody td.name')?.textContent).toContain('Set 1 Draft Booster Pack');
@@ -149,7 +149,7 @@ describe('StoreDeals filters', () => {
     await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']));
     expect(Array.from(container.querySelectorAll('.langs label')).map(l => l.textContent?.trim()))
       .toEqual(['English', 'Italian', 'Japanese']);
-    expect(Array.from(container.querySelectorAll('tbody .sub')).find(e => e.textContent?.includes('contents $6.00'))?.classList.contains('good')).toBe(true);
+    expect(Array.from(container.querySelectorAll('tbody .sub')).find(e => e.textContent?.includes('contents $6.00'))?.classList.contains('tone--great')).toBe(true);
     await act(() => fireEvent.click(checkbox(container, 'Japanese')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);
     const max = container.querySelector('.maxprice input') as HTMLInputElement;

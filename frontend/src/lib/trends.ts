@@ -232,11 +232,27 @@ export function evText(r: TrendRow): { value: string; change: string | null } | 
   return { value: money(r.ev.value), change };
 }
 
-/** 'good' when the row's price is at or under its contents value, 'over' when above; null if unknown. */
-export function contentsTone(r: TrendRow): 'good' | 'over' | null {
-  const price = r.trend?.current ?? r.marketPrice;
-  if (!r.ev || price == null) return null;
-  return price <= r.ev.value ? 'good' : 'over';
+/** How a price compares with what the cards inside are worth, the same scale
+ *  for every pack (so a colour always means the same thing): great (20%+
+ *  under) · good (2–20% under) · even (within 2%) · high (2–25% over) ·
+ *  higher (25%–2×) · highest (over 2×). Collector packs mostly land in the
+ *  orange and red: they usually sell well above their cards. */
+export type ValueTone = 'great' | 'good' | 'even' | 'high' | 'higher' | 'highest';
+
+export function valueTone(price: number | null | undefined, contents: number | null | undefined): ValueTone | null {
+  if (price == null || !contents || contents <= 0) return null;
+  const r = price / contents;
+  if (r < 0.8) return 'great';
+  if (r < 0.98) return 'good';
+  if (r <= 1.02) return 'even';
+  if (r <= 1.25) return 'high';
+  if (r <= 2) return 'higher';
+  return 'highest';
+}
+
+/** A trends row's price against its contents value; null if unknown. */
+export function contentsTone(r: TrendRow): ValueTone | null {
+  return valueTone(r.trend?.current ?? r.marketPrice, r.ev?.value);
 }
 
 /** Below this many packs, an alert notes how many you have. */

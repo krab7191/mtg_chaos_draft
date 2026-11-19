@@ -41,6 +41,14 @@
   const rows = $derived(data ? filterRows(data.products, kind, show) : []);
   const alerting = $derived(data ? data.products.filter(r => r.alerts.length > 0) : []);
   const alertGroups = $derived(groupBySet(alerting));
+  const ALERTS_OPEN_KEY = 'trendsAlertsOpen';
+  let alertsOpen = $state((() => {
+    try { return localStorage.getItem(ALERTS_OPEN_KEY) !== 'false'; } catch { return true; }
+  })());
+  function rememberAlertsOpen(isOpen: boolean) {
+    alertsOpen = isOpen;
+    try { localStorage.setItem(ALERTS_OPEN_KEY, String(isOpen)); } catch { /* private mode: not remembered */ }
+  }
   // Leave "Needs a look" once nothing alerts (its button is hidden then).
   $effect(() => { if (show === 'alerting' && alerting.length === 0) show = 'all'; });
   const th = $derived(data?.thresholds);
@@ -196,11 +204,14 @@
 
 <!-- ── Alerts ─────────────────────────────────────────────── -->
 {#if alerting.length > 0}
-  <section class="alerts" aria-label="Alerts">
-    <h2 class="alerts__title">
-      ◆ {alerting.length} watched {alerting.length === 1 ? 'product' : 'products'}{alertGroups.length > 1 ? ` in ${alertGroups.length} sets` : ''}
-      {alerting.length === 1 ? 'needs' : 'need'} a look
-    </h2>
+  <!-- Collapsible (it gets long); open or closed is remembered in this browser. -->
+  <details class="alerts" aria-label="Alerts" open={alertsOpen} ontoggle={e => rememberAlertsOpen(e.currentTarget.open)}>
+    <summary class="alerts__summary">
+      <h2 class="alerts__title">
+        ◆ {alerting.length} watched {alerting.length === 1 ? 'product' : 'products'}{alertGroups.length > 1 ? ` in ${alertGroups.length} sets` : ''}
+        {alerting.length === 1 ? 'needs' : 'need'} a look
+      </h2>
+    </summary>
     {#each alertGroups as g (g.setName)}
       <h3 class="alerts__set">{g.setName}</h3>
       <ul>
@@ -215,7 +226,7 @@
         {/each}
       </ul>
     {/each}
-  </section>
+  </details>
 {/if}
 
 <!-- ── Filters ────────────────────────────────────────────── -->
@@ -317,7 +328,7 @@
             <td class="num">{t ? pct(t.change30) : '—'}</td>
             <td class="num">
               {#if evText(r)}
-                <span class="ev ev--{contentsTone(r)}" title="Green: the price is at or under what the cards inside are worth; red: over">{evText(r)!.value}</span>{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
+                <span class="ev tone--{contentsTone(r)}" title="Price vs what the cards inside are worth: green under, plain about equal, yellow to red over">{evText(r)!.value}</span>{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
               {:else}—{/if}
             </td>
             <td>
@@ -405,7 +416,9 @@
       <li><strong>Contents</strong>: what the cards inside a pack are worth on average (for a box, its packs' value added up), from MTGJSON's pull rates
         and TCGplayer card prices, and how that moved over 2 weeks. When the cards are heating up (spoilers, new decks),
         packs have tended to follow over the next few weeks; when they cool off, waiting tends to pay. In a 90-day test the
-        effect was a few percent, so it's a hint, not an alert. Collector packs sell well above their contents.</li>
+        effect was a few percent, so it's a hint, not an alert. Its colour compares the price with the contents, on one scale
+        for every pack: dark green 20%+ under, light green 2–20% under, plain within 2%, yellow up to 25% over, orange up to
+        2×, red over 2×. Collector packs are mostly orange or red: they usually sell well above their cards.</li>
       <li>Not tracked here: Jumpstart (casual half-decks, not drafted) and sleeved retail packs (gone weeks after
         release). Both can still be added to the collection.</li>
       <li><strong>▼ New low</strong> (watched products): the week's median price broke at least 2% below its previous low,
@@ -454,7 +467,9 @@
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
   }
-  .alerts__title { font-size: 0.95rem; margin: 0 0 0.4rem; }
+  .alerts__summary { cursor: pointer; }
+  .alerts__title { display: inline; font-size: 0.95rem; margin: 0; }
+  .alerts[open] .alerts__summary { margin-bottom: 0.4rem; }
   .alerts ul { margin: 0 0 0.35rem; padding-left: 1.1rem; font-size: 0.85rem; }
   .alerts__set { font-size: 0.85rem; font-weight: 600; margin: 0.5rem 0 0.15rem; }
   .stock-note {
@@ -518,6 +533,4 @@
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
 
-  .ev--good { color: var(--color-success); }
-  .ev--over { color: var(--color-danger); }
 </style>
