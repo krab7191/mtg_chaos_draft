@@ -14,9 +14,13 @@
     title: string;
   } = $props();
 
-  const W = 720, H = 220;
+  // Drawn at the chart's real width, so text stays its normal size on a
+  // phone instead of shrinking with the whole picture.
+  let boxWidth = $state(0);
+  const W = $derived(Math.max(280, Math.round(boxWidth || 720)));
+  const H = $derived(W < 500 ? 200 : 220);
   const M = { top: 12, right: 12, bottom: 24, left: 52 };
-  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const iw = $derived(W - M.left - M.right), ih = $derived(H - M.top - M.bottom);
 
   const DAY = 86_400_000;
   const all = $derived(points.map(p => ({ t: new Date(p.day).getTime(), v: p.price })));
@@ -74,10 +78,13 @@
         });
       }
     }
+    // Keep month labels at least ~64px apart on narrow charts.
+    const every = Math.max(1, Math.ceil((xticks.length * 64) / iw));
+    const shownTicks = xticks.filter((_, i) => i % every === 0);
     const path = data.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
     // Whole dollars once ticks are a dollar or more apart.
     const tickLabel = (v: number) => `$${step >= 1 ? v.toFixed(0) : v.toFixed(2)}`;
-    return { x, y, ticks, xticks, path, t0, t1, tickLabel, lo, hi };
+    return { x, y, ticks, xticks: shownTicks, path, t0, t1, tickLabel, lo, hi };
   });
 
   function niceStep(raw: number): number {
@@ -117,7 +124,7 @@
   const releasedT = $derived(released ? new Date(released).getTime() : null);
 </script>
 
-<figure class="chart">
+<figure class="chart" bind:clientWidth={boxWidth}>
   <figcaption class="chart__head">
     <span class="chart__title">{title}</span>
     {#if ranges.length > 1}

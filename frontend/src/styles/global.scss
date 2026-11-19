@@ -25,6 +25,9 @@ body {
   font-family: var(--font);
   min-height: 100vh;
   line-height: 1.5;
+  /* Never let stray content widen the page past the screen: on phones that
+     zooms everything out and opens the menu off-screen. */
+  overflow-x: clip;
 }
 
 a {

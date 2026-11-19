@@ -327,17 +327,19 @@
           {#if open === r.mtgstocksId}
             <tr class="detail">
               <td colspan={canEdit ? 8 : 7}>
-                {#if history[r.mtgstocksId]}
-                  <PriceChart
-                    points={history[r.mtgstocksId]}
-                    released={r.releasedAt}
-                    low={t?.low ?? null}
-                    perPackDivisor={r.packsPerBox ?? 1}
-                    title="{r.setName} {kindLabel(r)}: daily market price"
-                  />
-                {:else}
-                  <p class="note">Loading history…</p>
-                {/if}
+                <div class="detail__inner">
+                  {#if history[r.mtgstocksId]}
+                    <PriceChart
+                      points={history[r.mtgstocksId]}
+                      released={r.releasedAt}
+                      low={t?.low ?? null}
+                      perPackDivisor={r.packsPerBox ?? 1}
+                      title="{r.setName} {kindLabel(r)}: daily market price"
+                    />
+                  {:else}
+                    <p class="note">Loading history…</p>
+                  {/if}
+                </div>
               </td>
             </tr>
           {/if}
@@ -434,7 +436,9 @@
   .phone code { font-size: 0.78rem; }
   .link--btn { color: var(--color-accent); margin-left: 0.4rem; }
 
-  .table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius); }
+  /* position: relative keeps absolutely positioned bits (screen-reader labels) inside the
+     scroll box; otherwise they sit at the table's full width and widen the page on phones. */
+  .table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius); }
   .trends { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
   .trends th {
     text-align: left; font-size: 0.72rem; font-weight: 500; color: var(--color-text-muted);
@@ -457,12 +461,18 @@
   .watch__all { display: inline-flex; gap: 0.35rem; align-items: center; cursor: pointer; }
   .watch__drop input { width: 3.6rem; font: inherit; font-size: 0.8rem; }
   .detail td { background: var(--color-bg); padding: 0.75rem 1rem 1rem; white-space: normal; }
+  /* On a phone the table is wider than the screen: keep the chart screen-wide
+     and in view while the table scrolls sideways. */
+  .detail__inner { position: sticky; left: 1rem; max-width: calc(100vw - 4.25rem); }
 
   .explain { margin-top: 1rem; font-size: 0.85rem; color: var(--color-text-muted); }
   .explain summary { cursor: pointer; }
   .explain ul { padding-left: 1.1rem; }
 
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
 
   /* Price line color for the charts (a calm blue, distinct from signal colors). */
   :global(:root) { --chart-line: #7aa2f7; }
