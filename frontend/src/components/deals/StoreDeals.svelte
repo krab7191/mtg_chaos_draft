@@ -168,7 +168,9 @@
                 <td class="num">
                   {money(o.price)}
                   {#if o.contents}
-                    <span class="sub" class:warn={o.premium} title="Value of the cards inside (pull rates × card prices)">
+                    <!-- Green: the price is at or under what the cards inside are worth; red: over. -->
+                    <span class="sub" class:warn={o.price > o.contents} class:good={o.price <= o.contents}
+                      title="Value of the cards inside (pull rates × card prices)">
                       {o.premium ? `⚠ ${(o.price / o.contents).toFixed(1)}× contents` : `contents ${money(o.contents)}`}
                     </span>
                   {/if}
@@ -239,6 +241,7 @@
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
   .sub.warn { color: var(--color-danger); }
+  .sub.good { color: var(--color-success); }
   .more { background: none; border: none; padding: 0; margin-top: 0.15rem; font: inherit; font-size: 0.72rem; color: var(--color-accent); cursor: pointer; }
   .others { list-style: none; margin: 0.2rem 0 0; padding: 0; font-size: 0.75rem; color: var(--color-text-muted); }
   .others li { padding: 0.1rem 0; }
