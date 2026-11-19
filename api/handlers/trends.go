@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,15 +25,17 @@ import (
 // ── Recording ─────────────────────────────────────────────────
 
 // trackedProducts are the products whose prices are recorded: single packs
-// (one per set and pack type, not sleeved) and booster boxes.
+// (one per set and pack type) and booster boxes. Left out: sleeved packs
+// (can't be hunted down after release weeks) and Jumpstart (casual
+// half-decks, not drafted; their noisy prices would skew the floor rules).
 func trackedProducts(c *catalog) []SearchResult {
 	out := make([]SearchResult, 0, len(c.products)+len(c.boxes))
-	for _, p := range c.products {
-		if !isSleeved(p) { // can't be hunted down after release weeks
+	for _, p := range append(slices.Clip(c.products), c.boxes...) {
+		if !isSleeved(p) && !isJumpstart(p.SetName, p.ProductType) {
 			out = append(out, p)
 		}
 	}
-	return append(out, c.boxes...)
+	return out
 }
 
 // recordDailyPrices stores today's prices from a live catalog. Saved or

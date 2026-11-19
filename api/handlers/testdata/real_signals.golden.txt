@@ -12,7 +12,6 @@ Innistrad Remastered | Collector Booster | pnnsrddFFrrdrsssrsrrsrr
 Innistrad Remastered | Play Booster | pnnrsssrsrssssrdrrssrrs
 Foundations | Collector Booster | ppnnrsrsddssrrsdrrrssrrrrss
 Foundations | Play Booster | pnsss!sdrdsssrrdrssdssrsrs
-Foundations | Jumpstart Booster | nnd!ssssFFFsssF!FFFrsssrssd
 Bloomburrow | Collector Booster | pnnd!rrrrrrssrrrrsdsrrsssrsrrr
 Bloomburrow | Play Booster | nnsd!rsrsrssddsrrrrddddrrrsrs
 Modern Horizons 3 | Collector Booster | pndrd!sFsssssssrsrsdrssrrssrrss
@@ -35,7 +34,6 @@ Commander Masters | Draft Booster | pnddrrssrrsssssssssssssdsdrrssrrrrsssss
 Commander Masters | Set Booster | ppppndrrrssdrssdrdssssrssrrrssrrrrrdssssss
 The Lord of the Rings: Tales of Middle-earth | Collector Booster | pppnnsssssrsrrssrrrrsssrsrsrrsrrssssrrrrsss
 The Lord of the Rings: Tales of Middle-earth | Draft Booster | pnnrrddrsssssrssssrsrdsdsssrrrssrrssrrdds
-The Lord of the Rings: Tales of Middle-earth | Jumpstart Booster | sdrdF!Frrrsddrsrsrssrsssrrrsssrrrssss
 The Lord of the Rings: Tales of Middle-earth | Set Booster | ppnnrdrd!rssrdsrrsdrssrsddrsrrrrssrdsrrssdd
 Dominaria Remastered | Collector Booster | pnds!rsssFFFF!FFFFsdFFssrssrrsrssrrrdrrsssrsssss
 Dominaria Remastered | Draft Booster | pnddsd!rsssssF!srrdssssrdssssrsssssrrsdsrrssrssr
@@ -49,21 +47,16 @@ March of the Machine: The Aftermath | Collector Booster | pnsd!d!d!Frsssssssssdr
 March of the Machine: The Aftermath | Epilogue Booster Pack | pnssssd!Fsssrsssrssrsssssrssssssssssssssrrs
 March of the Machine | Collector Booster | pnnsds!FdFFrrrsssssdrsssrssssrrrssrrrsssrrrr
 March of the Machine | Draft Booster | pnnd!rrssssddFrsssrrsssssssssrsssssssssssssr
-March of the Machine | Jumpstart Booster | pnnd!ds!s!F!FF!F!FFssssssrsrrsrsrssrsrrrrrsssssss
 March of the Machine | Set Booster | pppnnd!rssd!rsssssssssdsssrsssrrssrrrsssssrssss
 Phyrexia: All Will Be One | Collector Booster | pnnssd!F!FFsrsFrrrrsdrrrrrrsrsssssrrrrsssrrsrss
 Phyrexia: All Will Be One | Draft Booster | ppnsd!srrrsdssssdrsssssssssdsssssrsssrsrrrrrrss
 Phyrexia: All Will Be One | Set Booster | ppnndsssrrdrrsssssrsrssrdddrssssdsssrsrrrsrrrr
-Phyrexia: All Will Be One | Jumpstart Booster | ndd!d!ssssssssssssssrsrrsssssssssssssssrssssss
-Jumpstart 2022 | Booster Pack | nnsd!ssssrsssssssssssssssssssssssssrssrsrssdsss
 The Brothers' War | Collector Booster | pnndssssssdd!FssF!Frsssssrrsdrssrsrrrrrrsssssrrrss
 The Brothers' War | Draft Booster | pnsd!d!d!ssssssssssssssssrrsdrrsssssrssrrsrsssrrrr
 The Brothers' War | Set Booster | nnd!d!rdrssssrssssssssssssssssrdsrsrrrrdrrsssrsrs
-The Brothers' War | Jumpstart Booster | pnrssssssdsFF!FFsssFFrsrrssssssddsssrrssssssssrr
 Dominaria United | Collector Booster | pndsss!FFsFFF!F!F!FFsssrrsdsssrrsdrrsssrssrrsssssrrsss
 Dominaria United | Draft Booster | pndsd!ssrsssFFFrssssssssssssssssrsssssdrsssrsrrssrs
 Dominaria United | Set Booster | pndssssssssdFrsrssrssssssrrsdssssssrsrssssrrssrrrr
-Dominaria United | Jumpstart Booster | pnss!d!ds!FFFFFFFFFFFFsssssssrrsssrrsssssssssssssssss
 Double Masters 2022 | Collector Booster | pnsdsdFFF!FFrsdsssdF!Frsssrrssssssssssssssssssrsrrrsss
 Double Masters 2022 | Draft Booster | pndd!dsrdFrrsssssssssssdsssssdsssssrrsssrrrssrsrsrrss
 Commander Legends: Battle for Baldur's Gate | Collector Booster | nnsss!F!FF!F!Fssrsssddrrsssrrssssrssrssrsssssrsrrrsrssrr
@@ -103,7 +96,6 @@ Zendikar Rising | Collector Booster | srsssrrrsssssssssssddsrssssddsrsdsrsssssss
 Zendikar Rising | Draft Booster | sdrrsddssdssssssssssrsrsssdsssssssrsssssdrssrrrssssrdsssssrssrss
 Zendikar Rising | Set Booster | sssssd!ssrrrddssssssssrssssssssrssssssrsssssssssssssrsssssssrrrss
 Double Masters | Booster Pack | srsrrssdrrrsssddsssssdssssdsssssssrsssssssssssssssrsrssssssssrss
-Jumpstart | Booster Pack | sddssF!F!FFsssssssF!FssssFFFFsssFrsrrsssrdssssssssrssssssssssrssssr
 Core 2021 | Collector Booster | srsssdFrrsssssssssrsdsssssssssssssssssssssssssssssrrrrrsssssssss
 Core 2021 | Booster Pack | ssssss!ssssssrssssrdsrssssssssssdsssssssssssssdsrssssrsssssssrrss
 Ikoria: Lair of Behemoths | Collector Booster | sssssF!sssssrssdssssssrsssssdFF!Frrrsrssssrsssssrssssdrsrrrsrsrsrs
@@ -130,7 +122,6 @@ Innistrad Remastered | Collector Booster Box | pnnd!ssFrrsssssrrrsssrss
 Innistrad Remastered | Play Booster Box | pnnsd!ssssrrsrsrrdrrrrss
 Foundations | Collector Booster Box | pppnrsrrsdssrrsdrrrrsssrrss
 Foundations | Play Booster Box | pppnssrsddsssrsrrssdssrsrss
-Foundations | Jumpstart Booster Box | pppndsd!sssssssFrssssssssrrs
 Bloomburrow | Collector Booster Box | pppnsrrsrrrrsrrrrdsdrrsssrrrrss
 Bloomburrow | Play Booster Box | pppnss!ssrdsssdssrssrsdssssrsrss
 Modern Horizons 3 | Collector Booster Box | pnndssssssssssrrssdssrrsrsrrsss
@@ -152,7 +143,6 @@ Commander Masters | Collector Booster Box | pppppnrdrrdrsrssrssdrsrsrsrrdssssrrs
 Commander Masters | Draft Booster Box | pppppnsd!rssrrsssssssssssssssssrrrsrrrssssss
 The Lord of the Rings: Tales of Middle-earth | Collector Booster Box | sdFFrrrrrrrrrddsrrssrrrsssssrsrrrsrs
 The Lord of the Rings: Tales of Middle-earth | Draft Booster Box | pppnndsdsrrssrssssrssdrsrsrrrrrsssrrssrrsss
-The Lord of the Rings: Tales of Middle-earth | Jumpstart Booster Box | sdd!F!rsrrssssrrsrrrrssssssrrrrrsssrss
 The Lord of the Rings: Tales of Middle-earth | Set Booster Box | pppnnssdsrssssrsrdssrrdrdssrrrsrrrssrrssdds
 Dominaria Remastered | Collector Booster Box | ppndrsdd!rsd!d!rdrrsssssssrrssrrsrrssrrsssrrrsrsss
 Dominaria Remastered | Draft Booster Box | ppnnssd!dFsF!FFsssssrsdrsrsssrsrssrsrsssrrsrsssss
@@ -167,20 +157,15 @@ March of the Machine: The Aftermath | Booster Box | pnsd!d!sd!sdrrrddsrrsrrssssr
 March of the Machine | Collector Booster Box | ppndssd!Fd!rrrrsssssssrsrrrrsrrssssrrssrsrrss
 March of the Machine | Set Booster Box | ppnnsdd!d!F!rssrsdrrssdrsssssssrsrrsssssrrrrrsd
 March of the Machine | Draft Booster Box | ppndssdFsFFrrsrsssssssdssrsrsssssrrrssrrsrs
-March of the Machine | Jumpstart Booster Box | pnnsssd!F!FFF!Fsssrssrrssssssssrrsssssrrrrssrs
 Phyrexia: All Will Be One | Collector Booster Box | pppnssd!sFFFsd!rrrsrsssrssrssrrdrrrrsrrrssssrrrss
 Phyrexia: All Will Be One | Set Booster Box | pppnsd!ssrdsssssssrdssssdrdsssrsdsrssrrrrsrrrsss
 Phyrexia: All Will Be One | Draft Booster Box | pppnsd!sssd!rsssssrsssssssrssdsrrsssrssrrrssrrsrs
-Phyrexia: All Will Be One | Jumpstart Booster Box | pnnssssFFF!FF!F!srrrrssssrrssssssssssrrrrsssrsrs
-Jumpstart 2022 | Booster Box | pnndsrsdsddrdFrrsssssssssssssssrrssrrrsssrsdsss
 The Brothers' War | Collector Booster Box | pnnss!srssFFFFFF!Frsssssssdrssrrssrsrrssssssrrrrss
 The Brothers' War | Set Booster Box | ppnrdsssssd!sssd!rdrrrssssssssssrssrdrrrsrsssrrrsss
 The Brothers' War | Draft Booster Box | ppnrdssdsssFrsF!Frrssssrsssrsssrsrsssssrrrsssrrss
-The Brothers' War | Jumpstart Booster Box | pnsssrsdd!FF!FFF!rssdrdsrsrrrrsssssssssrsssssrsssss
 Dominaria United | Collector Booster Box | pnsd!s!d!F!FsdFFFFFsdrrsssssssrssssrsssrsssssrrsssrrss
 Dominaria United | Set Booster Box | pnds!ssssdF!rdrsssssrsdrrssssrsdssssssssrrsrrrrsdsrs
 Dominaria United | Draft Booster Box | pnsd!sssssssdFF!rssssrdrrssssrsssssssssdrrsssrrrrsss
-Dominaria United | Jumpstart Booster Box | pnds!dsd!rrdsssF!rFsrssrssssssrrssssssssssssrssssssrs
 Double Masters 2022 | Draft Booster Box | pnnssd!sssssssFFFFFF!rsssrsssssrssssrsssssssrrrsssssss
 Double Masters 2022 | Collector Booster Box | pnnsdd!F!FFFFsssFFF!F!FFrrsrsssssrsdssrsssssssssrsrrrsss
 Commander Legends: Battle for Baldur's Gate | Collector Booster Box | ppndd!d!ssdrsssssssssdrssrrssssrssssrrssrrsssrdrrrrrssss
@@ -220,7 +205,6 @@ Zendikar Rising | Collector Booster Box | ssrssrsrssssdsssssdssrrdsssdFF!FFrssss
 Zendikar Rising | Set Booster Box | sssssssssssssssssssrssssdrrsdssssssdsssssrsssssssrssrssrrssssrss
 Zendikar Rising | Draft Booster Box | srssssssssssssssssd!rssdsdssssFrrrssssssssssrrssssrrsdsssrssssrrs
 Double Masters | Booster Box | srrsssdrrrrdsssssssssssssssssssssrsssssssssssssssrssssssssssssss
-Jumpstart | Booster Box | FFssFF!rFsF!FFF!rssssrsdssdFrsFFF!srssssssssrsrsssssssssrrdrrdssrsss
 Core 2021 | Collector Booster Box | sFFFsssssssrsssssssssssssssdFFFFFFrssssssssssrsrrssddssrsssrrsss
 Core 2021 | Booster Box | ssrssssssssrsssssdsssrsdssssssdrrsssdssssssssdsrsssssrsrssssssss
 Ikoria: Lair of Behemoths | Collector Booster Box | FFFFd!rFsssssssssssssssrsssssF!FFrrssssssssrssssssrrsssssrssrrrrss
@@ -235,7 +219,6 @@ War of the Spark | Booster Box | ssssssssssssdsrsssdssd!sd!ssrsF!FFrsddrFrssrsss
 Ravnica Allegiance | Booster Box | sssssssssssrssssssdssssssss!ssd!ssssssF!ssssssssssssssrssssssssssss
 Marvel Super Heroes | Collector Booster | pppnnd!sss
 Marvel Super Heroes | Play Booster | ppnndsss
-Marvel Super Heroes | Jumpstart Booster | nnrdsd
 Secrets of Strixhaven | Collector Booster | ppnsrsrss
 Secrets of Strixhaven | Play Booster | ppnsdssss
 Lorwyn Eclipsed | Collector Booster | pppnnsssssssr
@@ -246,12 +229,10 @@ Edge of Eternities | Collector Booster | pppndssrsssrrsrrrss
 Edge of Eternities | Play Booster | ppppnnrrrsddrrssssrs
 Avatar: The Last Airbender | Collector Booster | pppnsdssFsrrsss
 Avatar: The Last Airbender | Play Booster | pppndsrdrsdsdsd
-Avatar: The Last Airbender | Jumpstart Booster | pppndsddd!sF!Frrs
 Teenage Mutant Ninja Turtles | Collector Booster | pppnsrssF!rs
 Teenage Mutant Ninja Turtles | Play Booster | ppppnndsd!rdds
 Marvel Super Heroes | Collector Booster Box | ppppnssss
 Marvel Super Heroes | Play Booster Box | ppppnsdd!s!
-Marvel Super Heroes | Jumpstart Booster Box | pppnrdsd!d
 Secrets of Strixhaven | Collector Booster Box | ppnnsrsss
 Secrets of Strixhaven | Play Booster Box | ppnnsssss
 Lorwyn Eclipsed | Collector Booster Box | pppnnssdFrsss
@@ -262,10 +243,9 @@ Edge of Eternities | Collector Booster Box | pppppnssssrrrrssrrsss
 Edge of Eternities | Play Booster Box | pppppnsrrdsdssdsrrrss
 Avatar: The Last Airbender | Collector Booster Box | pppnssssFFrrsss
 Avatar: The Last Airbender | Play Booster Box | pppndsdsssssssd
-Avatar: The Last Airbender | Jumpstart Booster Box | pppnddrdssdrsrs
 Teenage Mutant Ninja Turtles | Collector Booster Box | ppppnndrsssss
 Teenage Mutant Ninja Turtles | Play Booster Box | ppppnnd!rsrsds
 
 # Backtest of the default rules over these histories.
-regular: judged 114, fires 47%, within 5% 44%, within 10% 52%, median 8.8% above the low, false floors 46%
+regular: judged 100, fires 42%, within 5% 48%, within 10% 55%, median 6.4% above the low, false floors 43%
 collector: judged 73, fires 58%, within 5% 26%, within 10% 45%, median 13.1% above the low, false floors 52%

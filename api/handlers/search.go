@@ -102,6 +102,13 @@ const sleevedLabel = "Sleeved "
 // isSleeved reports whether a product is a sleeved retail pack.
 func isSleeved(p SearchResult) bool { return strings.HasPrefix(p.ProductType, sleevedLabel) }
 
+// isJumpstart reports whether a product is a Jumpstart pack or box: 20-card
+// themed half-decks for casual play, not drafted. "Jumpstart Booster" in most
+// sets; the original Jumpstart sets list plain "Booster Pack"/"Booster Box".
+func isJumpstart(setName, productType string) bool {
+	return strings.Contains(productType, "Jumpstart") || strings.HasPrefix(setName, "Jumpstart")
+}
+
 func deriveProductType(p msProduct) (string, bool) {
 	nameLower := strings.ToLower(p.Name)
 	w := words(nameLower)

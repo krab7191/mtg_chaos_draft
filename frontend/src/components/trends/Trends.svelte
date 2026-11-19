@@ -359,6 +359,8 @@
         within 5% of the low and ~50% within 10% (median ~10% above it); waiting a fixed 3 months lands within 5% only ~6%
         of the time for boxes. Collector: ~26% within 5%. It's a strong hint, not a guarantee. Watched products that hit
         a floor raise an alert.</li>
+      <li>Not tracked here: Jumpstart (casual half-decks, not drafted) and sleeved retail packs (gone weeks after
+        release). Both can still be added to the collection.</li>
       <li><strong>▼ New low</strong> (watched products): the week's median price broke at least 2% below its previous low,
         once a product has 2+ months of history. One cheap sale can't trigger it.</li>
       <li>The rules are re-tested every quarter on the latest price history; a clearly better rule is proposed here

@@ -73,6 +73,9 @@ func TestRealHistories(t *testing.T) {
 	b.WriteString("# p preorder, n new, F possible floor, d falling, r rising, s stable; ! = new low.\n")
 	byKind := map[string][]btProduct{}
 	for _, h := range hs {
+		if isJumpstart(h.Set, h.Type) {
+			continue // not tracked
+		}
 		pts := h.points()
 		rel := day(h.Released)
 		rule := defaultFloorRules[ruleKind(h.Type)]
@@ -157,5 +160,28 @@ func TestRealHistories_KnownCases(t *testing.T) {
 				t.Fatalf("%s %s: new low during preorder on %s", h.Set, h.Type, asOf.Format(time.DateOnly))
 			}
 		}
+	}
+}
+
+// Jumpstart and sleeved packs aren't tracked; draft packs and boxes are.
+func TestTrackedProducts_RealCatalog(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	tracked := trackedProducts(c)
+	boxes, jumpstartInCatalog := 0, 0
+	for _, p := range append(c.products, c.boxes...) {
+		if isJumpstart(p.SetName, p.ProductType) {
+			jumpstartInCatalog++
+		}
+	}
+	for _, p := range tracked {
+		if isJumpstart(p.SetName, p.ProductType) || isSleeved(p) {
+			t.Errorf("tracked: %s %s", p.SetName, p.ProductType)
+		}
+		if p.PacksPerBox > 0 {
+			boxes++
+		}
+	}
+	if jumpstartInCatalog < 15 || boxes < 50 || len(tracked) < 200 {
+		t.Errorf("jumpstart in catalog %d, tracked %d (%d boxes)", jumpstartInCatalog, len(tracked), boxes)
 	}
 }
