@@ -102,6 +102,20 @@ export function languagesIn(offers: StoreOffer[]): string[] {
   return [...set].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : (LANGUAGES[a] ?? a).localeCompare(LANGUAGES[b] ?? b)));
 }
 
+/** One pack's listings: the best one (first in the given order) and the rest. */
+export interface OfferGroup { best: StoreOffer; others: StoreOffer[] }
+
+/** Groups listings by pack, keeping the given order (best discount first). */
+export function groupByPack(offers: StoreOffer[]): OfferGroup[] {
+  const groups = new Map<number, OfferGroup>();
+  for (const o of offers) {
+    const g = groups.get(o.mtgstocksId);
+    if (g) g.others.push(o);
+    else groups.set(o.mtgstocksId, { best: o, others: [] });
+  }
+  return [...groups.values()];
+}
+
 export type OfferView = 'deals' | 'instock' | 'all';
 
 export function filterOffers(offers: StoreOffer[], view: OfferView): StoreOffer[] {
@@ -168,7 +182,6 @@ export function searchLinks(setName: string, productType: string, tcgUrl?: strin
     // Their packs section; no language filter, so foreign packs show too.
     { store: 'ABU Games', url: `https://abugames.com/magic-the-gathering/packs?search=${q}` },
     { store: 'CoolStuffInc', url: `https://www.coolstuffinc.com/main_search.php?pa=searchOnName&page=1&resultsPerPage=25&q=${q}` },
-    { store: 'Gamenerdz', url: `https://www.gamenerdz.com/search.php?search_query=${q}` },
     { store: 'Hareruya', url: `https://www.hareruyamtg.com/en/products/search?product=${q}` },
     { store: 'Cardmarket (EU)', url: `https://www.cardmarket.com/en/Magic/Products/Boosters/${cardmarketSlug(setName, productType)}` },
   ];

@@ -402,7 +402,7 @@
       <li><strong>↗ Climbing</strong>: a year or more after release, up 25%+ over the past year and not falling over the
         last 30 days. In tests such packs were higher 6 months later 85–93% of the time (median +16–26%), and only about
         1 in 10 dipped 10%+ below the price meanwhile: if you want one, waiting for a dip has rarely paid.</li>
-      <li><strong>Contents</strong> (packs): what the cards inside are worth on average, from MTGJSON's pull rates
+      <li><strong>Contents</strong>: what the cards inside a pack are worth on average (for a box, its packs' value added up), from MTGJSON's pull rates
         and TCGplayer card prices, and how that moved over 2 weeks. When the cards are heating up (spoilers, new decks),
         packs have tended to follow over the next few weeks; when they cool off, waiting tends to pay. In a 90-day test the
         effect was a few percent, so it's a hint, not an alert. Collector packs sell well above their contents.</li>

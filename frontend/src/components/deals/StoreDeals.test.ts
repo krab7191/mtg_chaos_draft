@@ -174,3 +174,29 @@ describe('StoreDeals filters', () => {
     expect(names(container)).toEqual(['Set 2', 'Set 3']);
   });
 });
+
+describe('StoreDeals grouping', () => {
+  it('shows one row per pack with its other listings on demand, and the first 25 packs', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => offer(i + 1));
+    const resp: OffersResponse = {
+      offers: [
+        offer(1, { store: 'Card Kingdom', url: 'https://ck/1', price: 30 }),
+        offer(1, { store: 'CardTrader', url: 'https://ct/1', price: 33, language: 'ja', discount: 0.2 }),
+        ...many.slice(1),
+      ],
+      stores: ['Card Kingdom', 'CardTrader'], watched: [], dealDiscount: 0.15,
+    };
+    const { container } = mount(resp);
+    await waitFor(() => expect(container.querySelectorAll('tbody td.name')).toHaveLength(25));
+    expect(container.textContent).toContain('Deals (30)'); // packs, not listings
+    const more = Array.from(container.querySelectorAll('.more')).find(b => b.textContent?.includes('+1 more listing'))!;
+    await act(() => fireEvent.click(more));
+    expect(container.querySelector('.others')?.textContent).toContain('CardTrader');
+    expect(container.querySelector('.others')?.textContent).toContain('Japanese');
+    expect(container.querySelector('.others')?.textContent).toContain('20% under');
+    await act(() => fireEvent.click(container.querySelector('.more')!)); // hide again
+    expect(container.querySelector('.others')).toBeNull();
+    await act(() => fireEvent.click(button(container, 'Show all 30')));
+    expect(container.querySelectorAll('tbody td.name')).toHaveLength(30);
+  });
+});

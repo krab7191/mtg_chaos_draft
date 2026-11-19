@@ -308,3 +308,42 @@ func TestWeeklyDaysAndOnOrBefore(t *testing.T) {
 		t.Errorf("before any price: %v", v)
 	}
 }
+
+// A box's contents are its packs' EV times packs per box.
+func TestBoxContents(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	var box, pack SearchResult
+	for _, p := range c.boxes {
+		if p.SetName == "Bloomburrow" && p.ProductType == "Play Booster Box" {
+			box = p
+		}
+	}
+	for _, p := range c.products {
+		if p.SetName == "Bloomburrow" && p.ProductType == "Play Booster" {
+			pack = p
+		}
+	}
+	if box.MTGStocksID == 0 || pack.MTGStocksID == 0 || box.PacksPerBox != 36 {
+		t.Fatalf("box %+v pack %+v", box, pack)
+	}
+	if got := boxPacks(c, []SearchResult{box, pack}); len(got) != 1 || got[box.MTGStocksID] != pack.MTGStocksID {
+		t.Errorf("box -> pack: %v", got)
+	}
+
+	// The box row shows 36 x the pack's EV, with the pack's 2-week change.
+	ctx := evDB(t)
+	pool := testhelper.Pool(t)
+	_ = db.RecordEV(ctx, pool, map[time.Time]map[int]float64{
+		day("2026-11-05"): {pack.MTGStocksID: 7},
+		day("2026-11-19"): {pack.MTGStocksID: 7.7},
+	})
+	h := NewTrendsHandler(pool)
+	rows, err := h.rows(ctx, c, []SearchResult{box}, nil, time.Time{}, day("2026-11-19"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := rows[0].EV
+	if ev == nil || math.Abs(ev.Value-36*7.7) > 1e-6 || ev.Change == nil || math.Abs(*ev.Change-0.1) > 1e-6 {
+		t.Errorf("box EV: %+v", ev)
+	}
+}

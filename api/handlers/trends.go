@@ -662,7 +662,13 @@ func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchR
 		return nil, err
 	}
 	deals := bestDeals(offers, c.products)
-	evs, err := db.LatestEV(ctx, h.pool, ids, evMomentumDays)
+	// A box's contents are its packs: the matching pack's EV × packs per box.
+	packOf := boxPacks(c, products)
+	evIDs := append([]int(nil), ids...)
+	for _, packID := range packOf {
+		evIDs = append(evIDs, packID)
+	}
+	evs, err := db.LatestEV(ctx, h.pool, evIDs, evMomentumDays)
 	if err != nil {
 		return nil, err
 	}
@@ -681,10 +687,33 @@ func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchR
 		row.Alerts = withDealAlert(row.Alerts, row.Watch, row.Deal, row.Stock)
 		if e, ok := evs[p.MTGStocksID]; ok {
 			row.EV = evInfo(e)
+		} else if e, ok := evs[packOf[p.MTGStocksID]]; ok && p.PacksPerBox > 0 {
+			info := evInfo(e) // the change is the pack's; the value scales
+			info.Value *= float64(p.PacksPerBox)
+			row.EV = info
 		}
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+// boxPacks maps each box among products to the single pack it holds (same
+// set, same kind: a Play Booster box to the Play Booster).
+func boxPacks(c *catalog, products []SearchResult) map[int]int {
+	packs := map[string]int{}
+	for _, p := range c.products {
+		packs[strings.ToLower(p.SetCode)+"|"+packKind(p.ProductType)] = p.MTGStocksID
+	}
+	out := map[int]int{}
+	for _, p := range products {
+		if p.PacksPerBox <= 0 {
+			continue
+		}
+		if id, ok := packs[strings.ToLower(p.SetCode)+"|"+packKind(p.ProductType)]; ok {
+			out[p.MTGStocksID] = id
+		}
+	}
+	return out
 }
 
 // cheapestLimit is how many packs the cheapest list shows.

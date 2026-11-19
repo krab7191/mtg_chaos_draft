@@ -5,7 +5,7 @@
   import { toast } from '../../lib/toast.svelte';
   import { money, pct } from '../../lib/trends';
   import {
-    filterOffers, applyFilters, languagesIn, searchLinks, languageLabel, LANGUAGES, NO_FILTERS,
+    filterOffers, applyFilters, languagesIn, groupByPack, searchLinks, languageLabel, LANGUAGES, NO_FILTERS,
     type OffersResponse, type OfferView, type StoreOffer, type OfferFilters,
   } from '../../lib/deals';
 
@@ -50,8 +50,13 @@
 
   const languages = $derived(data ? languagesIn(data.offers) : []);
   const filtered = $derived(data ? applyFilters(data.offers, filters) : []);
-  const rows = $derived(filterOffers(filtered, view));
-  const dealCount = $derived(filtered.filter(o => o.isDeal).length);
+  // One row per pack (its best listing), the first PAGE rows unless expanded.
+  const PAGE = 25;
+  let showAll = $state(false);
+  let openGroup = $state<number | null>(null);
+  const groups = $derived(groupByPack(filterOffers(filtered, view)));
+  const shown = $derived(showAll ? groups : groups.slice(0, PAGE));
+  const dealCount = $derived(groupByPack(filterOffers(filtered, 'deals')).length);
   const year = (iso: string) => iso.slice(0, 4);
   const packName = (o: StoreOffer) => (o.productType === 'Booster Pack' ? 'Booster Pack' : o.productType);
   /** The store's own name for it (CardTrader titles carry " · language · ships from …"). */
@@ -86,9 +91,9 @@
     <p class="note">No store listings yet: stores are read once a day, so check back tomorrow.</p>
   {:else}
     <div class="seg" role="group" aria-label="Show">
-      <button class:on={view === 'deals'} aria-pressed={view === 'deals'} onclick={() => (view = 'deals')}>Deals ({dealCount})</button>
-      <button class:on={view === 'instock'} aria-pressed={view === 'instock'} onclick={() => (view = 'instock')}>In stock</button>
-      <button class:on={view === 'all'} aria-pressed={view === 'all'} onclick={() => (view = 'all')}>All listings</button>
+      <button class:on={view === 'deals'} aria-pressed={view === 'deals'} onclick={() => { view = 'deals'; showAll = false; }}>Deals ({dealCount})</button>
+      <button class:on={view === 'instock'} aria-pressed={view === 'instock'} onclick={() => { view = 'instock'; showAll = false; }}>In stock</button>
+      <button class:on={view === 'all'} aria-pressed={view === 'all'} onclick={() => { view = 'all'; showAll = false; }}>All listings</button>
     </div>
 
     <div class="filters">
@@ -113,7 +118,7 @@
       </label>
     </div>
 
-    {#if rows.length === 0}
+    {#if groups.length === 0}
       <p class="note">{view === 'deals' ? 'No deals right now' : 'Nothing matches'} with these filters. Watch a pack to get an alert when a deal shows up.</p>
     {:else}
       <div class="table-wrap">
@@ -130,13 +135,31 @@
             </tr>
           </thead>
           <tbody>
-            {#each rows as o (o.store + o.url)}
+            {#each shown as g (g.best.mtgstocksId)}
+              {@const o = g.best}
               <tr class:deal={o.isDeal} class:soldout={!o.available}>
                 <td class="name">
                   <!-- What the store calls it, then what it's priced against, so a wrong match shows. -->
                   {listingName(o)}
                   {#if languageLabel(o.language)}<span class="lang">{languageLabel(o.language)}</span>{/if}
                   <span class="sub">priced as MTGStocks' {o.setName} {packName(o)} · {year(o.releasedAt)}</span>
+                  {#if g.others.length > 0}
+                    <button type="button" class="more" aria-expanded={openGroup === o.mtgstocksId}
+                      onclick={() => (openGroup = openGroup === o.mtgstocksId ? null : o.mtgstocksId)}>
+                      {openGroup === o.mtgstocksId ? 'Hide' : `+${g.others.length} more`} listing{g.others.length === 1 ? '' : 's'}
+                    </button>
+                    {#if openGroup === o.mtgstocksId}
+                      <ul class="others">
+                        {#each g.others as x (x.store + x.url)}
+                          <li>
+                            <a href={x.url} target="_blank" rel="noopener noreferrer">{x.store}</a>
+                            {#if languageLabel(x.language)}<span class="lang">{languageLabel(x.language)}</span>{/if}
+                            {money(x.price)} · {x.discount > 0 ? `${Math.round(x.discount * 100)}% under` : x.discount < 0 ? `${Math.round(-x.discount * 100)}% over` : 'at market'}{x.available ? '' : ' · sold out'}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  {/if}
                 </td>
                 <td>
                   <a href={o.url} target="_blank" rel="noopener noreferrer">{o.store}</a>
@@ -181,6 +204,9 @@
           </tbody>
         </table>
       </div>
+      {#if groups.length > shown.length}
+        <button type="button" class="show-all" onclick={() => (showAll = true)}>Show all {groups.length}</button>
+      {/if}
     {/if}
   {/if}
 </section>
@@ -213,6 +239,11 @@
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
   .sub.warn { color: var(--color-danger); }
+  .more { background: none; border: none; padding: 0; margin-top: 0.15rem; font: inherit; font-size: 0.72rem; color: var(--color-accent); cursor: pointer; }
+  .others { list-style: none; margin: 0.2rem 0 0; padding: 0; font-size: 0.75rem; color: var(--color-text-muted); }
+  .others li { padding: 0.1rem 0; }
+  .show-all { margin-top: 0.6rem; background: none; border: 1px solid var(--color-border); border-radius: var(--radius);
+    color: var(--color-text); font: inherit; font-size: 0.82rem; padding: 0.3rem 0.8rem; cursor: pointer; }
   .filters { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; margin-bottom: 0.8rem; font-size: 0.82rem; color: var(--color-text-muted); }
   .langs { border: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; align-items: center; }
   .langs legend { float: left; margin-right: 0.6rem; }
