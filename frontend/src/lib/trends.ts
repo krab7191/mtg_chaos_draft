@@ -232,6 +232,13 @@ export function evText(r: TrendRow): { value: string; change: string | null } | 
   return { value: money(r.ev.value), change };
 }
 
+/** 'good' when the row's price is at or under its contents value, 'over' when above; null if unknown. */
+export function contentsTone(r: TrendRow): 'good' | 'over' | null {
+  const price = r.trend?.current ?? r.marketPrice;
+  if (!r.ev || price == null) return null;
+  return price <= r.ev.value ? 'good' : 'over';
+}
+
 /** Below this many packs, an alert notes how many you have. */
 export const LOW_STOCK = 10;
 

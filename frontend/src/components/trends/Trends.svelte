@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, evText, filterRows, YEAR_OPTIONS, yearsLabel, windowFor, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
+    SIGNALS, evText, contentsTone, filterRows, YEAR_OPTIONS, yearsLabel, windowFor, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
   } from '../../lib/trends';
 
@@ -317,7 +317,7 @@
             <td class="num">{t ? pct(t.change30) : '—'}</td>
             <td class="num">
               {#if evText(r)}
-                {evText(r)!.value}{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
+                <span class="ev ev--{contentsTone(r)}" title="Green: the price is at or under what the cards inside are worth; red: over">{evText(r)!.value}</span>{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
               {:else}—{/if}
             </td>
             <td>
@@ -518,4 +518,6 @@
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
 
+  .ev--good { color: var(--color-success); }
+  .ev--over { color: var(--color-danger); }
 </style>

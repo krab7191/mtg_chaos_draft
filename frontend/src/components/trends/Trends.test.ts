@@ -166,6 +166,7 @@ describe('Trends page', () => {
     expect(container.querySelector('#trend-1')?.textContent).not.toContain('muted');
     // The value of the contents and its 2-week move.
     expect(container.querySelector('#trend-3')?.textContent).toContain('$43.20↓12% 2 wk');
+    expect(container.querySelector('#trend-3 .ev')?.classList.contains('ev--over')).toBe(true); // $120 for $43.20 of cards
 
     await act(() => fireEvent.click(button(container, 'Needs a look (2)')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);

@@ -3,7 +3,7 @@
   import { getJSON } from '../../lib/api';
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
-  import { money, pct, age, alertText, evText, type TrendRow, type PricePoint } from '../../lib/trends';
+  import { money, pct, age, alertText, evText, contentsTone, type TrendRow, type PricePoint } from '../../lib/trends';
   import { searchLinks } from '../../lib/deals';
   import Sparkline from '../trends/Sparkline.svelte';
   import PriceChart from '../trends/PriceChart.svelte';
@@ -125,7 +125,7 @@
               <td class="num">{t ? pct(t.change30) : '—'}</td>
               <td class="num">
                 {#if evText(r)}
-                  {evText(r)!.value}{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
+                  <span class="ev ev--{contentsTone(r)}" title="Green: the price is at or under what the cards inside are worth; red: over">{evText(r)!.value}</span>{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
                 {:else}—{/if}
               </td>
               <td>{#if t}<Sparkline values={t.spark} />{/if}</td>
@@ -220,4 +220,6 @@
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
+  .ev--good { color: var(--color-success); }
+  .ev--over { color: var(--color-danger); }
 </style>
