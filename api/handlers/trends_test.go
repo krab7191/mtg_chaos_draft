@@ -235,8 +235,11 @@ type fakeMTGStocks struct{ history string }
 
 func (f fakeMTGStocks) RoundTrip(r *http.Request) (*http.Response, error) {
 	body := fakeSetsJSON
-	if strings.HasSuffix(r.URL.Path, "/prices") {
+	switch {
+	case strings.HasSuffix(r.URL.Path, "/prices"):
 		body = f.history
+	case strings.HasPrefix(r.URL.Path, "/sealed/"): // one product (its TCGplayer link)
+		body = `{"id":1,"tcgUrl":"https://www.tcgplayer.com/product/5/pack"}`
 	}
 	return (&stubTransport{statusCode: 200, body: body}).RoundTrip(r)
 }
@@ -244,7 +247,8 @@ func (f fakeMTGStocks) RoundTrip(r *http.Request) (*http.Response, error) {
 func trendsDB(t *testing.T) context.Context {
 	t.Helper()
 	pool := testhelper.Pool(t)
-	testhelper.Truncate(t, pool, "price_history", "price_history_backfill", "price_watches")
+	testhelper.Truncate(t, pool, "price_history", "price_history_backfill", "price_watches", "store_offers", "product_links")
+	resetTCGLinks(t)
 	resetProductsCache()
 	t.Cleanup(resetProductsCache)
 	return context.Background()

@@ -40,6 +40,8 @@ type SearchResult struct {
 	MarketPrice *float64 `json:"marketPrice"`
 	// PacksPerBox is set only for booster boxes.
 	PacksPerBox int `json:"packsPerBox,omitempty"`
+	// TCGURL is the product's TCGplayer page, where known (cheapest packs).
+	TCGURL string `json:"tcgUrl,omitempty"`
 }
 
 var knownPackTypes = map[string]string{
@@ -182,6 +184,9 @@ func CheapestPacks(w http.ResponseWriter, r *http.Request) {
 	})
 	if len(priced) > 10 {
 		priced = priced[:10]
+	}
+	for i := range priced {
+		priced[i].TCGURL = tcgLink(priced[i].MTGStocksID)
 	}
 	if priced == nil {
 		priced = []SearchResult{}

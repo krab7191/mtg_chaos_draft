@@ -58,8 +58,14 @@ func sendNotification(ctx context.Context, title, message string) error {
 }
 
 // alertMessage words one alert for the phone.
-func alertMessage(p SearchResult, t *Trend, w *db.Watch, reason string) (title, body string) {
+func alertMessage(a watchedAlert, reason string) (title, body string) {
+	p, t, w := a.product, a.trend, &a.watch
 	name := p.SetName + " " + p.ProductType
+	if reason == AlertDeal && a.deal != nil {
+		d := a.deal
+		return "Deal: " + name,
+			fmt.Sprintf("$%.2f at %s, %.0f%% under TCG market ($%.2f). %s", d.Price, d.Store, d.Discount*100, d.MarketPrice, d.URL)
+	}
 	price := fmt.Sprintf("$%.2f", t.Current)
 	if p.PacksPerBox > 0 {
 		price += fmt.Sprintf(" ($%.2f/pack)", t.Current/float64(p.PacksPerBox))
@@ -82,6 +88,7 @@ type watchedAlert struct {
 	product SearchResult
 	trend   *Trend
 	watch   db.Watch
+	deal    *Deal // the best store deal, if any
 	alerts  []string
 }
 
@@ -117,6 +124,11 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 		return nil, err
 	}
 	stock := newStockIndex(collection)
+	offers, err := db.ListStoreOffers(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	deals := bestDeals(offers, c.products)
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	out := make([]watchedAlert, 0, len(picked))
 	for _, p := range picked {
@@ -126,7 +138,10 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 		}
 		w := watches[p.MTGStocksID]
 		t := summarize(history[p.MTGStocksID], released, today, ruleFor(p.ProductType))
-		out = append(out, watchedAlert{product: p, trend: t, watch: w, alerts: alertsFor(t, &w, stock.of(p))})
+		n := stock.of(p)
+		a := watchedAlert{product: p, trend: t, watch: w, deal: deals[p.MTGStocksID], alerts: alertsFor(t, &w, n)}
+		a.alerts = withDealAlert(a.alerts, &w, a.deal, n)
+		out = append(out, a)
 	}
 	return out, nil
 }
@@ -136,6 +151,9 @@ func alertLine(a watchedAlert, reason string) string {
 	t := a.trend
 	since := fmt.Sprintf("%+.0f%% since release", -t.DropFromRelease*100)
 	name := a.product.SetName + " " + a.product.ProductType
+	if reason == AlertDeal && a.deal != nil {
+		return fmt.Sprintf("$ %s: $%.2f at %s, %.0f%% under market", name, a.deal.Price, a.deal.Store, a.deal.Discount*100)
+	}
 	if reason == AlertNewLow {
 		return fmt.Sprintf("▼ %s: new low at $%.2f, below its previous low of $%.2f", name, t.Current, t.PrevLow)
 	}
@@ -175,7 +193,7 @@ func NotifyAlerts(ctx context.Context, pool *pgxpool.Pool) (int, error) {
 	delivered := len(news) == 0
 	switch {
 	case len(news) == 1:
-		title, body := alertMessage(news[0].a.product, news[0].a.trend, &news[0].a.watch, news[0].reason)
+		title, body := alertMessage(news[0].a, news[0].reason)
 		delivered = sendNotification(ctx, title, body) == nil
 	case len(news) > 1:
 		lines := make([]string, len(news))

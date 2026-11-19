@@ -67,6 +67,9 @@ func run(ctx context.Context, getenv func(string) string, viewerPath string) err
 	if err := handlers.LoadFloorRules(ctx, pool); err != nil {
 		log.Printf("floor rules: using defaults: %v", err)
 	}
+	if err := handlers.LoadProductLinks(ctx, pool); err != nil {
+		log.Printf("product links: %v", err)
+	}
 
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
@@ -265,6 +268,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Get("/api/trends", trendsHandler.List)
 			r.Get("/api/trends/{mtgstocksId}/history", trendsHandler.History)
 			r.Get("/api/cheapest", handlers.CheapestPacks)
+			r.Get("/api/store-offers", trendsHandler.StoreOffers)
 			r.Get("/api/price/{mtgstocksId}", handlers.Price)
 			r.Get("/api/drafts", draftHandler.List)
 			r.Get("/api/purchases", purchaseHandler.List)

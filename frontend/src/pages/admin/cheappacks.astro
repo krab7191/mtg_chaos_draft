@@ -1,5 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import StoreDeals from '../../components/deals/StoreDeals.svelte';
+import { searchLinks } from '../../lib/deals';
 
 const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
 const cookie = Astro.request.headers.get('cookie') ?? '';
@@ -15,22 +17,29 @@ const user = await meRes.json();
 const ADMIN_ROLES = ['admin', 'viewer'];
 if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
 
-const before = Astro.url.searchParams.get('before') ?? '';
+// Defaults to sets released before 2020; an empty value ("Clear") shows every set.
+const DEFAULT_BEFORE = '2020-01-01';
+const before = Astro.url.searchParams.get('before') ?? DEFAULT_BEFORE;
 const apiQuery = before ? `?before=${encodeURIComponent(before)}` : '';
 const cheapestRes = await fetch(`${apiUrl}/api/cheapest${apiQuery}`, { headers: { cookie } });
 const cheapest: any[] = cheapestRes.ok ? await cheapestRes.json() : [];
 ---
 
-<Layout title="Cheap Packs" user={user}>
+<Layout title="Cheap Packs" user={user} wide>
   <div class="page">
     <h1 class="page__title">Cheap Packs</h1>
-    <p class="page__sub">Top 10 cheapest MTG packs by current market price.</p>
+    <p class="page__sub">Packs for chaos drafts: store deals on single packs, and the cheapest packs by market price.</p>
+
+    <StoreDeals client:load canEdit={user.role === 'admin'} />
+
+    <h2 class="page__h2">Cheapest packs</h2>
+    <p class="page__sub">Top 10 cheapest MTG packs by current TCGplayer market price.</p>
 
     <form class="filter" method="get">
       <label class="filter__label" for="before">Released before</label>
       <input class="filter__input" type="date" id="before" name="before" value={before} />
       <button class="filter__btn" type="submit">Apply</button>
-      {before && <a class="filter__clear" href="/admin/cheappacks">Clear</a>}
+      {before && <a class="filter__clear" href="/admin/cheappacks?before=">Clear</a>}
     </form>
 
     {cheapest.length === 0 ? (
@@ -43,6 +52,7 @@ const cheapest: any[] = cheapestRes.ok ? await cheapestRes.json() : [];
             <th>Pack</th>
             <th>Type</th>
             <th class="table__price">Price</th>
+            <th>Elsewhere</th>
           </tr>
         </thead>
         <tbody>
@@ -55,6 +65,16 @@ const cheapest: any[] = cheapestRes.ok ? await cheapestRes.json() : [];
               </td>
               <td class="pack-type">{p.productType}</td>
               <td class="table__price table__price--val">${p.marketPrice.toFixed(2)}</td>
+              <td>
+                <details class="elsewhere">
+                  <summary>Search</summary>
+                  <ul>
+                    {searchLinks(p.setName, p.productType, p.tcgUrl).map(l => (
+                      <li><a href={l.url} target="_blank" rel="noopener noreferrer">{l.store}</a></li>
+                    ))}
+                  </ul>
+                </details>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -67,6 +87,12 @@ const cheapest: any[] = cheapestRes.ok ? await cheapestRes.json() : [];
   .page {
     &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
     &__sub   { color: var(--color-text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+    &__h2    { font-size: 1.1rem; margin: 0 0 0.3rem; }
+  }
+
+  .elsewhere {
+    summary { cursor: pointer; color: var(--color-accent); font-size: 0.8rem; }
+    ul { list-style: none; padding: 0.3rem 0 0; margin: 0; font-size: 0.8rem; }
   }
 
   .filter {

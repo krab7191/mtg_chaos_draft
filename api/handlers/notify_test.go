@@ -275,7 +275,7 @@ func TestNotifyTestEndpoint(t *testing.T) {
 func TestAlertTextForNewLow(t *testing.T) {
 	p := SearchResult{SetName: "Bloomburrow", ProductType: "Play Booster Box", PacksPerBox: 36}
 	tr := &Trend{Current: 108, PrevLow: 112.5, DropFromRelease: 0.4}
-	title, body := alertMessage(p, tr, &db.Watch{}, AlertNewLow)
+	title, body := alertMessage(watchedAlert{product: p, trend: tr}, AlertNewLow)
 	if title != "New low: Bloomburrow Play Booster Box" || !strings.Contains(body, "previous low ($112.50)") {
 		t.Errorf("%q %q", title, body)
 	}

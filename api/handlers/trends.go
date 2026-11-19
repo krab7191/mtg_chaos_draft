@@ -134,6 +134,10 @@ func BackfillPriceHistory(ctx context.Context, pool *pgxpool.Pool) (int, error) 
 	if n > 0 {
 		log.Printf("price history: backfilled %d products", n)
 	}
+	// Then each single pack's TCGplayer page, at the same gentle pace.
+	if _, err := backfillTCGLinks(ctx, pool, c); err != nil {
+		return n, err
+	}
 	return n, nil
 }
 
@@ -328,6 +332,8 @@ type trendRow struct {
 	Trend  *Trend    `json:"trend"`
 	Watch  *db.Watch `json:"watch"`
 	Alerts []string  `json:"alerts"`
+	// Deal is the best store listing well under market, if any.
+	Deal *Deal `json:"deal,omitempty"`
 	// Stock is how many packs of this set and pack type are in the
 	// collection (a box row counts loose packs of the kind it holds).
 	Stock int `json:"stock"`
@@ -375,7 +381,17 @@ const (
 	AlertFloor  = "floor"   // signal is a possible floor
 	AlertDrop   = "drop"    // at or past the watch's drop threshold
 	AlertNewLow = "new_low" // broke below its previous low
+	AlertDeal   = "deal"    // listed at a store well under market
 )
+
+// withDealAlert adds a deal alert for a watched product with a store deal,
+// unless plenty of stock mutes its alerts.
+func withDealAlert(alerts []string, w *db.Watch, d *Deal, stock int) []string {
+	if w != nil && d != nil && stock < muteAtStock {
+		alerts = append(alerts, AlertDeal)
+	}
+	return alerts
+}
 
 // New-low detection works on 7-day median prices, so a single cheap sale
 // can't trigger it, and compares with the lowest weekly median from before
@@ -516,6 +532,12 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stock := newStockIndex(collection)
+	offers, err := db.ListStoreOffers(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	deals := bestDeals(offers, c.products)
 	proposals, err := openProposals(r.Context(), h.pool)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
@@ -551,6 +573,8 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 			row.Watch = &wt
 		}
 		row.Alerts = alertsFor(row.Trend, row.Watch, row.Stock)
+		row.Deal = deals[p.MTGStocksID]
+		row.Alerts = withDealAlert(row.Alerts, row.Watch, row.Deal, row.Stock)
 		resp.Products = append(resp.Products, row)
 	}
 	sort.SliceStable(resp.Products, func(i, j int) bool {

@@ -64,4 +64,22 @@ describe('CheapPacksPage', () => {
     const html = await res.text();
     expect(html).toContain('class="empty"');
   });
+
+  it('defaults to sets released before 2020; clearing shows every set', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ role: 'admin', name: 'Alice', email: 'a@b.com' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [packRow] });
+    vi.stubGlobal('fetch', fetchMock);
+    const html = await (await renderPage(CheapPacksPage, '/admin/cheappacks')).text();
+    expect(fetchMock.mock.calls[1][0]).toContain('/api/cheapest?before=2020-01-01');
+    expect(html).toContain('value="2020-01-01"');
+    expect(html).toContain('href="/admin/cheappacks?before="');
+
+    fetchMock.mockReset()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ role: 'admin', name: 'Alice', email: 'a@b.com' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => [packRow] });
+    const cleared = await (await renderPage(CheapPacksPage, '/admin/cheappacks?before=')).text();
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/api\/cheapest$/);
+    expect(cleared).not.toContain('>Clear<');
+  });
 });

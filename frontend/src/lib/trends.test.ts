@@ -83,6 +83,11 @@ describe('trends helpers', () => {
     // 20+ packs in the collection mute alerts; 19 don't.
     expect(alertsFor(trend({ signal: 'floor' }), w, 19)).toEqual(['floor']);
     expect(alertsFor(trend({ signal: 'floor' }), w, 20)).toEqual([]);
+    // A store deal alerts too, even with no price history.
+    const deal = { store: 'Collector Store', url: 'https://x', price: 40, marketPrice: 56, discount: 0.29 };
+    expect(alertsFor(null, w, 0, deal)).toEqual(['deal']);
+    expect(alertsFor(null, null, 0, deal)).toEqual([]);
+    expect(alertText(row({ deal }), 'deal')).toBe('$40.00 at Collector Store, 29% under market');
   });
 
   it('gives watch feedback with or without history', () => {

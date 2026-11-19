@@ -28,6 +28,7 @@ func RefreshPrices(ctx context.Context, pool *pgxpool.Pool) {
 		len(prices), c.source, c.fetchedAt.Format("2006-01-02 15:04"))
 
 	recordDailyPrices(ctx, pool, c)
+	RefreshStoreOffers(ctx, pool) // before alerts, so today's deals count
 	if _, err := NotifyAlerts(ctx, pool); err != nil {
 		log.Printf("price alerts: %v", err)
 	}

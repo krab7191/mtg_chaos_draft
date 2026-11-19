@@ -23,7 +23,10 @@ export interface Trend {
 
 export interface Watch { mtgstocksId: number; dropAlert: number | null }
 
-export type AlertReason = 'floor' | 'drop' | 'new_low';
+export type AlertReason = 'floor' | 'drop' | 'new_low' | 'deal';
+
+/** The best store listing well under market (see lib/deals). */
+export interface RowDeal { store: string; url: string; price: number; marketPrice: number; discount: number }
 
 export interface TrendRow {
   mtgstocksId: number;
@@ -37,6 +40,7 @@ export interface TrendRow {
   trend: Trend | null;
   watch: Watch | null;
   alerts: AlertReason[];
+  deal?: RowDeal;
   /** Packs of this set and kind in the collection (loose packs for a box row). */
   stock?: number;
 }
@@ -149,6 +153,7 @@ export function filterRows(rows: TrendRow[], kind: KindFilter, show: ShowFilter)
 
 /** Explains an alert in plain words. */
 export function alertText(r: TrendRow, reason: AlertReason): string {
+  if (reason === 'deal' && r.deal) return `${money(r.deal.price)} at ${r.deal.store}, ${Math.round(r.deal.discount * 100)}% under market`;
   const t = r.trend!;
   if (reason === 'floor') return `possible floor at ${money(t.current)}, ${pct(-t.dropFromRelease)} since release`;
   if (reason === 'new_low') return `new low at ${money(t.current)}, below its previous low of ${money(t.prevLow)}`;
@@ -159,19 +164,20 @@ export function alertText(r: TrendRow, reason: AlertReason): string {
 export const MUTE_AT_STOCK = 20;
 
 /** Why a watched product needs attention right now (mirrors the API's rule). */
-export function alertsFor(t: Trend | null, w: Watch | null, stock = 0): AlertReason[] {
-  if (!t || !w || stock >= MUTE_AT_STOCK) return [];
+export function alertsFor(t: Trend | null, w: Watch | null, stock = 0, deal: RowDeal | null = null): AlertReason[] {
+  if (!w || stock >= MUTE_AT_STOCK) return [];
   return [
-    ...(t.signal === 'floor' ? ['floor' as const] : []),
-    ...(w.dropAlert != null && t.dropFromRelease >= w.dropAlert ? ['drop' as const] : []),
-    ...(t.newLow ? ['new_low' as const] : []),
+    ...(t?.signal === 'floor' ? ['floor' as const] : []),
+    ...(t && w.dropAlert != null && t.dropFromRelease >= w.dropAlert ? ['drop' as const] : []),
+    ...(t?.newLow ? ['new_low' as const] : []),
+    ...(deal ? ['deal' as const] : []),
   ];
 }
 
 /** Packs in stock when that is what silences a watched product's alerts; null otherwise. */
 export function mutedStock(r: TrendRow): number | null {
   const n = r.stock ?? 0;
-  return n >= MUTE_AT_STOCK && alertsFor(r.trend, r.watch).length > 0 ? n : null;
+  return n >= MUTE_AT_STOCK && alertsFor(r.trend, r.watch, 0, r.deal ?? null).length > 0 ? n : null;
 }
 
 /** Feedback right after starting to watch: would it alert now, and why? */

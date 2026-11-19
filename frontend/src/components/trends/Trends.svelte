@@ -68,7 +68,7 @@
     const hadAlert = r.alerts.length > 0;
     r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert } : null;
     // Recompute this row's alerts locally; the next load confirms them.
-    r.alerts = alertsFor(r.trend, r.watch, r.stock);
+    r.alerts = alertsFor(r.trend, r.watch, r.stock, r.deal);
     // Say right away whether it would alert: on a new watch, or when a
     // changed drop alert starts firing.
     if (watch && (!wasWatched || (!hadAlert && r.alerts.length > 0))) {
@@ -88,7 +88,7 @@
     if (!ok) return;
     for (const r of targets) {
       r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert: null } : null;
-      r.alerts = alertsFor(r.trend, r.watch, r.stock);
+      r.alerts = alertsFor(r.trend, r.watch, r.stock, r.deal);
     }
     if (watch) {
       const alerting = targets.filter(r => r.alerts.length > 0).length;
