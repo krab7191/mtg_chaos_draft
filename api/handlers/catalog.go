@@ -29,11 +29,14 @@ const catalogLiveInterval = time.Hour
 const maxCatalogUpload = 32 << 20
 
 type catalog struct {
-	products  []SearchResult  // one per set + pack type, for search
-	boxes     []SearchResult  // one per set + box type, for price trends
-	prices    map[int]float64 // every priced product by MTGStocks id
-	fetchedAt time.Time
-	source    string // "live" or "upload"
+	products []SearchResult  // one per set + pack type, for search
+	boxes    []SearchResult  // one per set + box type, for price trends
+	prices   map[int]float64 // every priced product by MTGStocks id
+	// listingOnly: products priced from the average asking price because
+	// there's no market price (no recent sales), e.g. ultra-rare test products.
+	listingOnly map[int]bool
+	fetchedAt   time.Time
+	source      string // "live" or "upload"
 }
 
 var (
@@ -155,7 +158,7 @@ func parseCatalog(raw []byte) (*catalog, error) {
 		return nil, fmt.Errorf("mtgstocks decode: %w", err)
 	}
 
-	c := &catalog{prices: make(map[int]float64)}
+	c := &catalog{prices: make(map[int]float64), listingOnly: make(map[int]bool)}
 	type seenKey struct{ setCode, productType string }
 	seen := make(map[seenKey]bool)
 
@@ -179,6 +182,7 @@ func parseCatalog(raw []byte) (*catalog, error) {
 		}
 		if price, ok := c.prices[p.ID]; ok {
 			result.MarketPrice = &price
+			result.NoSales = c.listingOnly[p.ID]
 		}
 		c.products = append(c.products, result)
 	}
@@ -188,6 +192,9 @@ func parseCatalog(raw []byte) (*catalog, error) {
 			if p.LatestPrice != nil {
 				if price, ok := pickPrice(p.LatestPrice.Low, p.LatestPrice.Market, p.LatestPrice.Average); ok {
 					c.prices[p.ID] = price
+					if m := p.LatestPrice.Market; m == nil || *m <= 0 {
+						c.listingOnly[p.ID] = true
+					}
 				}
 			}
 		}

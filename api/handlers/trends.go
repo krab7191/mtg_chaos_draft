@@ -26,12 +26,15 @@ import (
 
 // trackedProducts are the products whose prices are recorded: single packs
 // (one per set and pack type) and booster boxes. Left out: sleeved packs
-// (can't be hunted down after release weeks) and Jumpstart (casual
-// half-decks, not drafted; their noisy prices would skew the floor rules).
+// (can't be hunted down after release weeks), Jumpstart (casual half-decks,
+// not drafted; their noisy prices would skew the floor rules), and products
+// with no recent sales, priced only from a few asking prices (e.g. Beta packs
+// "at" $19,645): their price means little and made false deals. They come
+// back once MTGStocks records a sale.
 func trackedProducts(c *catalog) []SearchResult {
 	out := make([]SearchResult, 0, len(c.products)+len(c.boxes))
 	for _, p := range append(slices.Clip(c.products), c.boxes...) {
-		if !isSleeved(p) && !isJumpstart(p.SetName, p.ProductType) {
+		if !isSleeved(p) && !isJumpstart(p.SetName, p.ProductType) && !p.NoSales {
 			out = append(out, p)
 		}
 	}

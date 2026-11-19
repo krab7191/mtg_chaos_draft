@@ -42,6 +42,9 @@ type SearchResult struct {
 	PacksPerBox int `json:"packsPerBox,omitempty"`
 	// TCGURL is the product's TCGplayer page, where known (cheapest packs).
 	TCGURL string `json:"tcgUrl,omitempty"`
+	// NoSales: MarketPrice is only the average asking price (no recent
+	// sales), so it says little about what the product is worth.
+	NoSales bool `json:"noSales,omitempty"`
 }
 
 var knownPackTypes = map[string]string{

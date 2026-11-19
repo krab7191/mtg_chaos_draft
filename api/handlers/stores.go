@@ -473,7 +473,9 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 	out := []Deal{}
 	for _, o := range offers {
 		p, ok := byID[o.MTGStocksID]
-		if !ok || p.MarketPrice == nil || *p.MarketPrice <= 0 {
+		// No market price, or only asking prices (no recent sales): there's
+		// nothing real to compare with, so the listing isn't shown.
+		if !ok || p.MarketPrice == nil || *p.MarketPrice <= 0 || p.NoSales {
 			continue
 		}
 		d := Deal{Offer: o, SetName: p.SetName, ProductType: p.ProductType, ReleasedAt: p.ReleasedAt, MarketPrice: *p.MarketPrice, TCGURL: tcgLink(o.MTGStocksID)}

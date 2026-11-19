@@ -381,3 +381,35 @@ func TestStoreClient_ThroughProxy(t *testing.T) {
 		t.Error("no valid proxy means direct")
 	}
 }
+
+// Ravnica Allegiance Collector Booster: MTGStocks has no market price (no
+// sales), only a $1,875 average asking price. A $160 listing elsewhere isn't
+// "91% under market".
+func TestDeals_NoSalesIsNeverADeal(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	var rna *SearchResult
+	for i, p := range c.products {
+		if p.SetName == "Ravnica Allegiance" && p.ProductType == "Collector Booster" {
+			rna = &c.products[i]
+		}
+	}
+	if rna == nil || !rna.NoSales || rna.MarketPrice == nil || *rna.MarketPrice != 1875 {
+		t.Fatalf("RNA Collector Booster: %+v", rna)
+	}
+	// Its store listings aren't shown at all, and it isn't tracked.
+	deals := offersWithMarket([]db.Offer{{Store: "CardTrader", URL: "x", MTGStocksID: rna.MTGStocksID, Price: 160, Available: true, Language: "ja"}}, c.products)
+	if len(deals) != 0 {
+		t.Errorf("listings against asking prices: %+v", deals)
+	}
+	for _, p := range trackedProducts(c) {
+		if p.NoSales {
+			t.Errorf("tracked without sales: %s %s", p.SetName, p.ProductType)
+		}
+	}
+	// Ordinary packs have real market prices.
+	for _, p := range c.products {
+		if p.SetName == "Dragon's Maze" && p.ProductType == "Booster Pack" && p.NoSales {
+			t.Error("Dragon's Maze has sales")
+		}
+	}
+}
