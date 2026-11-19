@@ -5,9 +5,10 @@
   import { toast } from '../../lib/toast.svelte';
   import { money, pct, valueTone } from '../../lib/trends';
   import {
-    filterOffers, applyFilters, languagesIn, groupByPack, searchLinks, languageLabel, LANGUAGES, NO_FILTERS,
-    type OffersResponse, type OfferView, type StoreOffer, type OfferFilters,
+    filterOffers, applyFilters, groupByPack, searchLinks, languageLabel, checkedAgo,
+    type OffersResponse, type OfferView, type StoreOffer,
   } from '../../lib/deals';
+  import { filters, setShowOver } from '../../lib/filters.svelte';
 
   let { canEdit = false }: { canEdit?: boolean } = $props();
 
@@ -16,26 +17,7 @@
   let view = $state<OfferView>('deals');
   let watched = $state(new Set<number>());
 
-  // Filters are per viewer (others use this page too), remembered in this browser.
-  const FILTERS_KEY = 'storeListingFilters';
-  function loadFilters(): OfferFilters {
-    try {
-      const raw = localStorage.getItem(FILTERS_KEY);
-      return raw ? { ...NO_FILTERS, ...JSON.parse(raw) } : { ...NO_FILTERS };
-    } catch {
-      return { ...NO_FILTERS };
-    }
-  }
-  let filters = $state<OfferFilters>(loadFilters());
-  $effect(() => {
-    try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch { /* private mode: not remembered */ }
-  });
-  function toggleLanguage(lang: string, on: boolean) {
-    const all = languages;
-    const current = filters.languages ?? all;
-    const next = on ? [...new Set([...current, lang])] : current.filter(l => l !== lang);
-    filters.languages = next.length === all.length ? null : next;
-  }
+  // Language and max price come from the shared filter bar above the page.
 
   onMount(async () => {
     const res = await getJSON<OffersResponse>('/api/store-offers', "Couldn't load store listings");
@@ -48,7 +30,6 @@
     loading = false;
   });
 
-  const languages = $derived(data ? languagesIn(data.offers) : []);
   const filtered = $derived(data ? applyFilters(data.offers, filters) : []);
   // One row per pack (its best listing), the first PAGE rows unless expanded.
   const PAGE = 25;
@@ -96,27 +77,10 @@
       <button class:on={view === 'all'} aria-pressed={view === 'all'} onclick={() => { view = 'all'; showAll = false; }}>All listings</button>
     </div>
 
-    <div class="filters">
-      <fieldset class="langs">
-        <legend>Languages</legend>
-        {#each languages as lang (lang)}
-          <label>
-            <input type="checkbox" checked={filters.languages == null || filters.languages.includes(lang)}
-              onchange={e => toggleLanguage(lang, e.currentTarget.checked)} />
-            {LANGUAGES[lang] ?? lang.toUpperCase()}
-          </label>
-        {/each}
-      </fieldset>
-      <label class="maxprice">
-        Max price $
-        <input type="number" min="0" step="1" inputmode="decimal" placeholder="any" value={filters.maxPrice ?? ''}
-          onchange={e => { const v = parseFloat(e.currentTarget.value); filters.maxPrice = Number.isFinite(v) && v > 0 ? v : null; }} />
-      </label>
-      <label>
-        <input type="checkbox" bind:checked={filters.showOver} />
-        Show listings above market
-      </label>
-    </div>
+    <label class="showover">
+      <input type="checkbox" checked={filters.showOver} onchange={e => setShowOver(e.currentTarget.checked)} />
+      Show listings above market
+    </label>
 
     {#if groups.length === 0}
       <p class="note">{view === 'deals' ? 'No deals right now' : 'Nothing matches'} with these filters. Watch a pack to get an alert when a deal shows up.</p>
@@ -163,7 +127,7 @@
                 </td>
                 <td>
                   <a href={o.url} target="_blank" rel="noopener noreferrer">{o.store}</a>
-                  <span class="sub">{o.available ? 'In stock' : 'Sold out'}</span>
+                  <span class="sub">{o.available ? 'In stock' : 'Sold out'}{o.seenAt ? ` · ${checkedAgo(o.seenAt)}` : ''}</span>
                 </td>
                 <td class="num">
                   {money(o.price)}
@@ -249,11 +213,7 @@
   .others li { padding: 0.1rem 0; }
   .show-all { margin-top: 0.6rem; background: none; border: 1px solid var(--color-border); border-radius: var(--radius);
     color: var(--color-text); font: inherit; font-size: 0.82rem; padding: 0.3rem 0.8rem; cursor: pointer; }
-  .filters { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; margin-bottom: 0.8rem; font-size: 0.82rem; color: var(--color-text-muted); }
-  .langs { border: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; align-items: center; }
-  .langs legend { float: left; margin-right: 0.6rem; }
-  .filters label { display: inline-flex; gap: 0.3rem; align-items: center; cursor: pointer; }
-  .maxprice input { width: 5rem; font: inherit; }
+  .showover { display: inline-flex; gap: 0.3rem; align-items: center; cursor: pointer; margin: 0 0 0.8rem 1rem; font-size: 0.82rem; color: var(--color-text-muted); }
   .lang {
     margin-left: 0.35rem; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 999px;
     border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap;

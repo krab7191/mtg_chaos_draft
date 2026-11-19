@@ -3,8 +3,9 @@ import { render, fireEvent, act, waitFor } from '../../tests/svelte';
 import StoreDeals from './StoreDeals.svelte';
 import { toast } from '../../lib/toast.svelte';
 import type { OffersResponse, StoreOffer } from '../../lib/deals';
+import { clearFilters, setLanguage, setMaxPrice } from '../../lib/filters.svelte';
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); clearFilters(); localStorage.clear(); });
 
 const offer = (id: number, over: Partial<StoreOffer> = {}): StoreOffer => ({
   store: 'Collector Store', url: `https://x/${id}`, mtgstocksId: id, title: `Magic the Gathering: Set ${id} Draft Booster Pack`, price: 40, available: true,
@@ -137,45 +138,18 @@ describe('StoreDeals listing names', () => {
 
 describe('StoreDeals filters', () => {
   const resp: OffersResponse = {
-    offers: [
-      offer(1, { price: 4, contents: 6 }),
-      offer(2, { price: 30, language: 'it' }),
-      offer(3, { price: 8, language: 'ja' }),
-    ],
+    offers: [offer(1, { price: 4 }), offer(2, { price: 30, language: 'it' }), offer(3, { price: 8, language: 'ja' })],
     stores: ['CardTrader'], watched: [], dealDiscount: 0.15,
   };
 
-  it('filters by language and max price, and remembers the choice', async () => {
-    const { container, unmount } = mount(resp);
-    await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']));
-    expect(Array.from(container.querySelectorAll('.langs label')).map(l => l.textContent?.trim()))
-      .toEqual(['English', 'Italian', 'Japanese']);
-    expect(Array.from(container.querySelectorAll('tbody .contents-note')).find(e => e.textContent?.includes('contents $6.00'))?.classList.contains('tone--great')).toBe(true);
-    await act(() => fireEvent.click(checkbox(container, 'Japanese')));
-    expect(names(container)).toEqual(['Set 1', 'Set 2']);
-    const max = container.querySelector('.maxprice input') as HTMLInputElement;
-    await act(() => fireEvent.change(max, { target: { value: '10' } }));
-    expect(names(container)).toEqual(['Set 1']);
-    expect(container.textContent).toContain('Deals (1)');
-    unmount();
-
-    // Next visit: same filters.
-    const again = mount(resp);
-    await waitFor(() => expect(names(again.container)).toEqual(['Set 1']));
-    expect((again.container.querySelector('.maxprice input') as HTMLInputElement).value).toBe('10');
-    // Clearing the price and ticking Japanese again shows everything.
-    await act(() => fireEvent.change(again.container.querySelector('.maxprice input')!, { target: { value: '' } }));
-    await act(() => fireEvent.click(checkbox(again.container, 'Japanese')));
-    expect(names(again.container)).toEqual(['Set 1', 'Set 2', 'Set 3']);
-  });
-
-  it('works without browser storage', async () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+  it('follows the shared language and max-price filters, live', async () => {
     const { container } = mount(resp);
     await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']));
-    await act(() => fireEvent.click(checkbox(container, 'English')));
-    expect(names(container)).toEqual(['Set 2', 'Set 3']);
+    setLanguage('ja', false);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2']));
+    setMaxPrice(10);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1']));
+    expect(container.textContent).toContain('Deals (1)');
   });
 });
 

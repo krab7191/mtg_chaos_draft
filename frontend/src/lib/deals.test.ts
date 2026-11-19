@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterOffers, applyFilters, languagesIn, groupByPack, NO_FILTERS, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, chanceText, ratioText, type StoreOffer } from './deals';
+import { filterOffers, applyFilters, checkedAgo, languagesIn, groupByPack, NO_FILTERS, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, chanceText, ratioText, type StoreOffer } from './deals';
 
 const offer = (over: Partial<StoreOffer> = {}): StoreOffer => ({
   store: 'Collector Store', url: 'https://x/p', mtgstocksId: 1, title: 'Prophecy Booster Pack', price: 40, available: true,
@@ -61,6 +61,14 @@ describe('deals', () => {
     expect(applyFilters(all, { ...NO_FILTERS, languages: ['ja'] }).map(o => o.url)).toEqual(['c']);
     expect(applyFilters(all, { ...NO_FILTERS, maxPrice: 10 }).map(o => o.url)).toEqual(['c']);
     expect(languagesIn([offer({ language: 'ja' }), offer({ language: 'de' }), offer({ language: undefined })])).toEqual(['en', 'de', 'ja']);
+  });
+
+  it('says how fresh a listing is', () => {
+    const now = new Date('2026-11-19T12:00:00Z');
+    expect(checkedAgo('2026-11-19T11:20:00Z', now)).toBe('checked 40 min ago');
+    expect(checkedAgo('2026-11-19T09:00:00Z', now)).toBe('checked 3 h ago');
+    expect(checkedAgo('2026-11-15T12:00:00Z', now)).toBe('checked 4 days ago');
+    expect(checkedAgo('not a date', now)).toBe('');
   });
 
   it('groups listings by pack, best first', () => {

@@ -104,6 +104,15 @@ export function languagesIn(offers: StoreOffer[]): string[] {
   return [...set].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : (LANGUAGES[a] ?? a).localeCompare(LANGUAGES[b] ?? b)));
 }
 
+/** "checked 40 min ago" / "checked 3 h ago" for a listing's last read. */
+export function checkedAgo(iso: string, now = new Date()): string {
+  const min = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60_000));
+  if (!Number.isFinite(min)) return '';
+  if (min < 60) return `checked ${min} min ago`;
+  if (min < 48 * 60) return `checked ${Math.round(min / 60)} h ago`;
+  return `checked ${Math.round(min / 1440)} days ago`;
+}
+
 /** One pack's listings: the best one (first in the given order) and the rest. */
 export interface OfferGroup { best: StoreOffer; others: StoreOffer[] }
 

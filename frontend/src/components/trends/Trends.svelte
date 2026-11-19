@@ -5,6 +5,7 @@
   import { getJSON } from '../../lib/api';
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
+  import { withinMax } from '../../lib/filters.svelte';
   import {
     SIGNALS, evText, contentsTone, filterRows, YEAR_OPTIONS, yearsLabel, windowFor, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
@@ -38,7 +39,8 @@
     }
   });
 
-  const rows = $derived(data ? filterRows(data.products, kind, show) : []);
+  // The shared max-price filter, per pack so boxes compare fairly.
+  const rows = $derived(data ? filterRows(data.products, kind, show).filter(r => withinMax(perPack(r))) : []);
   const alerting = $derived(data ? data.products.filter(r => r.alerts.length > 0) : []);
   const alertGroups = $derived(groupBySet(alerting));
   const ALERTS_OPEN_KEY = 'trendsAlertsOpen';

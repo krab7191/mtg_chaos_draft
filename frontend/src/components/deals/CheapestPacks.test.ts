@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor } from '../../tests/svelte';
 import CheapestPacks from './CheapestPacks.svelte';
+import { clearFilters, setMaxPrice } from '../../lib/filters.svelte';
 import { toast } from '../../lib/toast.svelte';
 import type { Trend, TrendRow } from '../../lib/trends';
 
@@ -63,6 +64,14 @@ describe('CheapestPacks', () => {
     expect(container.querySelector('.detail')?.textContent).toContain('usual $5.00');
     await act(() => fireEvent.click(button(container, 'Set 1'))); // closes
     expect(container.querySelector('.detail')).toBeNull();
+  });
+
+  it('follows the shared max price', async () => {
+    const { container } = mount([row(1), row(2, { trend: trend({ current: 20 }) })]);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2']));
+    setMaxPrice(10);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1']));
+    clearFilters();
   });
 
   it('watches a pack and says what will alert; snaps back if saving fails', async () => {

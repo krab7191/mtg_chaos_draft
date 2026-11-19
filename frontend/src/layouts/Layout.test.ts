@@ -1,7 +1,10 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createContainer } from '../tests/astro';
 import Layout from './Layout.astro';
+
+// The filter bar has its own tests; a stub shows where the layout puts it.
+vi.mock('../components/FilterBar.svelte', () => import('../tests/IslandStub.svelte'));
 
 describe('Layout', () => {
   it('renders title in <title> tag', async () => {
@@ -57,6 +60,14 @@ describe('Layout', () => {
     const wide = await container.renderToString(Layout, { props: { title: 'T', wide: true } });
     expect(narrow).not.toContain('main--wide');
     expect(wide).toMatch(/class="main main--wide/);
+  });
+
+  it('price pages can show the shared filter bar', async () => {
+    const container = await createContainer();
+    const plain = await container.renderToString(Layout, { props: { title: 'T' } });
+    const withBar = await container.renderToString(Layout, { props: { title: 'T', filterBar: true } });
+    expect(plain).not.toContain('island-stub');
+    expect(withBar).toContain('island-stub');
   });
 
   it('groups admin pages under headings and marks the current page', async () => {

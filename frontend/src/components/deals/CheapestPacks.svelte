@@ -5,6 +5,7 @@
   import { toast } from '../../lib/toast.svelte';
   import { money, pct, age, alertText, evText, contentsTone, type TrendRow, type PricePoint } from '../../lib/trends';
   import { searchLinks } from '../../lib/deals';
+  import { withinMax } from '../../lib/filters.svelte';
   import Sparkline from '../trends/Sparkline.svelte';
   import PriceChart from '../trends/PriceChart.svelte';
 
@@ -109,7 +110,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.products as r, i (r.mtgstocksId)}
+          {#each data.products.filter(r => withinMax(r.trend?.current ?? r.marketPrice)) as r, i (r.mtgstocksId)}
             {@const t = r.trend}
             <tr id="cheap-{r.mtgstocksId}" class:open={open === r.mtgstocksId} class:alerting={r.alerts.length > 0}>
               <td class="num muted">{i + 1}</td>

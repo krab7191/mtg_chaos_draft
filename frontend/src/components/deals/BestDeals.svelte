@@ -2,22 +2,14 @@
   import { onMount } from 'svelte';
   import { getJSON } from '../../lib/api';
   import { money } from '../../lib/trends';
-  import { languageLabel, LANGUAGES, NO_FILTERS, type OfferFilters } from '../../lib/deals';
+  import { languageLabel } from '../../lib/deals';
+  import { filters } from '../../lib/filters.svelte';
   import { rank, topPicks, reasons, type BestDealsResponse, type ShippingSettings } from '../../lib/bestdeals';
 
   let data = $state<BestDealsResponse | null>(null);
   let loading = $state(true);
 
-  // The Cheap Packs filters (language, max price) apply here too.
-  function readFilters(): OfferFilters {
-    try {
-      const raw = localStorage.getItem('storeListingFilters');
-      return raw ? { ...NO_FILTERS, ...JSON.parse(raw) } : { ...NO_FILTERS };
-    } catch {
-      return { ...NO_FILTERS };
-    }
-  }
-  const filters = readFilters();
+  // Language and max price come from the shared filter bar above the page.
 
   const SHIP_KEY = 'bestDealsShipping';
   let ship = $state<ShippingSettings>({ perOrder: {}, packsPerOrder: 3 });
@@ -40,10 +32,6 @@
   const ranked = $derived(data ? rank(data.candidates, filters, ship) : []);
   const picks = $derived(topPicks(ranked, 3));
   const runnersUp = $derived(topPicks(ranked, 10).slice(3));
-  const filterNote = $derived([
-    filters.languages ? `languages: ${filters.languages.map(l => LANGUAGES[l] ?? l).join(', ')}` : 'all languages',
-    filters.maxPrice != null ? `up to ${money(filters.maxPrice)}` : 'any price',
-  ].join(' · '));
 </script>
 
 <section class="best">
@@ -91,7 +79,7 @@
     {/if}
 
     <details class="settings">
-      <summary>How these are picked · filters and shipping</summary>
+      <summary>How these are picked · shipping</summary>
       <p class="note">
         Every in-stock pack (Card Kingdom, CardTrader, and TCGplayer at its market price) is scored on
         <strong>contents ÷ (price + shipping per pack)</strong>, then adjusted by its price signal: how much packs with that
@@ -99,7 +87,7 @@
         The top 3 are from different sets. Unreleased sets, products without real sales and listings far above market are
         left out. Contents count every card at market price, including bulk commons that are hard to sell.
       </p>
-      <p class="note">Filters from Cheap Packs: {filterNote}. <a href="/admin/cheappacks">Change them there</a>.</p>
+      <p class="note">Language and max price come from the filter bar at the top of the page.</p>
       <div class="ship">
         <span>Shipping per order:</span>
         {#each Object.keys(ship.perOrder) as store (store)}

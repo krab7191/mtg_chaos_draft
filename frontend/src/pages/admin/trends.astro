@@ -17,7 +17,7 @@ const ADMIN_ROLES = ['admin', 'viewer'];
 if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
 ---
 
-<Layout title="Price Trends" user={user} wide>
+<Layout title="Price Trends" user={user} wide filterBar>
   <div class="page">
     <h1 class="page__title">Price Trends</h1>
     <p class="page__sub">How each recent set's packs and boxes have moved since release, to spot when prices stop falling.</p>

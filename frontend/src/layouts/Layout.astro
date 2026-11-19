@@ -1,15 +1,18 @@
 ---
 import '../styles/global.scss';
 import Toast from '../components/Toast.svelte';
+import FilterBar from '../components/FilterBar.svelte';
 
 interface Props {
   title: string;
   user?: { name: string; email: string; role: string; picture?: string } | null;
   /** Let wide tables use the screen: up to 1200px instead of 768px. */
   wide?: boolean;
+  /** Show the shared price filters (language, max price) above the page. */
+  filterBar?: boolean;
 }
 
-const { title, user, wide = false } = Astro.props;
+const { title, user, wide = false, filterBar = false } = Astro.props;
 
 // Menu: pick a pack for everyone; admin pages grouped for admins & viewers.
 const NAV_GROUPS = [
@@ -83,6 +86,7 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
     )}
 
     <main class:list={["main", { "main--wide": wide }]}>
+      {filterBar && <FilterBar client:load />}
       <slot />
     </main>
 

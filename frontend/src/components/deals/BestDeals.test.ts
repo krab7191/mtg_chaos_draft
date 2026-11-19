@@ -2,8 +2,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor } from '../../tests/svelte';
 import BestDeals from './BestDeals.svelte';
 import type { BestDealsResponse, Candidate } from '../../lib/bestdeals';
+import { clearFilters, setLanguage, setMaxPrice, ALL_LANGUAGES } from '../../lib/filters.svelte';
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); clearFilters(); localStorage.clear(); });
 
 const cand = (id: number, over: Partial<Candidate> = {}): Candidate => ({
   mtgstocksId: id, setName: `Set ${id}`, productType: 'Booster Pack', releasedAt: '2007-01-01', store: 'Card Kingdom',
@@ -31,14 +32,15 @@ describe('BestDeals', () => {
     expect(container.querySelector('.pick__why')?.textContent).toContain('of cards per $1');
     expect(container.querySelector('.pick__buy a')?.getAttribute('href')).toBe('https://ck/1');
     expect(container.querySelector('.runners')?.textContent).toContain('Set 4');
-    expect(container.textContent).toContain('all languages · any price');
   });
 
-  it('follows the Cheap Packs language filter: no French means the next pack moves up', async () => {
-    localStorage.setItem('storeListingFilters', JSON.stringify({ languages: ['en'], maxPrice: 50, showOver: false }));
+  it('follows the shared filters: no French means the next pack moves up, live', async () => {
     const { container } = mount(resp);
+    await waitFor(() => expect(names(container)).toHaveLength(3));
+    for (const l of ALL_LANGUAGES) if (l !== 'en') setLanguage(l, false);
     await waitFor(() => expect(names(container)).toEqual(['Set 2 Booster Pack', 'Set 3 Booster Pack', 'Set 4 Booster Pack']));
-    expect(container.textContent).toContain('languages: English · up to $50.00');
+    setMaxPrice(5); // nothing that cheap
+    await waitFor(() => expect(names(container)).toEqual([]));
   });
 
   it('shipping settings change the delivered price and are remembered', async () => {

@@ -23,7 +23,7 @@ const DEFAULT_BEFORE = '2020-01-01';
 const before = Astro.url.searchParams.get('before') ?? DEFAULT_BEFORE;
 ---
 
-<Layout title="Cheap Packs" user={user} wide>
+<Layout title="Cheap Packs" user={user} wide filterBar>
   <div class="page">
     <h1 class="page__title">Cheap Packs</h1>
     <p class="page__sub">Packs for chaos drafts: store deals on single packs, and the cheapest packs by market price.</p>

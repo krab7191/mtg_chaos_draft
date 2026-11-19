@@ -17,7 +17,7 @@ const ADMIN_ROLES = ['admin', 'viewer'];
 if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
 ---
 
-<Layout title="Best Deals" user={user}>
+<Layout title="Best Deals" user={user} filterBar>
   <div class="page">
     <h1 class="page__title">Best Deals</h1>
     <p class="page__sub">The 3 packs that give you the most cards for your money right now, and aren't likely to get cheaper soon.</p>

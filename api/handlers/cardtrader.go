@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -20,7 +21,8 @@ import (
 // with many foreign-language packs. Its sets carry standard set codes; its
 // "Magic Boosters" products (blueprints) are found once per set and saved;
 // then each day every booster's listings are read, one request at a time,
-// keeping the cheapest listing per language. The API allows 1 request a
+// keeping the cheapest CardTrader Zero listing per language. Prices include
+// CardTrader's buyer fee (cardTraderFee), which its API prices leave out. The API allows 1 request a
 // second; a refused request waits a minute and is retried once.
 
 const cardTraderName = "CardTrader"
@@ -31,6 +33,10 @@ var (
 	cardTraderDelay = 1500 * time.Millisecond
 	cardTraderRetry = time.Minute
 )
+
+// cardTraderFee: CardTrader adds a buyer fee to every item, roughly 10%
+// (real carts: $0.76 on $8.12, $1.33 on $12.50). Prices shown include it.
+const cardTraderFee = 0.10
 
 // ctBoosterCategory is CardTrader's "Magic Boosters" category.
 const ctBoosterCategory = 5
@@ -137,6 +143,10 @@ type ctListing struct {
 	} `json:"properties_hash"`
 	User struct {
 		CountryCode string `json:"country_code"`
+		// Sealed product is bought through CardTrader Zero (the hub): free
+		// shipping to the hub, one shipment home. Direct shipping costs ~$7 a
+		// seller (a real cart: $12.50 pack + $6.94), so those don't compete.
+		CTZero bool `json:"can_sell_sealed_with_ct_zero"`
 	} `json:"user"`
 }
 
@@ -207,7 +217,7 @@ func fetchCardTrader(ctx context.Context, pool *pgxpool.Pool, c *catalog, idx *p
 		}
 		cheapest := map[string]ctListing{}
 		for _, l := range byBlueprint[fmt.Sprint(b.BlueprintID)] {
-			if l.Quantity <= 0 || l.OnVacation || l.PriceCents <= 0 || l.PriceCurrency != "USD" {
+			if l.Quantity <= 0 || l.OnVacation || l.PriceCents <= 0 || l.PriceCurrency != "USD" || !l.User.CTZero {
 				continue
 			}
 			lang := ctLanguage(l.PropertiesHash.Language)
@@ -230,8 +240,8 @@ func fetchCardTrader(ctx context.Context, pool *pgxpool.Pool, c *catalog, idx *p
 				Store:       cardTraderName,
 				URL:         fmt.Sprintf("https://www.cardtrader.com/en/cards/%d#%s", b.BlueprintID, lang),
 				MTGStocksID: b.MTGStocksID,
-				Title:       fmt.Sprintf("%s · %s · ships from %s", b.Name, name, l.User.CountryCode),
-				Price:       float64(l.PriceCents) / 100,
+				Title:       fmt.Sprintf("%s · %s · ships from %s via Zero · incl. ~10%% fee", b.Name, name, l.User.CountryCode),
+				Price:       math.Round(float64(l.PriceCents)*(1+cardTraderFee)) / 100,
 				Available:   true,
 				Language:    lang,
 			})

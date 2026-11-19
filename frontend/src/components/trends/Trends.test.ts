@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor } from '../../tests/svelte';
 import Trends from './Trends.svelte';
+import { clearFilters, setMaxPrice } from '../../lib/filters.svelte';
 import { toast } from '../../lib/toast.svelte';
 import type { TrendRow, TrendsResponse, Trend } from '../../lib/trends';
 
@@ -76,6 +77,15 @@ describe('Trends page', () => {
     expect(names(container)).toEqual(['Set 2']);
     await act(() => fireEvent.click(button(container, 'All')));
     expect(names(container)).toHaveLength(3);
+  });
+
+  it('follows the shared max price, per pack', async () => {
+    // row(): a 36-pack box at $120 ($3.33 a pack).
+    const { container } = await mount([row(1), row(2, { trend: trend({ current: 360 }) })]); // $10 a pack
+    expect(names(container)).toEqual(['Set 1', 'Set 2']);
+    setMaxPrice(5);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1']));
+    clearFilters();
   });
 
   it('reloads for a different time range', async () => {

@@ -41,9 +41,11 @@ func fakeCardTrader(t *testing.T, refuseFirst bool) *atomic.Int32 {
 				{"id":13,"name":"Lightning Bolt","category_id":1}]`))
 		case r.URL.Path == "/marketplace/products" && r.URL.Query().Get("blueprint_id") == "10":
 			_, _ = w.Write([]byte(`{"10":[
-				{"price_cents":495,"price_currency":"USD","quantity":9,"on_vacation":false,"properties_hash":{"mtg_language":"jp"},"user":{"country_code":"BE"}},
-				{"price_cents":450,"price_currency":"USD","quantity":2,"on_vacation":false,"properties_hash":{"mtg_language":"jp"},"user":{"country_code":"IT"}},
-				{"price_cents":523,"price_currency":"USD","quantity":1,"on_vacation":false,"properties_hash":{"mtg_language":"en"},"user":{"country_code":"CA"}},
+				{"price_cents":495,"price_currency":"USD","quantity":9,"on_vacation":false,"properties_hash":{"mtg_language":"jp"},"user":{"country_code":"BE","can_sell_sealed_with_ct_zero":true}},
+				{"price_cents":450,"price_currency":"USD","quantity":2,"on_vacation":false,"properties_hash":{"mtg_language":"jp"},"user":{"country_code":"IT","can_sell_sealed_with_ct_zero":true}},
+				{"price_cents":523,"price_currency":"USD","quantity":1,"on_vacation":false,"properties_hash":{"mtg_language":"en"},"user":{"country_code":"CA","can_sell_sealed_with_ct_zero":false}},
+				{"price_cents":631,"price_currency":"USD","quantity":10,"on_vacation":false,"properties_hash":{"mtg_language":"en"},"user":{"country_code":"DE","can_sell_sealed_with_ct_zero":true}},
+				{"price_cents":1250,"price_currency":"USD","quantity":5,"on_vacation":false,"properties_hash":{"mtg_language":"fr"},"user":{"country_code":"US","can_sell_sealed_with_ct_zero":false}},
 				{"price_cents":100,"price_currency":"USD","quantity":1,"on_vacation":true,"properties_hash":{"mtg_language":"en"},"user":{"country_code":"US"}},
 				{"price_cents":200,"price_currency":"EUR","quantity":1,"on_vacation":false,"properties_hash":{"mtg_language":"de"},"user":{"country_code":"DE"}},
 				{"price_cents":300,"price_currency":"USD","quantity":0,"on_vacation":false,"properties_hash":{"mtg_language":"kr"},"user":{"country_code":"KR"}}]}`))
@@ -83,15 +85,22 @@ func TestCardTrader_RefreshKeepsCheapestPerLanguage(t *testing.T) {
 		got[o.Language] = o
 	}
 	if len(offers) != 2 {
-		t.Fatalf("want an English and a Japanese listing, got %+v", offers)
+		t.Fatalf("want English and Japanese Zero listings, got %+v", offers)
+	}
+	// A direct-ship seller (~$7 shipping a pack) doesn't count, even in the US.
+	if fr, ok := got["fr"]; ok {
+		t.Errorf("direct-ship listing kept: %+v", fr)
 	}
 	ja := got["ja"]
-	if ja.Price != 4.50 || ja.MTGStocksID != 1 || ja.Store != "CardTrader" || !strings.Contains(ja.Title, "Japanese · ships from IT") ||
+	// Prices include CardTrader's ~10% buyer fee: $4.50 listed -> $4.95.
+	if ja.Price != 4.95 || ja.MTGStocksID != 1 || ja.Store != "CardTrader" || !strings.Contains(ja.Title, "Japanese · ships from IT via Zero · incl. ~10% fee") ||
 		ja.URL != "https://www.cardtrader.com/en/cards/10#ja" {
 		t.Errorf("Japanese: %+v", ja)
 	}
-	if en := got["en"]; en.Price != 5.23 || !strings.Contains(en.Title, "English · ships from CA") {
-		t.Errorf("English (the $1 one is on vacation): %+v", en)
+	// The real Dragon's Maze case: the $5.23 Canadian seller can't ship
+	// sealed through CardTrader Zero, so the buyable English pack is $6.31.
+	if en := got["en"]; en.Price != 6.94 || !strings.Contains(en.Title, "English · ships from DE") { // $6.31 + 10%
+		t.Errorf("English (the $1 one is on vacation, the $5.23 one isn't Zero): %+v", en)
 	}
 	// 429 + expansions + one set's blueprints + one booster's listings.
 	if n := requests.Load(); n != 4 {
