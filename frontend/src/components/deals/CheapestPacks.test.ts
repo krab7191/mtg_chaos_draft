@@ -41,7 +41,7 @@ const button = (c: HTMLElement, label: string) =>
 describe('CheapestPacks', () => {
   it('lists packs with how they compare to their usual price, and opens a chart', async () => {
     const { container, fetchMock } = mount([
-      row(1, { watch: { mtgstocksId: 1, dropAlert: null }, alerts: ['dip'] }),
+      row(1, { watch: { mtgstocksId: 1, dropAlert: null }, alerts: ['dip'], ev: { value: 4.4, change: 0.08, day: '2026-11-19' } }),
       row(2, { trend: trend({ vsUsual: 0.05, dip: false }) }),
       row(3, { trend: trend({ vsUsual: 0.001, dip: false }) }),
       row(4, { trend: null, marketPrice: 6 }),
@@ -52,6 +52,7 @@ describe('CheapestPacks', () => {
     expect(text(1)).toContain('20% under usual');
     expect(text(1)).toContain('$4.00, 20% under its usual $5.00'); // the alert, in words
     expect(container.querySelector('#cheap-1')?.classList.contains('alerting')).toBe(true);
+    expect(text(1)).toContain('$4.40↑8% 2 wk');
     expect(text(2)).toContain('5% over usual');
     expect(text(3)).toContain('at usual');
     expect(text(4)).toContain('$6.00');

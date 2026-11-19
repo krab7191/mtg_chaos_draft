@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
+    SIGNALS, evText, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
   } from '../../lib/trends';
 
@@ -262,6 +262,7 @@
           <th class="num">Since release</th>
           <th class="num">Low since release</th>
           <th class="num">{th?.trendWindow ?? 30} days</th>
+          <th class="num" title="Value of the cards inside (pull rates x card prices), and its 2-week change">Contents</th>
           <th>Signal</th>
           <th>Trend</th>
           {#if canEdit}
@@ -306,6 +307,11 @@
               {#if t}<span class="sub">{t.aboveLow < 0.005 ? 'at the low' : `${pct(t.aboveLow)} above`}</span>{/if}
             </td>
             <td class="num">{t ? pct(t.change30) : '—'}</td>
+            <td class="num">
+              {#if evText(r)}
+                {evText(r)!.value}{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
+              {:else}—{/if}
+            </td>
             <td>
               {#if s}
                 <span class="signal signal--{t!.signal}" title={s.hint}><span aria-hidden="true">{s.icon}</span> {s.label}</span>
@@ -342,7 +348,7 @@
           </tr>
           {#if open === r.mtgstocksId}
             <tr class="detail">
-              <td colspan={canEdit ? 8 : 7}>
+              <td colspan={canEdit ? 9 : 8}>
                 <div class="detail__inner">
                   {#if history[r.mtgstocksId]}
                     <PriceChart
@@ -384,6 +390,10 @@
         usual right now", not "the bottom": in tests the price kept sliding about half the time.</li>
       <li><strong>$ Store deal</strong> (watched packs, once released): a store lists it in stock 15%+ under TCGplayer's
         market price (see Cheap Packs). Preorder listings don't count: before release the market price is preorder hype.</li>
+      <li><strong>Contents</strong> (packs): what the cards inside are worth on average, from MTGJSON's pull rates
+        and TCGplayer card prices, and how that moved over 2 weeks. When the cards are heating up (spoilers, new decks),
+        packs have tended to follow over the next few weeks; when they cool off, waiting tends to pay. In a 90-day test the
+        effect was a few percent, so it's a hint, not an alert. Collector packs sell well above their contents.</li>
       <li>Not tracked here: Jumpstart (casual half-decks, not drafted) and sleeved retail packs (gone weeks after
         release). Both can still be added to the collection.</li>
       <li><strong>▼ New low</strong> (watched products): the week's median price broke at least 2% below its previous low,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perPack, money, pct, age, filterRows, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
+import { perPack, money, pct, age, evText, filterRows, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 120, low: 100, lowDay: '2026-03-01', aboveLow: 0.2, change30: -0.02, releasePrice: 150,
@@ -103,6 +103,14 @@ describe('trends helpers', () => {
     expect(watchFeedback(row({ stock: 36, alerts: [] }))).toEqual({
       msg: 'Watching Set Play Booster Box. Alerts are muted: you have 36 packs.', alerting: false,
     });
+  });
+
+  it('describes the value of a pack\'s contents', () => {
+    expect(evText(row({}))).toBeNull();
+    expect(evText(row({ ev: { value: 43.2, day: '2026-11-19' } }))).toEqual({ value: '$43.20', change: null });
+    expect(evText(row({ ev: { value: 43.2, change: 0.061, day: '2026-11-19' } }))!.change).toBe('↑6%');
+    expect(evText(row({ ev: { value: 43.2, change: -0.12, day: '2026-11-19' } }))!.change).toBe('↓12%');
+    expect(evText(row({ ev: { value: 43.2, change: 0.001, day: '2026-11-19' } }))!.change).toBe('→ flat');
   });
 
   it('notes low stock only', () => {

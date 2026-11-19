@@ -35,4 +35,9 @@ func RefreshPrices(ctx context.Context, pool *pgxpool.Pool) {
 	if err := MaybeRunBacktest(ctx, pool); err != nil {
 		log.Printf("backtest: %v", err)
 	}
+	if evEnabled {
+		if err := RefreshEV(ctx, pool); err != nil {
+			log.Printf("pack EV: %v", err)
+		}
+	}
 }

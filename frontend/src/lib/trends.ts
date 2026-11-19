@@ -47,6 +47,8 @@ export interface TrendRow {
   watch: Watch | null;
   alerts: AlertReason[];
   deal?: RowDeal;
+  /** Value of a pack's contents (pull rates x card prices) and its 2-week change. */
+  ev?: { value: number; change?: number; day: string };
   /** Packs of this set and kind in the collection (loose packs for a box row). */
   stock?: number;
 }
@@ -202,6 +204,14 @@ export function watchFeedback(r: TrendRow): { msg: string; alerting: boolean } {
   }
   const now = r.trend ? SIGNALS[r.trend.signal].label.toLowerCase() : 'no price history yet';
   return { msg: `Watching ${name}. No alert right now (${now}).`, alerting: false };
+}
+
+/** "$43" and "↑6%" (2-week change, when known) for a pack's contents value. */
+export function evText(r: TrendRow): { value: string; change: string | null } | null {
+  if (!r.ev) return null;
+  const c = r.ev.change;
+  const change = c == null ? null : Math.round(c * 100) === 0 ? '→ flat' : `${c > 0 ? '↑' : '↓'}${Math.abs(Math.round(c * 100))}%`;
+  return { value: money(r.ev.value), change };
 }
 
 /** Below this many packs, an alert notes how many you have. */

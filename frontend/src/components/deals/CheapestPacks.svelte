@@ -3,7 +3,7 @@
   import { getJSON } from '../../lib/api';
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
-  import { money, pct, age, alertText, type TrendRow, type PricePoint } from '../../lib/trends';
+  import { money, pct, age, alertText, evText, type TrendRow, type PricePoint } from '../../lib/trends';
   import { searchLinks } from '../../lib/deals';
   import Sparkline from '../trends/Sparkline.svelte';
   import PriceChart from '../trends/PriceChart.svelte';
@@ -102,6 +102,7 @@
             <th class="num">Price</th>
             <th class="num">vs usual</th>
             <th class="num">30 days</th>
+            <th class="num" title="Value of the cards inside (pull rates x card prices), and its 2-week change">Contents</th>
             <th>Trend</th>
             {#if canEdit}<th>Watch</th>{/if}
             <th>Elsewhere</th>
@@ -122,6 +123,11 @@
               <td class="num">{money(t?.current ?? r.marketPrice)}</td>
               <td class="num" class:dip={t?.dip}>{vsUsual(r) ?? '—'}</td>
               <td class="num">{t ? pct(t.change30) : '—'}</td>
+              <td class="num">
+                {#if evText(r)}
+                  {evText(r)!.value}{#if evText(r)!.change}<span class="sub">{evText(r)!.change} 2 wk</span>{/if}
+                {:else}—{/if}
+              </td>
               <td>{#if t}<Sparkline values={t.spark} />{/if}</td>
               {#if canEdit}
                 <td>
@@ -148,7 +154,7 @@
             </tr>
             {#if open === r.mtgstocksId}
               <tr class="detail">
-                <td colspan={canEdit ? 8 : 7}>
+                <td colspan={canEdit ? 9 : 8}>
                   <div class="detail__inner">
                     {#if history[r.mtgstocksId]}
                       <PriceChart

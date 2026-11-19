@@ -393,6 +393,9 @@ type trendRow struct {
 	Alerts []string  `json:"alerts"`
 	// Deal is the best store listing well under market, if any.
 	Deal *Deal `json:"deal,omitempty"`
+	// EV is the value of the pack's contents (MTGJSON pull rates x card
+	// prices) and how it moved over the last two weeks; packs only.
+	EV *EVInfo `json:"ev,omitempty"`
 	// Stock is how many packs of this set and pack type are in the
 	// collection (a box row counts loose packs of the kind it holds).
 	Stock int `json:"stock"`
@@ -640,6 +643,10 @@ func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchR
 		return nil, err
 	}
 	deals := bestDeals(offers, c.products)
+	evs, err := db.LatestEV(ctx, h.pool, ids, evMomentumDays)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]trendRow, 0, len(products))
 	for _, p := range products {
 		var released *time.Time
@@ -653,6 +660,9 @@ func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchR
 		row.Alerts = alertsFor(row.Trend, row.Watch, row.Stock)
 		row.Deal = deals[p.MTGStocksID]
 		row.Alerts = withDealAlert(row.Alerts, row.Watch, row.Deal, row.Stock)
+		if e, ok := evs[p.MTGStocksID]; ok {
+			row.EV = evInfo(e)
+		}
 		out = append(out, row)
 	}
 	return out, nil

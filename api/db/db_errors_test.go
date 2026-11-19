@@ -66,6 +66,13 @@ func TestDB_DatabaseDown(t *testing.T) {
 			return db.SaveCardTraderExpansion(ctx, pool, 1, []db.CTBlueprint{{BlueprintID: 1, MTGStocksID: 1, Name: "B"}})
 		},
 		"CardTraderBlueprints": func() error { return errOnly(db.CardTraderBlueprints(ctx, pool)) },
+		"SaveBoosters":         func() error { return db.SaveBoosters(ctx, pool, "x", []byte("{}")) },
+		"LoadBoosters":         func() error { return errOnly(db.LoadBoosters(ctx, pool)) },
+		"RecordEV": func() error {
+			return db.RecordEV(ctx, pool, map[time.Time]map[int]float64{time.Now(): {1: 1}})
+		},
+		"EVDays":               func() error { return errOnly(db.EVDays(ctx, pool)) },
+		"LatestEV":             func() error { return errOnly(db.LatestEV(ctx, pool, []int{1}, 14)) },
 		"GetWeightSettings":    func() error { return errOnly(db.GetWeightSettings(ctx, pool)) },
 		"UpdateWeightSettings": func() error { return errOnly(db.UpdateWeightSettings(ctx, pool, &db.WeightSettings{})) },
 		"GetOrCreateUser":      func() error { return errOnly(db.GetOrCreateUser(ctx, pool, "g", "e@x", "N", "")) },

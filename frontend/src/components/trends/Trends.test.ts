@@ -149,12 +149,15 @@ describe('Trends page', () => {
     const { container } = await mount([
       row(1, { trend: trend({ signal: 'floor' }), watch: w(1), alerts: ['floor'] }),
       row(2, { packsPerBox: undefined, productType: 'Collector Booster', trend: trend({ newLow: true, prevLow: 130 }), watch: w(2), alerts: ['new_low'] }),
-      row(3, { trend: trend({ signal: 'floor' }), watch: w(3), alerts: [], stock: 36 }), // muted by stock
+      row(3, { trend: trend({ signal: 'floor' }), watch: w(3), alerts: [], stock: 36, // muted by stock
+        ev: { value: 43.2, change: -0.12, day: '2026-11-19' } }),
       row(4),
     ]);
     // Muted: the signal shows, with the reason.
     expect(container.querySelector('#trend-3')?.textContent).toContain('alert muted · you own 36');
     expect(container.querySelector('#trend-1')?.textContent).not.toContain('muted');
+    // The value of the contents and its 2-week move.
+    expect(container.querySelector('#trend-3')?.textContent).toContain('$43.20↓12% 2 wk');
 
     await act(() => fireEvent.click(button(container, 'Needs a look (2)')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);

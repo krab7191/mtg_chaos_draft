@@ -58,7 +58,7 @@ func TestPackIndex_MatchesRealTitles(t *testing.T) {
 }
 
 // Tests never reach real stores: individual tests point a store at a fake.
-func init() { shopifyStores, cardKingdomURL = nil, "" }
+func init() { shopifyStores, cardKingdomURL, evEnabled = nil, "", false }
 
 // fakeShopify serves a collection: page 1 is full (250 products) so a second
 // page is fetched. status, if set, answers every request instead.
