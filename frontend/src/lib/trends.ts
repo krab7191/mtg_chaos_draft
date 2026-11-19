@@ -152,9 +152,12 @@ export function alertText(r: TrendRow, reason: AlertReason): string {
   return `${pct(-t.dropFromRelease)} since release, past your ${pct(-(r.watch?.dropAlert ?? 0))} alert`;
 }
 
+/** With this many packs in the collection, alerts are muted (mirrors the API). */
+export const MUTE_AT_STOCK = 20;
+
 /** Why a watched product needs attention right now (mirrors the API's rule). */
-export function alertsFor(t: Trend | null, w: Watch | null): AlertReason[] {
-  if (!t || !w) return [];
+export function alertsFor(t: Trend | null, w: Watch | null, stock = 0): AlertReason[] {
+  if (!t || !w || stock >= MUTE_AT_STOCK) return [];
   return [
     ...(t.signal === 'floor' ? ['floor' as const] : []),
     ...(w.dropAlert != null && t.dropFromRelease >= w.dropAlert ? ['drop' as const] : []),
@@ -167,6 +170,9 @@ export function watchFeedback(r: TrendRow): { msg: string; alerting: boolean } {
   const name = `${r.setName} ${r.productType}`;
   if (r.alerts.length > 0) {
     return { msg: `Watching ${name}: alert now, ${r.alerts.map(a => alertText(r, a)).join('; ')}`, alerting: true };
+  }
+  if ((r.stock ?? 0) >= MUTE_AT_STOCK) {
+    return { msg: `Watching ${name}. Alerts are muted: you have ${r.stock} packs.`, alerting: false };
   }
   const now = r.trend ? SIGNALS[r.trend.signal].label.toLowerCase() : 'no price history yet';
   return { msg: `Watching ${name}. No alert right now (${now}).`, alerting: false };

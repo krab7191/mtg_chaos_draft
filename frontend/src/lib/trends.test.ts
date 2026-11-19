@@ -66,12 +66,18 @@ describe('trends helpers', () => {
     expect(alertsFor(trend({ dropFromRelease: 0.1 }), w)).toEqual([]);
     expect(alertsFor(trend({ signal: 'floor' }), null)).toEqual([]);
     expect(alertsFor(null, w)).toEqual([]);
+    // 20+ packs in the collection mute alerts; 19 don't.
+    expect(alertsFor(trend({ signal: 'floor' }), w, 19)).toEqual(['floor']);
+    expect(alertsFor(trend({ signal: 'floor' }), w, 20)).toEqual([]);
   });
 
   it('gives watch feedback with or without history', () => {
     expect(watchFeedback(row({ trend: null })).msg).toContain('(no price history yet)');
     expect(watchFeedback(row({ trend: trend({ signal: 'rising' }) }))).toEqual({
       msg: 'Watching Set Play Booster Box. No alert right now (rising).', alerting: false,
+    });
+    expect(watchFeedback(row({ stock: 36, alerts: [] }))).toEqual({
+      msg: 'Watching Set Play Booster Box. Alerts are muted: you have 36 packs.', alerting: false,
     });
   });
 

@@ -172,17 +172,24 @@ func TestSummarize_Edges(t *testing.T) {
 func TestAlertsFor(t *testing.T) {
 	drop := 0.3
 	floor := &Trend{Signal: SignalFloor, DropFromRelease: 0.35}
-	if got := alertsFor(floor, &db.Watch{DropAlert: &drop}); strings.Join(got, ",") != "floor,drop" {
+	if got := alertsFor(floor, &db.Watch{DropAlert: &drop}, 0); strings.Join(got, ",") != "floor,drop" {
 		t.Errorf("both: %v", got)
 	}
-	if got := alertsFor(&Trend{Signal: SignalFalling, DropFromRelease: 0.1}, &db.Watch{DropAlert: &drop}); len(got) != 0 {
+	if got := alertsFor(&Trend{Signal: SignalFalling, DropFromRelease: 0.1}, &db.Watch{DropAlert: &drop}, 0); len(got) != 0 {
 		t.Errorf("none: %v", got)
 	}
-	if got := alertsFor(floor, nil); len(got) != 0 {
+	if got := alertsFor(floor, nil, 0); len(got) != 0 {
 		t.Errorf("unwatched: %v", got)
 	}
-	if got := alertsFor(nil, &db.Watch{}); len(got) != 0 {
+	if got := alertsFor(nil, &db.Watch{}, 0); len(got) != 0 {
 		t.Errorf("no trend: %v", got)
+	}
+	// 20+ packs in the collection mute the alerts; 19 don't.
+	if got := alertsFor(floor, &db.Watch{DropAlert: &drop}, 19); len(got) != 2 {
+		t.Errorf("19 in stock: %v", got)
+	}
+	if got := alertsFor(floor, &db.Watch{DropAlert: &drop}, 20); len(got) != 0 {
+		t.Errorf("20 in stock should mute: %v", got)
 	}
 }
 
@@ -626,7 +633,7 @@ func TestNewLow(t *testing.T) {
 	if !tr.NewLow || math.Abs(tr.PrevLow-6) > 1e-9 {
 		t.Errorf("break below $6: newLow=%v prev=%v", tr.NewLow, tr.PrevLow)
 	}
-	if got := alertsFor(tr, &db.Watch{}); !slices.Contains(got, AlertNewLow) {
+	if got := alertsFor(tr, &db.Watch{}, 0); !slices.Contains(got, AlertNewLow) {
 		t.Errorf("alerts: %v", got)
 	}
 	// One cheap sale isn't a new low: the weekly average barely moves.

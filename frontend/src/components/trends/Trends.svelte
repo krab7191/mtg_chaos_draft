@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet,
+    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
   } from '../../lib/trends';
 
@@ -58,7 +58,7 @@
     const hadAlert = r.alerts.length > 0;
     r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert } : null;
     // Recompute this row's alerts locally; the next load confirms them.
-    r.alerts = alertsFor(r.trend, r.watch);
+    r.alerts = alertsFor(r.trend, r.watch, r.stock);
     // Say right away whether it would alert: on a new watch, or when a
     // changed drop alert starts firing.
     if (watch && (!wasWatched || (!hadAlert && r.alerts.length > 0))) {
@@ -78,7 +78,7 @@
     if (!ok) return;
     for (const r of targets) {
       r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert: null } : null;
-      r.alerts = alertsFor(r.trend, r.watch);
+      r.alerts = alertsFor(r.trend, r.watch, r.stock);
     }
     if (watch) {
       const alerting = targets.filter(r => r.alerts.length > 0).length;
@@ -359,6 +359,8 @@
         within 5% of the low and ~50% within 10% (median ~10% above it); waiting a fixed 3 months lands within 5% only ~6%
         of the time for boxes. Collector: ~26% within 5%. It's a strong hint, not a guarantee. Watched products that hit
         a floor raise an alert.</li>
+      <li>Alerts are muted for products you already have {MUTE_AT_STOCK}+ packs of (counting loose packs of the
+        same set and kind); the signal still shows in the table.</li>
       <li>Not tracked here: Jumpstart (casual half-decks, not drafted) and sleeved retail packs (gone weeks after
         release). Both can still be added to the collection.</li>
       <li><strong>▼ New low</strong> (watched products): the week's median price broke at least 2% below its previous low,

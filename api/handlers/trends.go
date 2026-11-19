@@ -418,10 +418,15 @@ func newLow(since []db.PricePoint) (bool, float64) {
 	return avg[len(avg)-1] < prev*(1-newLowBreak), prev
 }
 
-// alertsFor lists why a watched product needs attention.
-func alertsFor(t *Trend, w *db.Watch) []string {
+// muteAtStock: with this many packs of a product's kind in the collection,
+// its alerts are muted (the signal still shows): no need to buy more.
+const muteAtStock = 20
+
+// alertsFor lists why a watched product needs attention, given how many
+// packs of it the collection holds.
+func alertsFor(t *Trend, w *db.Watch, stock int) []string {
 	alerts := []string{}
-	if t == nil || w == nil {
+	if t == nil || w == nil || stock >= muteAtStock {
 		return alerts
 	}
 	if t.Signal == SignalFloor {
@@ -448,6 +453,7 @@ type trendsResponse struct {
 	Tracked       int  `json:"tracked"`
 	Thresholds    struct {
 		NewSetDays  int                  `json:"newSetDays"`
+		MuteAtStock int                  `json:"muteAtStock"`
 		TrendWindow int                  `json:"trendWindow"`
 		TrendMove   float64              `json:"trendMove"`
 		FloorRules  map[string]FloorRule `json:"floorRules"`
@@ -532,7 +538,7 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		resp.LastBacktest = &lastRun
 	}
 	th := &resp.Thresholds
-	th.NewSetDays, th.TrendWindow, th.TrendMove = newSetDays, trendWindow, trendMove
+	th.NewSetDays, th.TrendWindow, th.TrendMove, th.MuteAtStock = newSetDays, trendWindow, trendMove, muteAtStock
 	th.FloorRules = activeRules()
 	for _, p := range picked {
 		var released *time.Time
@@ -544,7 +550,7 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		if wt, ok := watches[p.MTGStocksID]; ok {
 			row.Watch = &wt
 		}
-		row.Alerts = alertsFor(row.Trend, row.Watch)
+		row.Alerts = alertsFor(row.Trend, row.Watch, row.Stock)
 		resp.Products = append(resp.Products, row)
 	}
 	sort.SliceStable(resp.Products, func(i, j int) bool {

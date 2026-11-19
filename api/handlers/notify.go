@@ -112,6 +112,11 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 	if err != nil {
 		return nil, err
 	}
+	collection, err := db.ListCollection(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	stock := newStockIndex(collection)
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	out := make([]watchedAlert, 0, len(picked))
 	for _, p := range picked {
@@ -121,7 +126,7 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 		}
 		w := watches[p.MTGStocksID]
 		t := summarize(history[p.MTGStocksID], released, today, ruleFor(p.ProductType))
-		out = append(out, watchedAlert{product: p, trend: t, watch: w, alerts: alertsFor(t, &w)})
+		out = append(out, watchedAlert{product: p, trend: t, watch: w, alerts: alertsFor(t, &w, stock.of(p))})
 	}
 	return out, nil
 }

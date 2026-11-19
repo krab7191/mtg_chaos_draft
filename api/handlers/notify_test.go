@@ -127,6 +127,40 @@ func TestNotifyAlerts_SingleAlertGetsItsOwnMessage(t *testing.T) {
 	}
 }
 
+func TestNotifyAlerts_MutedWithPlentyInStock(t *testing.T) {
+	ctx := trendsDB(t)
+	pool := testhelper.Pool(t)
+	ntfy := newFakeNtfy(t)
+	_ = db.SetWatch(ctx, pool, db.Watch{MTGStocksID: 1})
+	seedFloor(t, ctx, 6)
+	testhelper.Truncate(t, pool, "collection_packs")
+	clear := func() {
+		if _, err := pool.Exec(ctx, `TRUNCATE collection_packs RESTART IDENTITY CASCADE`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	clear()
+	if _, err := db.AddPack(ctx, pool, 999, "x", "Test Set", "TST", "Draft Booster", muteAtStock, 1, nil, 15); err != nil {
+		t.Fatal(err)
+	}
+	withMockClient(200, fakeSetsJSON, func() {
+		if n, err := NotifyAlerts(ctx, pool); n != 0 || err != nil {
+			t.Fatalf("20 packs in stock: want no notification, got %d %v", n, err)
+		}
+	})
+	if ntfy.count() != 0 {
+		t.Errorf("sent: %v", ntfy.bodies)
+	}
+	// Down to 19: alerts again.
+	clear()
+	_, _ = db.AddPack(ctx, pool, 999, "x", "Test Set", "TST", "Draft Booster", muteAtStock-1, 1, nil, 15)
+	withMockClient(200, fakeSetsJSON, func() {
+		if n, err := NotifyAlerts(ctx, pool); n != 1 || err != nil {
+			t.Fatalf("19 packs: want 1 notification, got %d %v", n, err)
+		}
+	})
+}
+
 func TestWatching_MarksExistingAlertsSeen(t *testing.T) {
 	ctx := trendsDB(t)
 	pool := testhelper.Pool(t)
