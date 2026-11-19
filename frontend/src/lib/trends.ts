@@ -149,6 +149,21 @@ export function age(iso: string, today = new Date()): string {
   return `${(days / 365.25).toFixed(1)} yr`;
 }
 
+/** "Released in the last …" choices; 30 means every set. */
+export const YEAR_OPTIONS = [1, 2, 5, 10, 30];
+export const yearsLabel = (y: number) => (y === 1 ? 'year' : y >= 30 ? 'all years' : `${y} years`);
+
+/** The smallest window that covers every watched product in rows. */
+export function windowFor(rows: TrendRow[], today = new Date()): number {
+  let oldest = Infinity;
+  for (const r of rows) {
+    if (r.watch && r.releasedAt) oldest = Math.min(oldest, new Date(r.releasedAt).getTime());
+  }
+  if (!Number.isFinite(oldest)) return 0;
+  const ageYears = (today.getTime() - oldest) / (365.25 * 86_400_000);
+  return YEAR_OPTIONS.find(y => y >= ageYears) ?? YEAR_OPTIONS[YEAR_OPTIONS.length - 1];
+}
+
 export type KindFilter = 'pack' | 'box';
 export type ShowFilter = 'all' | 'alerting' | 'floor' | 'watched';
 

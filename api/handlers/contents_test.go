@@ -75,10 +75,17 @@ func TestContents(t *testing.T) {
 		t.Errorf("unknown: %d", code)
 	}
 
-	// A listing far above the contents is flagged as a premium.
-	deals := offersWithMarket([]db.Offer{{Store: "S", URL: "u", MTGStocksID: 1, Price: 50, Available: true}}, mustCatalog(t).products)
-	if len(deals) != 1 || deals[0].Contents != 14.5 || !deals[0].Premium {
+	// Listings carry the contents value; one at 3x+ the contents is a premium.
+	listing := []db.Offer{{Store: "S", URL: "u", MTGStocksID: 1, Title: "Test Set Draft Booster Pack", Price: 8, Available: true}}
+	deals := offersWithMarket(listing, mustCatalog(t).products)
+	if len(deals) != 1 || deals[0].Contents != 14.5 || deals[0].Premium {
 		t.Errorf("listing: %+v", deals)
+	}
+	contentsMu.Lock()
+	contentsValue[1] = 2 // pretend the cards inside crashed
+	contentsMu.Unlock()
+	if deals := offersWithMarket(listing, mustCatalog(t).products); len(deals) != 1 || !deals[0].Premium {
+		t.Errorf("premium: %+v", deals)
 	}
 	if slotName("foilRareMythic") != "foil rare mythic" {
 		t.Errorf("slot name: %q", slotName("foilRareMythic"))

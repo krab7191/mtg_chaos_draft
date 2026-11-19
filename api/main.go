@@ -33,6 +33,8 @@ var (
 	maintenanceInterval = 24 * time.Hour
 	backfillPrices      = handlers.BackfillPriceHistory
 	backfillInterval    = time.Hour
+	refreshMarkets      = handlers.RefreshMarketplaces
+	marketsInterval     = 2 * time.Hour
 )
 
 const viewerEmailsPath = "/etc/mtg-chaos-draft/viewer_emails"
@@ -75,6 +77,7 @@ func run(ctx context.Context, getenv func(string) string, viewerPath string) err
 	defer bgCancel()
 	go runMaintenance(bgCtx, pool, maintenanceInterval)
 	go runBackfill(bgCtx, pool, backfillInterval)
+	go runEvery(bgCtx, marketsInterval, func() { refreshMarkets(bgCtx, pool) })
 
 	redirectURL := env["GOOGLE_REDIRECT_URL"]
 	oauthConfig := &oauth2.Config{
@@ -130,6 +133,21 @@ func runMaintenance(ctx context.Context, pool *pgxpool.Pool, interval time.Durat
 		if err := db.DeleteExpiredSessions(ctx, pool); err != nil && ctx.Err() == nil {
 			log.Printf("session cleanup: %v", err)
 		}
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// runEvery runs job now and then every interval until ctx ends (Card
+// Kingdom and CardTrader listings: their prices move within hours).
+func runEvery(ctx context.Context, interval time.Duration, job func()) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		job()
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():

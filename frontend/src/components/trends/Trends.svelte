@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, evText, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
+    SIGNALS, evText, filterRows, YEAR_OPTIONS, yearsLabel, windowFor, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
   } from '../../lib/trends';
 
@@ -26,7 +26,17 @@
     if (res) data = res;
     loading = false;
   }
-  onMount(load);
+
+  // The list always includes watched packs, however old. So the window opens
+  // wide enough to cover the oldest one, and the dropdown says what's shown.
+  onMount(async () => {
+    await load();
+    const needed = windowFor(data?.products ?? []);
+    if (needed > years) {
+      years = needed;
+      await load();
+    }
+  });
 
   const rows = $derived(data ? filterRows(data.products, kind, show) : []);
   const alerting = $derived(data ? data.products.filter(r => r.alerts.length > 0) : []);
@@ -225,9 +235,7 @@
   <label class="years">
     Released in the last
     <select bind:value={years} onchange={load}>
-      <option value={1}>year</option>
-      <option value={2}>2 years</option>
-      <option value={5}>5 years</option>
+      {#each YEAR_OPTIONS as y (y)}<option value={y}>{yearsLabel(y)}</option>{/each}
     </select>
   </label>
   {#if data && data.backfilled < data.tracked}

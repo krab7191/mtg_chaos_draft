@@ -4,7 +4,10 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import { money, pct } from '../../lib/trends';
-  import { filterOffers, searchLinks, languageLabel, type OffersResponse, type OfferView, type StoreOffer } from '../../lib/deals';
+  import {
+    filterOffers, applyFilters, languagesIn, searchLinks, languageLabel, LANGUAGES, NO_FILTERS,
+    type OffersResponse, type OfferView, type StoreOffer, type OfferFilters,
+  } from '../../lib/deals';
 
   let { canEdit = false }: { canEdit?: boolean } = $props();
 
@@ -12,6 +15,27 @@
   let loading = $state(true);
   let view = $state<OfferView>('deals');
   let watched = $state(new Set<number>());
+
+  // Filters are per viewer (others use this page too), remembered in this browser.
+  const FILTERS_KEY = 'storeListingFilters';
+  function loadFilters(): OfferFilters {
+    try {
+      const raw = localStorage.getItem(FILTERS_KEY);
+      return raw ? { ...NO_FILTERS, ...JSON.parse(raw) } : { ...NO_FILTERS };
+    } catch {
+      return { ...NO_FILTERS };
+    }
+  }
+  let filters = $state<OfferFilters>(loadFilters());
+  $effect(() => {
+    try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch { /* private mode: not remembered */ }
+  });
+  function toggleLanguage(lang: string, on: boolean) {
+    const all = languages;
+    const current = filters.languages ?? all;
+    const next = on ? [...new Set([...current, lang])] : current.filter(l => l !== lang);
+    filters.languages = next.length === all.length ? null : next;
+  }
 
   onMount(async () => {
     const res = await getJSON<OffersResponse>('/api/store-offers', "Couldn't load store listings");
@@ -24,10 +48,14 @@
     loading = false;
   });
 
-  const rows = $derived(data ? filterOffers(data.offers, view) : []);
-  const dealCount = $derived(data ? data.offers.filter(o => o.isDeal).length : 0);
+  const languages = $derived(data ? languagesIn(data.offers) : []);
+  const filtered = $derived(data ? applyFilters(data.offers, filters) : []);
+  const rows = $derived(filterOffers(filtered, view));
+  const dealCount = $derived(filtered.filter(o => o.isDeal).length);
   const year = (iso: string) => iso.slice(0, 4);
   const packName = (o: StoreOffer) => (o.productType === 'Booster Pack' ? 'Booster Pack' : o.productType);
+  /** The store's own name for it (CardTrader titles carry " · language · ships from …"). */
+  const listingName = (o: StoreOffer) => (o.title ? o.title.split(' · ')[0].replace(/^Magic the Gathering:\s*/i, '') : `${o.setName} ${packName(o)}`);
 
   async function setWatch(o: StoreOffer, watch: boolean) {
     const ok = await send(`/api/trends/${o.mtgstocksId}/watch`, 'PUT', { watch, dropAlert: null }, "Couldn't update the watch");
@@ -43,8 +71,8 @@
   <h2 id="deals-title" class="deals__title">Store listings</h2>
   {#if data}
     <p class="deals__sub">
-      Single packs at {data.stores.length ? data.stores.join(', ') : 'online stores'}, checked daily and compared with
-      TCGplayer's market price. A <strong>deal</strong> is in stock and {Math.round(data.dealDiscount * 100)}%+ under market;
+      Single packs at {data.stores.length ? data.stores.join(', ') : 'online stores'} (Card Kingdom and CardTrader checked
+      every 2 hours, others daily), compared with TCGplayer's market price. Unreleased sets aren't listed. A <strong>deal</strong> is in stock and {Math.round(data.dealDiscount * 100)}%+ under market;
       watched packs alert your phone when one appears. Foreign-language packs are labelled and compared with the English
       pack's market price. Prices don't include shipping.
     </p>
@@ -63,8 +91,30 @@
       <button class:on={view === 'all'} aria-pressed={view === 'all'} onclick={() => (view = 'all')}>All listings</button>
     </div>
 
+    <div class="filters">
+      <fieldset class="langs">
+        <legend>Languages</legend>
+        {#each languages as lang (lang)}
+          <label>
+            <input type="checkbox" checked={filters.languages == null || filters.languages.includes(lang)}
+              onchange={e => toggleLanguage(lang, e.currentTarget.checked)} />
+            {LANGUAGES[lang] ?? lang.toUpperCase()}
+          </label>
+        {/each}
+      </fieldset>
+      <label class="maxprice">
+        Max price $
+        <input type="number" min="0" step="1" inputmode="decimal" placeholder="any" value={filters.maxPrice ?? ''}
+          onchange={e => { const v = parseFloat(e.currentTarget.value); filters.maxPrice = Number.isFinite(v) && v > 0 ? v : null; }} />
+      </label>
+      <label>
+        <input type="checkbox" bind:checked={filters.showOver} />
+        Show listings above market
+      </label>
+    </div>
+
     {#if rows.length === 0}
-      <p class="note">No deals right now. Watch a pack to get an alert when one shows up.</p>
+      <p class="note">{view === 'deals' ? 'No deals right now' : 'Nothing matches'} with these filters. Watch a pack to get an alert when a deal shows up.</p>
     {:else}
       <div class="table-wrap">
         <table class="offers">
@@ -83,13 +133,14 @@
             {#each rows as o (o.store + o.url)}
               <tr class:deal={o.isDeal} class:soldout={!o.available}>
                 <td class="name">
-                  {o.setName}
+                  <!-- What the store calls it, then what it's priced against, so a wrong match shows. -->
+                  {listingName(o)}
                   {#if languageLabel(o.language)}<span class="lang">{languageLabel(o.language)}</span>{/if}
-                  <span class="sub">{packName(o)} · {year(o.releasedAt)}</span>
+                  <span class="sub">priced as MTGStocks' {o.setName} {packName(o)} · {year(o.releasedAt)}</span>
                 </td>
                 <td>
                   <a href={o.url} target="_blank" rel="noopener noreferrer">{o.store}</a>
-                  <span class="sub">{o.available ? 'In stock' : 'Sold out'}{o.preorder ? ' · Preorder' : ''}</span>
+                  <span class="sub">{o.available ? 'In stock' : 'Sold out'}</span>
                 </td>
                 <td class="num">
                   {money(o.price)}
@@ -162,6 +213,11 @@
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
   .sub.warn { color: var(--color-danger); }
+  .filters { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; margin-bottom: 0.8rem; font-size: 0.82rem; color: var(--color-text-muted); }
+  .langs { border: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem; align-items: center; }
+  .langs legend { float: left; margin-right: 0.6rem; }
+  .filters label { display: inline-flex; gap: 0.3rem; align-items: center; cursor: pointer; }
+  .maxprice input { width: 5rem; font: inherit; }
   .lang {
     margin-left: 0.35rem; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 999px;
     border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap;

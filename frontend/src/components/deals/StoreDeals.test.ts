@@ -4,10 +4,10 @@ import StoreDeals from './StoreDeals.svelte';
 import { toast } from '../../lib/toast.svelte';
 import type { OffersResponse, StoreOffer } from '../../lib/deals';
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 
 const offer = (id: number, over: Partial<StoreOffer> = {}): StoreOffer => ({
-  store: 'Collector Store', url: `https://x/${id}`, mtgstocksId: id, title: 't', price: 40, available: true,
+  store: 'Collector Store', url: `https://x/${id}`, mtgstocksId: id, title: `Magic the Gathering: Set ${id} Draft Booster Pack`, price: 40, available: true,
   seenAt: '2026-11-19T00:00:00Z', setName: `Set ${id}`, productType: 'Booster Pack', releasedAt: '2000-06-05',
   marketPrice: 56, discount: 0.29, isDeal: true, ...over,
 });
@@ -25,15 +25,18 @@ function mount(resp: OffersResponse | null, props = { canEdit: true }, watch: { 
   return { ...render(StoreDeals, { props }), fetchMock };
 }
 
-const names = (c: HTMLElement) => Array.from(c.querySelectorAll('tbody td.name')).map(td => td.firstChild?.textContent?.trim());
+const names = (c: HTMLElement) => Array.from(c.querySelectorAll('tbody td.name'))
+  .map(td => td.querySelector('.sub')?.textContent?.match(/MTGStocks' (Set \d+)/)?.[1]);
 const button = (c: HTMLElement, label: string) =>
   Array.from(c.querySelectorAll('button')).find(b => b.textContent?.trim() === label)!;
+const checkbox = (c: HTMLElement, label: string) =>
+  Array.from(c.querySelectorAll('label')).find(l => l.textContent?.trim() === label)!.querySelector('input')!;
 
 describe('StoreDeals', () => {
   const resp: OffersResponse = {
     offers: [
       offer(1, { contents: 31 }),
-      offer(2, { isDeal: false, discount: -0.1, price: 61.6, preorder: true, contents: 12, premium: true }),
+      offer(2, { isDeal: false, discount: -0.1, price: 61.6, contents: 12, premium: true }),
       offer(3, { isDeal: false, available: false, discount: 0.4, language: 'ja' }),
     ],
     stores: ['Collector Store'], watched: [2], dealDiscount: 0.15,
@@ -46,12 +49,16 @@ describe('StoreDeals', () => {
     expect(container.querySelector('tbody')?.textContent).toContain('29% under');
     expect(container.querySelector('tbody')?.textContent).toContain('contents $31.00');
     expect(container.querySelector('tbody a')?.getAttribute('href')).toBe('https://x/1');
+    // The store's own name, then what it's priced against.
+    expect(container.querySelector('tbody td.name')?.textContent).toContain('Set 1 Draft Booster Pack');
+    expect(container.querySelector('tbody td.name')?.textContent).toContain("priced as MTGStocks' Set 1 Booster Pack · 2000");
     expect(Array.from(container.querySelectorAll('.elsewhere a')).map(a => a.textContent)).toContain('Card Kingdom');
 
     await act(() => fireEvent.click(button(container, 'In stock')));
+    expect(names(container)).toEqual(['Set 1']); // Set 2 is above market: hidden by default
+    await act(() => fireEvent.click(checkbox(container, 'Show listings above market')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);
     expect(container.querySelector('tbody')?.textContent).toContain('10% over');
-    expect(container.querySelector('tbody')?.textContent).toContain('In stock · Preorder');
     expect(container.querySelector('tbody')?.textContent).toContain('⚠ 5.1× contents');
     await act(() => fireEvent.click(button(container, 'All listings')));
     expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']);
@@ -66,7 +73,7 @@ describe('StoreDeals', () => {
     await waitFor(() => expect(names(container)).toEqual(['Set 2']));
     expect(container.querySelector('tbody')?.textContent).toContain('at market');
     await act(() => fireEvent.click(button(container, 'Deals (0)')));
-    expect(container.textContent).toContain('No deals right now');
+    expect(container.textContent).toContain('No deals right now with these filters');
   });
 
   it('watches a pack from its listing, and snaps back if saving fails', async () => {
@@ -104,5 +111,66 @@ describe('StoreDeals', () => {
 
     const failed = mount(null);
     await waitFor(() => expect(failed.container.textContent).toContain("Store listings aren't available right now"));
+  });
+});
+
+describe('StoreDeals listing names', () => {
+  it("drops CardTrader's language and seller suffix, and falls back to the product without a title", async () => {
+    const resp: OffersResponse = {
+      offers: [
+        offer(1, { store: 'CardTrader', title: "Dragon's Maze Booster · Japanese · ships from BE", language: 'ja' }),
+        offer(2, { title: '' }),
+      ],
+      stores: ['CardTrader'], watched: [], dealDiscount: 0.15,
+    };
+    const { container } = mount(resp);
+    await waitFor(() => expect(container.querySelectorAll('tbody td.name')).toHaveLength(2));
+    const cells = Array.from(container.querySelectorAll('tbody td.name')).map(td => td.textContent ?? '');
+    expect(cells[0]).toContain("Dragon's Maze Booster");
+    expect(cells[0]).not.toContain('ships from');
+    expect(cells[1]).toContain('Set 2 Booster Pack');
+  });
+});
+
+describe('StoreDeals filters', () => {
+  const resp: OffersResponse = {
+    offers: [
+      offer(1, { price: 4 }),
+      offer(2, { price: 30, language: 'it' }),
+      offer(3, { price: 8, language: 'ja' }),
+    ],
+    stores: ['CardTrader'], watched: [], dealDiscount: 0.15,
+  };
+
+  it('filters by language and max price, and remembers the choice', async () => {
+    const { container, unmount } = mount(resp);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']));
+    expect(Array.from(container.querySelectorAll('.langs label')).map(l => l.textContent?.trim()))
+      .toEqual(['English', 'Italian', 'Japanese']);
+    await act(() => fireEvent.click(checkbox(container, 'Japanese')));
+    expect(names(container)).toEqual(['Set 1', 'Set 2']);
+    const max = container.querySelector('.maxprice input') as HTMLInputElement;
+    await act(() => fireEvent.change(max, { target: { value: '10' } }));
+    expect(names(container)).toEqual(['Set 1']);
+    expect(container.textContent).toContain('Deals (1)');
+    unmount();
+
+    // Next visit: same filters.
+    const again = mount(resp);
+    await waitFor(() => expect(names(again.container)).toEqual(['Set 1']));
+    expect((again.container.querySelector('.maxprice input') as HTMLInputElement).value).toBe('10');
+    // Clearing the price and ticking Japanese again shows everything.
+    await act(() => fireEvent.change(again.container.querySelector('.maxprice input')!, { target: { value: '' } }));
+    await act(() => fireEvent.click(checkbox(again.container, 'Japanese')));
+    expect(names(again.container)).toEqual(['Set 1', 'Set 2', 'Set 3']);
+  });
+
+  it('works without browser storage', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    const { container } = mount(resp);
+    await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']));
+    await act(() => fireEvent.click(checkbox(container, 'English')));
+    expect(names(container)).toEqual(['Set 2', 'Set 3']);
   });
 });

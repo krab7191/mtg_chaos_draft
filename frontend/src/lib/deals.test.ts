@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterOffers, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, chanceText, ratioText, type StoreOffer } from './deals';
+import { filterOffers, applyFilters, languagesIn, NO_FILTERS, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, chanceText, ratioText, type StoreOffer } from './deals';
 
 const offer = (over: Partial<StoreOffer> = {}): StoreOffer => ({
   store: 'Collector Store', url: 'https://x/p', mtgstocksId: 1, title: 'Prophecy Booster Pack', price: 40, available: true,
@@ -52,6 +52,15 @@ describe('deals', () => {
     expect(ratioText(2)).toContain('typical for Collector packs');
     expect(ratioText(1)).toBe('about what the cards inside are worth');
     expect(ratioText(0.5)).toContain('worth 2.0× the price');
+  });
+
+  it('filters by language, max price and above-market, and lists languages English first', () => {
+    const all = [offer(), offer({ url: 'b', language: 'it', price: 30, discount: -0.2 }), offer({ url: 'c', language: 'ja', price: 8 })];
+    expect(applyFilters(all, NO_FILTERS).map(o => o.url)).toEqual(['https://x/p', 'c']);
+    expect(applyFilters(all, { ...NO_FILTERS, showOver: true }).map(o => o.url)).toEqual(['https://x/p', 'b', 'c']);
+    expect(applyFilters(all, { ...NO_FILTERS, languages: ['ja'] }).map(o => o.url)).toEqual(['c']);
+    expect(applyFilters(all, { ...NO_FILTERS, maxPrice: 10 }).map(o => o.url)).toEqual(['c']);
+    expect(languagesIn([offer({ language: 'ja' }), offer({ language: 'de' }), offer({ language: undefined })])).toEqual(['en', 'de', 'ja']);
   });
 
   it('labels foreign-language packs', () => {

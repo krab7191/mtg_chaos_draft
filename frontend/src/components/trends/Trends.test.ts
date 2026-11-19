@@ -125,6 +125,14 @@ describe('Trends page', () => {
     await waitFor(() => expect(container.querySelector('.watch__drop')).toBeNull());
   });
 
+  it('widens the release window to cover an older watched pack', async () => {
+    const old = row(9, { releasedAt: '2007-02-02', watch: { mtgstocksId: 9, dropAlert: null } });
+    const { container, fetchMock } = await mount([row(1), old]);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/trends?years=30', undefined));
+    expect((container.querySelector('.years select') as HTMLSelectElement).value).toBe('30');
+    expect(container.querySelector('.years')?.textContent).toContain('all years');
+  });
+
   it('a watched floor alerts, and clicking it opens that row on the right tab', async () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;

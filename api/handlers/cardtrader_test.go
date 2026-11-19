@@ -75,7 +75,7 @@ func TestCardTrader_RefreshKeepsCheapestPerLanguage(t *testing.T) {
 	ctx := ctDB(t)
 	pool := testhelper.Pool(t)
 	requests := fakeCardTrader(t, true) // the first request is refused, then retried
-	withMockClient(200, fakeSetsJSON, func() { RefreshStoreOffers(ctx, pool) })
+	withMockClient(200, fakeSetsJSON, func() { RefreshMarketplaces(ctx, pool) })
 
 	offers, _ := db.ListStoreOffers(ctx, pool)
 	got := map[string]db.Offer{}
@@ -99,7 +99,7 @@ func TestCardTrader_RefreshKeepsCheapestPerLanguage(t *testing.T) {
 	}
 	// The next day: sets aren't scanned again, only listings are read.
 	requests.Store(0)
-	withMockClient(200, fakeSetsJSON, func() { RefreshStoreOffers(ctx, pool) })
+	withMockClient(200, fakeSetsJSON, func() { RefreshMarketplaces(ctx, pool) })
 	if n := requests.Load(); n != 2 { // expansions + listings
 		t.Errorf("second day requests: %d", n)
 	}

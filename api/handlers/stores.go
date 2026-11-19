@@ -57,6 +57,10 @@ var (
 // dealDiscount: a listing this far under TCGplayer's market price is a deal.
 const dealDiscount = 0.15
 
+// maxOverMarket: listings priced above this many times the market price
+// aren't shown (wrong matches, joke prices).
+const maxOverMarket = 2.0
+
 // ── Shopify feed ──────────────────────────────────────────────
 
 type shopifyProduct struct {
@@ -422,9 +426,22 @@ func fetchCardKingdom(ctx context.Context, idx *packIndex) ([]db.Offer, int, err
 
 // ── Daily refresh ─────────────────────────────────────────────
 
-// RefreshStoreOffers re-reads every store once. A store that fails keeps its
-// last complete listing.
+// RefreshStoreOffers re-reads the Shopify stores (daily: they rate-limit
+// hard). A store that fails keeps its last complete listing.
 func RefreshStoreOffers(ctx context.Context, pool *pgxpool.Pool) {
+	refreshStores(ctx, pool, true, false)
+}
+
+// RefreshMarketplaces re-reads Card Kingdom and CardTrader, whose prices
+// move within hours, then checks alerts so new deals reach the phone soon.
+func RefreshMarketplaces(ctx context.Context, pool *pgxpool.Pool) {
+	refreshStores(ctx, pool, false, true)
+	if _, err := NotifyAlerts(ctx, pool); err != nil {
+		log.Printf("price alerts: %v", err)
+	}
+}
+
+func refreshStores(ctx context.Context, pool *pgxpool.Pool, shopify, marketplaces bool) {
 	c, err := getCatalog()
 	if err != nil {
 		log.Printf("store listings: no catalog: %v", err)
@@ -439,12 +456,18 @@ func RefreshStoreOffers(ctx context.Context, pool *pgxpool.Pool) {
 		log.Printf("store listings: %s: %d packs matched from %d products", store, len(offers), from)
 	}
 	for _, s := range shopifyStores {
+		if !shopify {
+			break
+		}
 		products, err := fetchShopify(ctx, s)
 		if err != nil {
 			log.Printf("store listings: %v (keeping the last listing)", err)
 			continue
 		}
 		save(s.Name, shopifyOffers(s, products, idx), len(products))
+	}
+	if !marketplaces {
+		return
 	}
 	if cardKingdomURL != "" {
 		if offers, n, err := fetchCardKingdom(ctx, idx); err != nil {
@@ -474,9 +497,6 @@ type Deal struct {
 	// Discount below market: 0.2 = 20% under; negative = above market.
 	Discount float64 `json:"discount"`
 	IsDeal   bool    `json:"isDeal"`
-	// Preorder: the product isn't released yet. Its "market" price is
-	// preorder hype, so a listing under it is never called a deal.
-	Preorder bool `json:"preorder,omitempty"`
 	// TCGURL is the pack's TCGplayer page, where known.
 	TCGURL string `json:"tcgUrl,omitempty"`
 	// Contents is the value of the cards inside (0 if unknown); Premium
@@ -488,6 +508,7 @@ type Deal struct {
 // offersWithMarket joins listings with market prices, best discount first.
 func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 	today := time.Now().UTC().Format(time.DateOnly)
+	idx := newPackIndex(products)
 	byID := map[int]SearchResult{}
 	for _, p := range products {
 		byID[p.MTGStocksID] = p
@@ -500,14 +521,29 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 		if !ok || p.MarketPrice == nil || *p.MarketPrice <= 0 || p.NoSales {
 			continue
 		}
+		// Re-check stored listings against today's matcher, so a matcher fix
+		// hides bad matches saved earlier (e.g. a demo booster) at once.
+		// CardTrader titles end in " · <language> · ships from <country>".
+		name, _, _ := strings.Cut(o.Title, " · ")
+		if m, ok := idx.match(name); !ok || m.MTGStocksID != o.MTGStocksID {
+			continue
+		}
+		// Not released yet: its "market" price is preorder hype. Not shown.
+		if p.ReleasedAt > today {
+			continue
+		}
 		d := Deal{Offer: o, SetName: p.SetName, ProductType: p.ProductType, ReleasedAt: p.ReleasedAt, MarketPrice: *p.MarketPrice, TCGURL: tcgLink(o.MTGStocksID)}
 		d.Discount = 1 - o.Price / *p.MarketPrice
-		d.Preorder = p.ReleasedAt > today
+		// More than maxOverMarket× the market price is almost always a wrong
+		// match (a box or a different product) or a joke price. Not shown.
+		if o.Price > maxOverMarket**p.MarketPrice {
+			continue
+		}
 		if v := packValue(o.MTGStocksID); v > 0 {
 			d.Contents = v
 			d.Premium = o.Price >= premiumRatio*v
 		}
-		d.IsDeal = o.Available && !d.Preorder && d.Discount >= dealDiscount
+		d.IsDeal = o.Available && d.Discount >= dealDiscount
 		out = append(out, d)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Discount > out[j].Discount })

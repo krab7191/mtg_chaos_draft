@@ -49,6 +49,7 @@ func TestPackIndex_MatchesRealTitles(t *testing.T) {
 		"Portal Second Age Two Player Booster Pack":             "",
 		"Guilds of Ravnica Guild Kit Booster":                   "",
 		"Ravnica Allegiance Promo Pack":                         "",
+		`Secrets of Strixhaven: "Quandrix" Seeded Booster`:      "",
 		"Magic the Gathering: Tempest Theme Deck":               "",
 		"Magic the Gathering: Kaldheim Jumpstart Booster Pack":  "",
 		"Pokemon Scarlet & Violet Booster Pack":                 "",
@@ -318,7 +319,7 @@ func TestRefreshStoreOffers_CardKingdom(t *testing.T) {
 	cardKingdomURL = srv.URL
 	t.Cleanup(func() { cardKingdomURL = orig })
 
-	withMockClient(200, fakeSetsJSON, func() { RefreshStoreOffers(ctx, pool) })
+	withMockClient(200, fakeSetsJSON, func() { RefreshMarketplaces(ctx, pool) })
 	offers, _ := db.ListStoreOffers(ctx, pool)
 	if len(offers) != 1 || offers[0].Store != "Card Kingdom" || offers[0].URL != "https://ck.example/mtg-sealed/another" || !offers[0].Available {
 		t.Fatalf("offers: %+v", offers) // the box and the $0 listing are skipped
@@ -340,18 +341,18 @@ func TestDeals_PreordersAndLanguages(t *testing.T) {
 		{MTGStocksID: 2, SetName: "Old", ProductType: "Booster Pack", ReleasedAt: "2010-01-01", MarketPrice: &price},
 	}
 	offers := []db.Offer{
-		{Store: "CardTrader", URL: "a", MTGStocksID: 1, Price: 30, Available: true},
-		{Store: "CardTrader", URL: "b", MTGStocksID: 2, Price: 30, Available: true, Language: "ja"},
+		{Store: "CardTrader", URL: "a", MTGStocksID: 1, Title: "Nauctis Collector Booster · English · ships from US", Price: 30, Available: true},
+		{Store: "CardTrader", URL: "b", MTGStocksID: 2, Title: "Old Booster · Japanese · ships from JP", Price: 30, Available: true, Language: "ja"},
 	}
 	deals := offersWithMarket(offers, products)
 	byID := map[int]Deal{}
 	for _, d := range deals {
 		byID[d.MTGStocksID] = d
 	}
-	if !byID[1].Preorder || byID[1].IsDeal {
-		t.Errorf("a preorder listing is never a deal: %+v", byID[1])
+	if _, shown := byID[1]; shown {
+		t.Errorf("a preorder's listings aren't shown: %+v", byID[1])
 	}
-	if byID[2].Preorder || !byID[2].IsDeal {
+	if !byID[2].IsDeal {
 		t.Errorf("released pack 40%% under: %+v", byID[2])
 	}
 	if best := bestDeals(offers, products); best[1] != nil || best[2] == nil {
@@ -419,5 +420,47 @@ func TestDeals_NoSalesIsNeverADeal(t *testing.T) {
 		if p.SetName == "Dragon's Maze" && p.ProductType == "Booster Pack" && p.NoSales {
 			t.Error("Dragon's Maze has sales")
 		}
+	}
+}
+
+// Listings saved under an older matcher are re-checked when shown: the demo
+// and sampler boosters the user saw disappear without waiting for a refresh.
+func TestOffersWithMarket_RechecksStoredMatches(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	var eighth, ninth int
+	for _, p := range c.products {
+		if p.ProductType == "Booster Pack" && p.SetName == "8th Edition" {
+			eighth = p.MTGStocksID
+		}
+		if p.ProductType == "Booster Pack" && p.SetName == "9th Edition" {
+			ninth = p.MTGStocksID
+		}
+	}
+	if eighth == 0 || ninth == 0 {
+		t.Fatal("8th/9th Edition packs not in the catalog")
+	}
+	offers := []db.Offer{
+		{Store: "CardTrader", URL: "a", MTGStocksID: eighth, Title: "Eighth Edition: Demo Game Booster · English · ships from US", Price: 2, Available: true},
+		{Store: "CardTrader", URL: "b", MTGStocksID: ninth, Title: "Ninth Edition Sampler Booster · English · ships from US", Price: 2, Available: true},
+		{Store: "CardTrader", URL: "c", MTGStocksID: eighth, Title: "Eighth Edition Booster · Italian · ships from IT", Price: 5, Available: true},
+	}
+	got := offersWithMarket(offers, c.products)
+	if len(got) != 1 || got[0].URL != "c" {
+		t.Errorf("want only the real 8th Edition booster, got %+v", got)
+	}
+}
+
+// Listings far above market (wrong matches, joke prices) aren't shown.
+func TestOffersWithMarket_DropsAbsurdPrices(t *testing.T) {
+	price := 10.0
+	products := []SearchResult{{MTGStocksID: 1, SetName: "Old", ProductType: "Booster Pack", ReleasedAt: "2010-01-01", MarketPrice: &price}}
+	offers := []db.Offer{
+		{Store: "S", URL: "a", MTGStocksID: 1, Title: "Old Booster Pack", Price: 12941.5, Available: true},
+		{Store: "S", URL: "b", MTGStocksID: 1, Title: "Old Booster Pack", Price: 19.99, Available: true},
+		{Store: "S", URL: "c", MTGStocksID: 1, Title: "Old Booster Pack", Price: 20.01, Available: true},
+	}
+	got := offersWithMarket(offers, products)
+	if len(got) != 1 || got[0].URL != "b" {
+		t.Errorf("want only the listing under 2x market, got %+v", got)
 	}
 }

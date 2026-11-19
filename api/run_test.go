@@ -42,11 +42,14 @@ func getenvFrom(env map[string]string) func(string) string {
 func stubMaintenance(t *testing.T, interval time.Duration) *atomic.Int32 {
 	t.Helper()
 	var calls atomic.Int32
-	origRefresh, origInterval, origBackfill := refreshPrices, maintenanceInterval, backfillPrices
+	origRefresh, origInterval, origBackfill, origMarkets := refreshPrices, maintenanceInterval, backfillPrices, refreshMarkets
 	refreshPrices = func(context.Context, *pgxpool.Pool) { calls.Add(1) }
 	backfillPrices = func(context.Context, *pgxpool.Pool) (int, error) { return 0, nil }
+	refreshMarkets = func(context.Context, *pgxpool.Pool) {}
 	maintenanceInterval = interval
-	t.Cleanup(func() { refreshPrices, maintenanceInterval, backfillPrices = origRefresh, origInterval, origBackfill })
+	t.Cleanup(func() {
+		refreshPrices, maintenanceInterval, backfillPrices, refreshMarkets = origRefresh, origInterval, origBackfill, origMarkets
+	})
 	return &calls
 }
 
@@ -168,5 +171,18 @@ func TestRunBackfill_RetriesUntilCancelled(t *testing.T) {
 	<-done
 	if calls.Load() < 3 {
 		t.Errorf("want repeated runs after a failure, got %d", calls.Load())
+	}
+}
+
+func TestRunEvery(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	var n atomic.Int32
+	done := make(chan struct{})
+	go func() { runEvery(ctx, 5*time.Millisecond, func() { n.Add(1) }); close(done) }()
+	time.Sleep(30 * time.Millisecond)
+	cancel()
+	<-done
+	if n.Load() < 2 {
+		t.Errorf("ran %d times", n.Load())
 	}
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perPack, money, pct, age, evText, filterRows, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
+import { perPack, money, pct, age, evText, filterRows, windowFor, yearsLabel, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 120, low: 100, lowDay: '2026-03-01', aboveLow: 0.2, change30: -0.02, releasePrice: 150,
@@ -111,6 +111,16 @@ describe('trends helpers', () => {
     expect(evText(row({ ev: { value: 43.2, change: 0.061, day: '2026-11-19' } }))!.change).toBe('↑6%');
     expect(evText(row({ ev: { value: 43.2, change: -0.12, day: '2026-11-19' } }))!.change).toBe('↓12%');
     expect(evText(row({ ev: { value: 43.2, change: 0.001, day: '2026-11-19' } }))!.change).toBe('→ flat');
+  });
+
+  it('opens the trends window wide enough for the oldest watched pack', () => {
+    const today = new Date('2026-11-19');
+    const watch = { mtgstocksId: 1, dropAlert: null };
+    expect(windowFor([row({ releasedAt: '2026-01-01', watch })], today)).toBe(1);
+    expect(windowFor([row({ releasedAt: '2023-06-01', watch })], today)).toBe(5);
+    expect(windowFor([row({ releasedAt: '2007-02-02', watch }), row({ releasedAt: '2026-01-01', watch })], today)).toBe(30);
+    expect(windowFor([row({ releasedAt: '2001-01-01', watch: null })], today)).toBe(0); // unwatched: no effect
+    expect([1, 2, 30].map(yearsLabel)).toEqual(['year', '2 years', 'all years']);
   });
 
   it('notes low stock only', () => {

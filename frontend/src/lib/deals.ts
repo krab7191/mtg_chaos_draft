@@ -17,8 +17,6 @@ export interface StoreOffer {
   /** Below market: 0.2 = 20% under; negative = above market. */
   discount: number;
   isDeal: boolean;
-  /** Not released yet: never a deal (its market price is preorder hype). */
-  preorder?: boolean;
   /** The pack's TCGplayer page, where known. */
   tcgUrl?: string;
   /** Value of the cards inside (absent if unknown); premium: this listing costs 3×+ that. */
@@ -68,7 +66,7 @@ export interface OffersResponse {
   dealDiscount: number;
 }
 
-const LANGUAGES: Record<string, string> = {
+export const LANGUAGES: Record<string, string> = {
   en: 'English', ja: 'Japanese', de: 'German', fr: 'French', it: 'Italian', es: 'Spanish',
   pt: 'Portuguese', zh: 'Chinese', ko: 'Korean', ru: 'Russian', other: 'Foreign',
 };
@@ -77,6 +75,31 @@ const LANGUAGES: Record<string, string> = {
 export function languageLabel(lang: string | undefined): string | null {
   if (!lang || lang === 'en') return null;
   return LANGUAGES[lang] ?? lang.toUpperCase();
+}
+
+/** Viewer's filters on the store listings. */
+export interface OfferFilters {
+  /** Languages to show (codes); null = all. */
+  languages: string[] | null;
+  /** Highest listing price to show; null = any. */
+  maxPrice: number | null;
+  /** Also show listings priced above market (hidden by default). */
+  showOver: boolean;
+}
+
+export const NO_FILTERS: OfferFilters = { languages: null, maxPrice: null, showOver: false };
+
+export function applyFilters(offers: StoreOffer[], f: OfferFilters): StoreOffer[] {
+  return offers.filter(o =>
+    (f.showOver || o.discount >= 0) &&
+    (f.maxPrice == null || o.price <= f.maxPrice) &&
+    (f.languages == null || f.languages.includes(o.language ?? 'en')));
+}
+
+/** The languages among the listings, English first. */
+export function languagesIn(offers: StoreOffer[]): string[] {
+  const set = new Set(offers.map(o => o.language ?? 'en'));
+  return [...set].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : (LANGUAGES[a] ?? a).localeCompare(LANGUAGES[b] ?? b)));
 }
 
 export type OfferView = 'deals' | 'instock' | 'all';
