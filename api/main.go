@@ -271,6 +271,7 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Get("/api/cheapest", handlers.CheapestPacks)
 			r.Get("/api/store-offers", trendsHandler.StoreOffers)
 			r.Get("/api/cheapest/trends", trendsHandler.Cheapest)
+			r.Get("/api/packs/{mtgstocksId}/contents", trendsHandler.Contents)
 			r.Get("/api/price/{mtgstocksId}", handlers.Price)
 			r.Get("/api/drafts", draftHandler.List)
 			r.Get("/api/purchases", purchaseHandler.List)

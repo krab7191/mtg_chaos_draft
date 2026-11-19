@@ -166,3 +166,27 @@ func TestLanguages(t *testing.T) {
 	}
 	ConfigureCardTrader("")
 }
+
+// A booster saved under an older, looser matcher is skipped once the matcher
+// rejects it: fixes apply to sets already scanned.
+func TestCardTrader_SavedMatchesAreRechecked(t *testing.T) {
+	ctx := ctDB(t)
+	pool := testhelper.Pool(t)
+	requests := fakeCardTrader(t, false)
+	c, _ := parseCatalog([]byte(fakeSetsJSON))
+	idx := newPackIndex(c.products)
+	_ = db.SaveCardTraderExpansion(ctx, pool, 1, []db.CTBlueprint{{BlueprintID: 99, MTGStocksID: 1, Name: "Test Set Demo Game Booster"}})
+	offers, _, err := fetchCardTrader(ctx, pool, c, idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, o := range offers {
+		if strings.Contains(o.Title, "Demo") {
+			t.Errorf("stale match used: %+v", o)
+		}
+	}
+	// Expansions + (set 1 already scanned) + no listings request for the demo pack.
+	if n := requests.Load(); n != 1 {
+		t.Errorf("requests: %d", n)
+	}
+}

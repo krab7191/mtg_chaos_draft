@@ -41,6 +41,14 @@ func TestPackIndex_MatchesRealTitles(t *testing.T) {
 		"Magic the Gathering: Prophecy Booster Pack (Japanese)": "Prophecy | Booster Pack", // foreign packs are kept (labelled)
 		"Magic the Gathering: Onslaught Booster Pack Lot (3)":   "",
 		"Magic the Gathering: Mirage Booster Pack x2":           "",
+		"Eighth Edition: Demo Game Booster":                     "", // a promo, not the set's booster (CardTrader)
+		"Portal Second Age Demo Game Booster Pack":              "",
+		"Core Set 2020 Welcome Booster":                         "",
+		"Ninth Edition Sampler Booster":                         "",
+		"Portal Second Age: Demo Game Booster":                  "",
+		"Portal Second Age Two Player Booster Pack":             "",
+		"Guilds of Ravnica Guild Kit Booster":                   "",
+		"Ravnica Allegiance Promo Pack":                         "",
 		"Magic the Gathering: Tempest Theme Deck":               "",
 		"Magic the Gathering: Kaldheim Jumpstart Booster Pack":  "",
 		"Pokemon Scarlet & Violet Booster Pack":                 "",

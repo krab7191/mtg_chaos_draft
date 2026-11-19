@@ -91,7 +91,14 @@
                   <a href={o.url} target="_blank" rel="noopener noreferrer">{o.store}</a>
                   <span class="sub">{o.available ? 'In stock' : 'Sold out'}{o.preorder ? ' · Preorder' : ''}</span>
                 </td>
-                <td class="num">{money(o.price)}</td>
+                <td class="num">
+                  {money(o.price)}
+                  {#if o.contents}
+                    <span class="sub" class:warn={o.premium} title="Value of the cards inside (pull rates × card prices)">
+                      {o.premium ? `⚠ ${(o.price / o.contents).toFixed(1)}× contents` : `contents ${money(o.contents)}`}
+                    </span>
+                  {/if}
+                </td>
                 <td class="num">{money(o.marketPrice)}</td>
                 <td class="num">
                   {o.discount > 0 ? `${Math.round(o.discount * 100)}% under` : o.discount < 0 ? `${Math.round(-o.discount * 100)}% over` : 'at market'}
@@ -154,6 +161,7 @@
   .offers tr.soldout td { color: var(--color-text-muted); }
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
+  .sub.warn { color: var(--color-danger); }
   .lang {
     margin-left: 0.35rem; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 999px;
     border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap;

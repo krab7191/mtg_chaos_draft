@@ -32,8 +32,8 @@ const button = (c: HTMLElement, label: string) =>
 describe('StoreDeals', () => {
   const resp: OffersResponse = {
     offers: [
-      offer(1),
-      offer(2, { isDeal: false, discount: -0.1, price: 61.6, preorder: true }),
+      offer(1, { contents: 31 }),
+      offer(2, { isDeal: false, discount: -0.1, price: 61.6, preorder: true, contents: 12, premium: true }),
       offer(3, { isDeal: false, available: false, discount: 0.4, language: 'ja' }),
     ],
     stores: ['Collector Store'], watched: [2], dealDiscount: 0.15,
@@ -44,6 +44,7 @@ describe('StoreDeals', () => {
     await waitFor(() => expect(names(container)).toEqual(['Set 1']));
     expect(container.textContent).toContain('Single packs at Collector Store');
     expect(container.querySelector('tbody')?.textContent).toContain('29% under');
+    expect(container.querySelector('tbody')?.textContent).toContain('contents $31.00');
     expect(container.querySelector('tbody a')?.getAttribute('href')).toBe('https://x/1');
     expect(Array.from(container.querySelectorAll('.elsewhere a')).map(a => a.textContent)).toContain('Card Kingdom');
 
@@ -51,6 +52,7 @@ describe('StoreDeals', () => {
     expect(names(container)).toEqual(['Set 1', 'Set 2']);
     expect(container.querySelector('tbody')?.textContent).toContain('10% over');
     expect(container.querySelector('tbody')?.textContent).toContain('In stock · Preorder');
+    expect(container.querySelector('tbody')?.textContent).toContain('⚠ 5.1× contents');
     await act(() => fireEvent.click(button(container, 'All listings')));
     expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']);
     expect(container.textContent).toContain('Sold out');

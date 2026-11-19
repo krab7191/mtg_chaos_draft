@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterOffers, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, type StoreOffer } from './deals';
+import { filterOffers, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, chanceText, ratioText, type StoreOffer } from './deals';
 
 const offer = (over: Partial<StoreOffer> = {}): StoreOffer => ({
   store: 'Collector Store', url: 'https://x/p', mtgstocksId: 1, title: 'Prophecy Booster Pack', price: 40, available: true,
@@ -42,6 +42,16 @@ describe('deals', () => {
     expect(tcg('https://www.tcgplayer.com/product/67752/magic-dragons-maze-dragons-maze-booster-pack'))
       .toBe('https://www.tcgplayer.com/product/67752/magic-dragons-maze-dragons-maze-booster-pack?Language=English');
     expect(tcg()).toContain('/search/magic/product?q=Dragon');
+  });
+
+  it('words pull chances and price-to-contents ratios', () => {
+    expect(chanceText(1 / 55)).toBe('1 in 55 packs');
+    expect(chanceText(0.75)).toBe('0.8 per pack');
+    expect(chanceText(5)).toBe('5 per pack');
+    expect(ratioText(13.7)).toContain('13.7× what the cards inside are worth');
+    expect(ratioText(2)).toContain('typical for Collector packs');
+    expect(ratioText(1)).toBe('about what the cards inside are worth');
+    expect(ratioText(0.5)).toContain('worth 2.0× the price');
   });
 
   it('labels foreign-language packs', () => {

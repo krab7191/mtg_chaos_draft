@@ -190,6 +190,11 @@ func fetchCardTrader(ctx context.Context, pool *pgxpool.Pool, c *catalog, idx *p
 	}
 	var out []db.Offer
 	for _, b := range bps {
+		// Saved matches are re-checked against today's matcher, so a fix
+		// (e.g. demo packs aren't boosters) applies to sets already scanned.
+		if p, ok := idx.match(b.Name); !ok || p.MTGStocksID != b.MTGStocksID {
+			continue
+		}
 		var byBlueprint map[string][]ctListing
 		if err := ct.get(ctx, fmt.Sprintf("/marketplace/products?blueprint_id=%d", b.BlueprintID), &byBlueprint); err != nil {
 			return nil, 0, err

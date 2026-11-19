@@ -21,6 +21,42 @@ export interface StoreOffer {
   preorder?: boolean;
   /** The pack's TCGplayer page, where known. */
   tcgUrl?: string;
+  /** Value of the cards inside (absent if unknown); premium: this listing costs 3×+ that. */
+  contents?: number;
+  premium?: boolean;
+}
+
+/** A pack's value broken down by slot and by card (GET /api/packs/{id}/contents). */
+export interface Breakdown {
+  mtgstocksId: number;
+  setName: string;
+  productType: string;
+  /** Market price (absent if unknown). */
+  price?: number;
+  noSales?: boolean;
+  /** Expected value of the contents. */
+  value: number;
+  /** price / value. */
+  ratio?: number;
+  premium: boolean;
+  cards: number;
+  slots: { name: string; count: number; value: number }[];
+  top: { name: string; foil: boolean; price: number; chance: number; value: number }[];
+  pricesDay: string;
+}
+
+/** "1 in 12 packs", or "0.8 per pack" when it's likely to show up. */
+export function chanceText(chance: number): string {
+  if (chance >= 0.5) return `${chance.toFixed(chance >= 2 ? 0 : 1)} per pack`;
+  return `1 in ${Math.round(1 / chance)} packs`;
+}
+
+/** What a price-to-contents ratio means for buying. */
+export function ratioText(ratio: number): string {
+  if (ratio >= 3) return `you'd pay ${ratio.toFixed(1)}× what the cards inside are worth: mostly a collectible premium`;
+  if (ratio >= 1.2) return `you'd pay ${ratio.toFixed(1)}× the contents (typical for Collector packs: ~1.2–3×)`;
+  if (ratio >= 0.8) return `about what the cards inside are worth`;
+  return `the cards inside are worth ${(1 / ratio).toFixed(1)}× the price (counting bulk at market, which is hard to sell)`;
 }
 
 export interface OffersResponse {

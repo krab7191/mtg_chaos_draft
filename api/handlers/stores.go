@@ -182,8 +182,19 @@ func languageOf(title string) string {
 	return "en"
 }
 
+// packWords may appear in a single pack's title besides the set name.
+var packWords = map[string]bool{
+	"booster": true, "pack": true, "draft": true, "set": true, "play": true, "collector": true, "collectors": true,
+	"single": true, "sealed": true, "factory": true, "new": true, "english": true, "non": true, "edition": true,
+	"1": true, "1pack": true, "one": true, "default": true, "title": true, "magic": true, "the": true, "gathering": true,
+	"mtg": true, "and": true, "of": true,
+	// Real pack names seen at stores: "3rd Edition Revised", Mirrodin Besieged's
+	// Mirran/Phyrexian faction packs, "Ravnica: City of Guilds".
+	"3rd": true, "faction": true, "mirran": true, "phyrexian": true, "city": true, "guilds": true,
+}
+
 // notAPack: listings that aren't one sealed booster pack.
-var notAPack = regexp.MustCompile(`\b(box|boxes|display|case|bundle|blister|lot|lots|theme|starter|tournament|prerelease|fat|gift|deck|decks|empty|opened|repack|repacked|resealed|wrapper|proxy|art|sample|jumpstart|commander|omega|collection|mystery|sleeve|sleeves|premium|foil|vip|anniversary)\b|\bspecial edition\b|\b(six|6) card\b|\bset of\b|\bpack of\b|\b\d+\s*x\b|\bx\s*\d+\b|\b\d+\s*(packs|boosters)\b|\(\d+\)`)
+var notAPack = regexp.MustCompile(`\b(box|boxes|display|case|bundle|blister|lot|lots|theme|starter|tournament|prerelease|fat|gift|deck|decks|empty|opened|repack|repacked|resealed|wrapper|proxy|art|sample|jumpstart|commander|omega|collection|mystery|sleeve|sleeves|premium|foil|vip|anniversary|demo|intro|welcome|arena|sampler|player|promo|promos|tutorial|trial|kit|kits|convention)\b|\bspecial edition\b|\b(six|6) card\b|\bset of\b|\bpack of\b|\b\d+\s*x\b|\bx\s*\d+\b|\b\d+\s*(packs|boosters)\b|\(\d+\)`)
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -336,6 +347,13 @@ func (idx *packIndex) match(title string) (SearchResult, bool) {
 		}
 		kind = plain[0]
 	}
+	// Whatever else the title says must be ordinary pack words: an unexpected
+	// word ("Demo Game", "Sampler", "Two Player") means some other product.
+	for _, w := range strings.Fields(rest) {
+		if !packWords[w] && languageWords[w] == "" {
+			return SearchResult{}, false
+		}
+	}
 	p, ok := best.byKind[kind]
 	if !ok && kind == "draft" {
 		// Older sets' draft boosters are plain "Booster Pack"s in MTGStocks.
@@ -461,6 +479,10 @@ type Deal struct {
 	Preorder bool `json:"preorder,omitempty"`
 	// TCGURL is the pack's TCGplayer page, where known.
 	TCGURL string `json:"tcgUrl,omitempty"`
+	// Contents is the value of the cards inside (0 if unknown); Premium
+	// means this listing costs premiumRatio× that or more.
+	Contents float64 `json:"contents,omitempty"`
+	Premium  bool    `json:"premium,omitempty"`
 }
 
 // offersWithMarket joins listings with market prices, best discount first.
@@ -481,6 +503,10 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 		d := Deal{Offer: o, SetName: p.SetName, ProductType: p.ProductType, ReleasedAt: p.ReleasedAt, MarketPrice: *p.MarketPrice, TCGURL: tcgLink(o.MTGStocksID)}
 		d.Discount = 1 - o.Price / *p.MarketPrice
 		d.Preorder = p.ReleasedAt > today
+		if v := packValue(o.MTGStocksID); v > 0 {
+			d.Contents = v
+			d.Premium = o.Price >= premiumRatio*v
+		}
 		d.IsDeal = o.Available && !d.Preorder && d.Discount >= dealDiscount
 		out = append(out, d)
 	}

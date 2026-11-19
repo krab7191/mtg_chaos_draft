@@ -7,6 +7,7 @@ import CheapPacksPage from './cheappacks.astro';
 // coverage of server-rendered island templates) about the page.
 vi.mock('../../components/deals/StoreDeals.svelte', () => import('../../tests/IslandStub.svelte'));
 vi.mock('../../components/deals/CheapestPacks.svelte', () => import('../../tests/IslandStub.svelte'));
+vi.mock('../../components/deals/PackCheck.svelte', () => import('../../tests/IslandStub.svelte'));
 
 function mockFetch(responses: Array<{ ok: boolean; json?: () => Promise<unknown> }>) {
   let i = 0;

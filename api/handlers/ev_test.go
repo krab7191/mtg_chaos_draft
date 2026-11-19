@@ -19,7 +19,7 @@ import (
 
 // A tiny draft booster: one slot from a 2-card sheet (weights 3:1) and one
 // foil slot with a single card.
-const tstBoosters = `{"data":{"booster":{
+const tstBoosters = `{"data":{"cards":[{"uuid":"card-a","name":"Alpha Card"},{"uuid":"card-b","name":"Beta Card"},{"uuid":"card-c","name":"Shiny Card"}],"booster":{
 	"draft":{"boostersTotalWeight":1,"boosters":[{"weight":1,"contents":{"main":1,"shiny":1}}],
 		"sheets":{"main":{"totalWeight":4,"cards":{"card-a":3,"card-b":1}},
 		          "shiny":{"foil":true,"totalWeight":1,"cards":{"card-c":1}}}},
@@ -184,13 +184,13 @@ func TestRefreshBoosters_NewSetsRecheckedWeekly(t *testing.T) {
 		"old": {"booster": {MTGStocksID: 5, ReleasedAt: "2001-01-01"}},
 	}
 	now := day("2026-11-03")
-	if _, err := refreshBoosters(ctx, pool, targets, now); err != nil {
+	if _, _, err := refreshBoosters(ctx, pool, targets, now); err != nil {
 		t.Fatal(err)
 	}
 	*requests = nil
 	// A week later: the new set (and the one with no data yet) are asked again.
 	_, _ = pool.Exec(ctx, `UPDATE mtgjson_boosters SET fetched_at = NOW() - INTERVAL '8 days'`)
-	b, err := refreshBoosters(ctx, pool, targets, time.Now().UTC())
+	b, _, err := refreshBoosters(ctx, pool, targets, time.Now().UTC())
 	if err != nil || len(b["tst"]) != 2 {
 		t.Fatalf("%v %v", b, err)
 	}
@@ -200,10 +200,10 @@ func TestRefreshBoosters_NewSetsRecheckedWeekly(t *testing.T) {
 	// A failing download stops asking for the day but keeps stored data.
 	mtgjsonBase = "http://127.0.0.1:1"
 	_, _ = pool.Exec(ctx, `UPDATE mtgjson_boosters SET fetched_at = NOW() - INTERVAL '8 days'`)
-	if b, err := refreshBoosters(ctx, pool, targets, time.Now().UTC()); err != nil || len(b["tst"]) != 2 {
+	if b, _, err := refreshBoosters(ctx, pool, targets, time.Now().UTC()); err != nil || len(b["tst"]) != 2 {
 		t.Errorf("after a failure: %v %v", b, err)
 	}
-	if _, err := refreshBoosters(ctx, closedPool(t), targets, now); err == nil {
+	if _, _, err := refreshBoosters(ctx, closedPool(t), targets, now); err == nil {
 		t.Error("db down")
 	}
 }
@@ -236,7 +236,7 @@ func TestRefreshEV_Failures(t *testing.T) {
 	if _, err := readPrices(strings.NewReader(`{"meta":{}}`), nil); err == nil {
 		t.Error("no data: want an error")
 	}
-	if _, err := fetchBoosters(ctx, "tst"); err == nil {
+	if _, _, err := fetchBoosters(ctx, "tst"); err == nil {
 		t.Error("500: want an error")
 	}
 	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -249,12 +249,12 @@ func TestRefreshEV_Failures(t *testing.T) {
 	defer bad.Close()
 	mtgjsonBase = bad.URL
 	for _, code := range []string{"gz", "js"} {
-		if _, err := fetchBoosters(ctx, code); err == nil {
+		if _, _, err := fetchBoosters(ctx, code); err == nil {
 			t.Errorf("%s: want an error", code)
 		}
 	}
 	mtgjsonBase = "::bad"
-	if _, err := fetchBoosters(ctx, "x"); err == nil {
+	if _, _, err := fetchBoosters(ctx, "x"); err == nil {
 		t.Error("bad URL: want an error")
 	}
 	// Recording nothing is fine; a cancelled run stops.
@@ -265,7 +265,7 @@ func TestRefreshEV_Failures(t *testing.T) {
 	cancel()
 	targets := map[string]map[string]SearchResult{"a": {"draft": {}}, "b": {"draft": {}}}
 	mtgjsonBase = srv.URL
-	if _, err := refreshBoosters(cancelled, pool, targets, time.Now()); err == nil {
+	if _, _, err := refreshBoosters(cancelled, pool, targets, time.Now()); err == nil {
 		t.Error("cancelled: want an error")
 	}
 }

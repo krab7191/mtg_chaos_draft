@@ -9,23 +9,29 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// StoredBoosters is a set's MTGJSON pull-rate data and when it was fetched.
+// StoredBoosters is a set's MTGJSON pull-rate data, its card names (uuid ->
+// name) and when it was fetched.
 type StoredBoosters struct {
 	Boosters  json.RawMessage
+	Names     json.RawMessage
 	FetchedAt time.Time
 }
 
 // SaveBoosters stores a set's pull-rate data (by lowercase set code).
-func SaveBoosters(ctx context.Context, pool *pgxpool.Pool, setCode string, boosters json.RawMessage) error {
+func SaveBoosters(ctx context.Context, pool *pgxpool.Pool, setCode string, boosters, names json.RawMessage) error {
+	if len(names) == 0 {
+		names = json.RawMessage(`{}`)
+	}
 	_, err := pool.Exec(ctx, `
-		INSERT INTO mtgjson_boosters (set_code, boosters) VALUES ($1, $2)
-		ON CONFLICT (set_code) DO UPDATE SET boosters = EXCLUDED.boosters, fetched_at = NOW()`, setCode, boosters)
+		INSERT INTO mtgjson_boosters (set_code, boosters, names) VALUES ($1, $2, $3)
+		ON CONFLICT (set_code) DO UPDATE SET boosters = EXCLUDED.boosters, names = EXCLUDED.names, fetched_at = NOW()`,
+		setCode, boosters, names)
 	return err
 }
 
 // LoadBoosters returns every stored set's pull-rate data.
 func LoadBoosters(ctx context.Context, pool *pgxpool.Pool) (map[string]StoredBoosters, error) {
-	rows, err := pool.Query(ctx, `SELECT set_code, boosters, fetched_at FROM mtgjson_boosters`)
+	rows, err := pool.Query(ctx, `SELECT set_code, boosters, names, fetched_at FROM mtgjson_boosters`)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +40,7 @@ func LoadBoosters(ctx context.Context, pool *pgxpool.Pool) (map[string]StoredBoo
 	for rows.Next() {
 		var code string
 		var b StoredBoosters
-		if err := rows.Scan(&code, &b.Boosters, &b.FetchedAt); err != nil {
+		if err := rows.Scan(&code, &b.Boosters, &b.Names, &b.FetchedAt); err != nil {
 			return nil, err
 		}
 		out[code] = b

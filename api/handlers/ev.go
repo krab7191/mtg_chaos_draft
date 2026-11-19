@@ -74,34 +74,39 @@ func evTargets(c *catalog) map[string]map[string]SearchResult {
 	return out
 }
 
-// fetchBoosters downloads a set's pull rates (only the booster types used).
-func fetchBoosters(ctx context.Context, code string) (map[string]mjBooster, error) {
+// fetchBoosters downloads a set's pull rates (only the booster types used)
+// and its card names by uuid.
+func fetchBoosters(ctx context.Context, code string) (map[string]mjBooster, map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/%s.json.gz", mtgjsonBase, strings.ToUpper(code)), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	resp, err := evClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return map[string]mjBooster{}, nil
+		return map[string]mjBooster{}, map[string]string{}, nil
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("mtgjson %s: status %d", code, resp.StatusCode)
+		return nil, nil, fmt.Errorf("mtgjson %s: status %d", code, resp.StatusCode)
 	}
 	zr, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("mtgjson %s: %w", code, err)
+		return nil, nil, fmt.Errorf("mtgjson %s: %w", code, err)
 	}
 	var data struct {
 		Data struct {
 			Booster map[string]mjBooster `json:"booster"`
+			Cards   []struct {
+				UUID string `json:"uuid"`
+				Name string `json:"name"`
+			} `json:"cards"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(zr).Decode(&data); err != nil {
-		return nil, fmt.Errorf("mtgjson %s: %w", code, err)
+		return nil, nil, fmt.Errorf("mtgjson %s: %w", code, err)
 	}
 	out := map[string]mjBooster{}
 	for t, b := range data.Data.Booster {
@@ -109,17 +114,22 @@ func fetchBoosters(ctx context.Context, code string) (map[string]mjBooster, erro
 			out[t] = b
 		}
 	}
-	return out, nil
+	names := make(map[string]string, len(data.Data.Cards))
+	for _, c := range data.Data.Cards {
+		names[c.UUID] = c.Name
+	}
+	return out, names, nil
 }
 
 // refreshBoosters fetches pull rates for sets that have none stored yet, and
 // weekly for new or upcoming sets (MTGJSON adds them around release). A
 // failed download stops fetching for today; stored data is still used.
-func refreshBoosters(ctx context.Context, pool *pgxpool.Pool, targets map[string]map[string]SearchResult, now time.Time) (map[string]map[string]mjBooster, error) {
+func refreshBoosters(ctx context.Context, pool *pgxpool.Pool, targets map[string]map[string]SearchResult, now time.Time) (map[string]map[string]mjBooster, map[string]string, error) {
 	stored, err := db.LoadBoosters(ctx, pool)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	names := map[string]string{}
 	codes := make([]string, 0, len(targets))
 	for code := range targets {
 		codes = append(codes, code)
@@ -130,42 +140,49 @@ func refreshBoosters(ctx context.Context, pool *pgxpool.Pool, targets map[string
 	for _, code := range codes {
 		s, ok := stored[code]
 		var b map[string]mjBooster
+		var setNames map[string]string
 		if ok {
 			_ = json.Unmarshal(s.Boosters, &b)
+			_ = json.Unmarshal(s.Names, &setNames)
 		}
 		newest := ""
 		for _, p := range targets[code] {
 			newest = max(newest, p.ReleasedAt)
 		}
 		recent := newest >= now.AddDate(0, 0, -evNewSetDays).Format(time.DateOnly)
-		due := !ok || (now.Sub(s.FetchedAt) >= evRecheckDays*24*time.Hour && (recent || len(b) == 0))
+		due := !ok || (now.Sub(s.FetchedAt) >= evRecheckDays*24*time.Hour && (recent || len(b) == 0)) ||
+			len(b) > 0 && len(setNames) == 0 // stored before names were kept
 		if due && !stopped {
 			if fetched > 0 {
 				select {
 				case <-time.After(evFetchDelay):
 				case <-ctx.Done():
-					return nil, ctx.Err()
+					return nil, nil, ctx.Err()
 				}
 			}
-			fresh, err := fetchBoosters(ctx, code)
+			fresh, freshNames, err := fetchBoosters(ctx, code)
 			if err != nil {
 				log.Printf("pack EV: %v (using stored pull rates; retrying tomorrow)", err)
 				stopped = true
 			} else {
 				fetched++
 				raw, _ := json.Marshal(fresh)
-				if err := db.SaveBoosters(ctx, pool, code, raw); err != nil {
-					return nil, err
+				rawNames, _ := json.Marshal(freshNames)
+				if err := db.SaveBoosters(ctx, pool, code, raw, rawNames); err != nil {
+					return nil, nil, err
 				}
-				b = fresh
+				b, setNames = fresh, freshNames
 			}
 		}
 		out[code] = b
+		for u, n := range setNames {
+			names[u] = n
+		}
 	}
 	if fetched > 0 {
 		log.Printf("pack EV: fetched pull rates for %d sets", fetched)
 	}
-	return out, nil
+	return out, names, nil
 }
 
 // evPack is one catalog pack and the pull rates that fill it.
@@ -336,7 +353,7 @@ func RefreshEV(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 	targets := evTargets(c)
-	boosters, err := refreshBoosters(ctx, pool, targets, time.Now().UTC())
+	boosters, names, err := refreshBoosters(ctx, pool, targets, time.Now().UTC())
 	if err != nil {
 		return err
 	}
@@ -381,6 +398,7 @@ func RefreshEV(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := db.RecordEV(ctx, pool, byDay); err != nil {
 		return err
 	}
+	setContents(packs, latestPrices(prices), names)
 	log.Printf("pack EV: %d packs over %d days (%s)", len(packs), len(byDay), file)
 	return nil
 }
