@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"mtg-chaos-draft/db"
 	"mtg-chaos-draft/testhelper"
@@ -320,5 +321,40 @@ func TestRefreshStoreOffers_CardKingdom(t *testing.T) {
 	})
 	if !strings.Contains(rr.Body.String(), `"stores":["Card Kingdom"]`) {
 		t.Errorf("stores: %s", rr.Body.String())
+	}
+}
+
+func TestDeals_PreordersAndLanguages(t *testing.T) {
+	future := time.Now().UTC().AddDate(0, 2, 0).Format(time.DateOnly)
+	price := 50.0
+	products := []SearchResult{
+		{MTGStocksID: 1, SetName: "Nauctis", ProductType: "Collector Booster", ReleasedAt: future, MarketPrice: &price},
+		{MTGStocksID: 2, SetName: "Old", ProductType: "Booster Pack", ReleasedAt: "2010-01-01", MarketPrice: &price},
+	}
+	offers := []db.Offer{
+		{Store: "CardTrader", URL: "a", MTGStocksID: 1, Price: 30, Available: true},
+		{Store: "CardTrader", URL: "b", MTGStocksID: 2, Price: 30, Available: true, Language: "ja"},
+	}
+	deals := offersWithMarket(offers, products)
+	byID := map[int]Deal{}
+	for _, d := range deals {
+		byID[d.MTGStocksID] = d
+	}
+	if !byID[1].Preorder || byID[1].IsDeal {
+		t.Errorf("a preorder listing is never a deal: %+v", byID[1])
+	}
+	if byID[2].Preorder || !byID[2].IsDeal {
+		t.Errorf("released pack 40%% under: %+v", byID[2])
+	}
+	if best := bestDeals(offers, products); best[1] != nil || best[2] == nil {
+		t.Errorf("best deals: %+v", best)
+	}
+	d := byID[2]
+	title, body := alertMessage(watchedAlert{product: products[1], trend: &Trend{}, deal: &d}, AlertDeal)
+	if title != "Deal: Old Booster Pack" || !strings.HasPrefix(body, "$30.00 at CardTrader (Japanese), 40% under TCG market") {
+		t.Errorf("message: %q / %q", title, body)
+	}
+	if got := languageNote("xx"); got != " (xx)" {
+		t.Errorf("unknown language: %q", got)
 	}
 }

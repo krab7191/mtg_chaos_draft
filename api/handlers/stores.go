@@ -452,12 +452,16 @@ type Deal struct {
 	// Discount below market: 0.2 = 20% under; negative = above market.
 	Discount float64 `json:"discount"`
 	IsDeal   bool    `json:"isDeal"`
+	// Preorder: the product isn't released yet. Its "market" price is
+	// preorder hype, so a listing under it is never called a deal.
+	Preorder bool `json:"preorder,omitempty"`
 	// TCGURL is the pack's TCGplayer page, where known.
 	TCGURL string `json:"tcgUrl,omitempty"`
 }
 
 // offersWithMarket joins listings with market prices, best discount first.
 func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
+	today := time.Now().UTC().Format(time.DateOnly)
 	byID := map[int]SearchResult{}
 	for _, p := range products {
 		byID[p.MTGStocksID] = p
@@ -470,7 +474,8 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 		}
 		d := Deal{Offer: o, SetName: p.SetName, ProductType: p.ProductType, ReleasedAt: p.ReleasedAt, MarketPrice: *p.MarketPrice, TCGURL: tcgLink(o.MTGStocksID)}
 		d.Discount = 1 - o.Price / *p.MarketPrice
-		d.IsDeal = o.Available && d.Discount >= dealDiscount
+		d.Preorder = p.ReleasedAt > today
+		d.IsDeal = o.Available && !d.Preorder && d.Discount >= dealDiscount
 		out = append(out, d)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Discount > out[j].Discount })

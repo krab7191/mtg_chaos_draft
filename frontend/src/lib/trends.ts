@@ -1,4 +1,5 @@
 // Types and helpers for the price trends page.
+import { languageLabel } from './deals';
 
 export type Signal = 'preorder' | 'new' | 'floor' | 'falling' | 'rising' | 'stable';
 
@@ -31,7 +32,7 @@ export interface Watch { mtgstocksId: number; dropAlert: number | null }
 export type AlertReason = 'floor' | 'drop' | 'new_low' | 'deal' | 'dip';
 
 /** The best store listing well under market (see lib/deals). */
-export interface RowDeal { store: string; url: string; price: number; marketPrice: number; discount: number }
+export interface RowDeal { store: string; url: string; price: number; marketPrice: number; discount: number; language?: string }
 
 export interface TrendRow {
   mtgstocksId: number;
@@ -158,7 +159,10 @@ export function filterRows(rows: TrendRow[], kind: KindFilter, show: ShowFilter)
 
 /** Explains an alert in plain words. */
 export function alertText(r: TrendRow, reason: AlertReason): string {
-  if (reason === 'deal' && r.deal) return `${money(r.deal.price)} at ${r.deal.store}, ${Math.round(r.deal.discount * 100)}% under market`;
+  if (reason === 'deal' && r.deal) {
+    const lang = languageLabel(r.deal.language);
+    return `${money(r.deal.price)} at ${r.deal.store}${lang ? ` (${lang})` : ''}, ${Math.round(r.deal.discount * 100)}% under market`;
+  }
   const t = r.trend!;
   if (reason === 'floor') return `possible floor at ${money(t.current)}, ${pct(-t.dropFromRelease)} since release`;
   if (reason === 'dip') return `${money(t.current)}, ${Math.round(-(t.vsUsual ?? 0) * 100)}% under its usual ${money(t.usual)}`;
@@ -203,11 +207,11 @@ export function watchFeedback(r: TrendRow): { msg: string; alerting: boolean } {
 /** Below this many packs, an alert notes how many you have. */
 export const LOW_STOCK = 10;
 
-/** "none in stock" / "6 in stock" when stock is low; null otherwise. */
+/** "you own none" / "you own 6" when you have few packs of it; null otherwise. */
 export function stockNote(r: TrendRow): string | null {
   const n = r.stock ?? 0;
   if (n >= LOW_STOCK) return null;
-  return n === 0 ? 'none in stock' : `${n} in stock`;
+  return n === 0 ? 'you own none' : `you own ${n}`;
 }
 
 /** Alerting rows grouped by set (sets in first-seen order); within a set,

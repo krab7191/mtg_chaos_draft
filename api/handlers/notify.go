@@ -64,7 +64,7 @@ func alertMessage(a watchedAlert, reason string) (title, body string) {
 	if reason == AlertDeal && a.deal != nil {
 		d := a.deal
 		return "Deal: " + name,
-			fmt.Sprintf("$%.2f at %s, %.0f%% under TCG market ($%.2f). %s", d.Price, d.Store, d.Discount*100, d.MarketPrice, d.URL)
+			fmt.Sprintf("$%.2f at %s%s, %.0f%% under TCG market ($%.2f). %s", d.Price, d.Store, languageNote(d.Language), d.Discount*100, d.MarketPrice, d.URL)
 	}
 	price := fmt.Sprintf("$%.2f", t.Current)
 	if p.PacksPerBox > 0 {
@@ -150,13 +150,24 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 	return out, nil
 }
 
+// languageNote is " (Japanese)" for a foreign pack, "" for English.
+func languageNote(lang string) string {
+	if lang == "" || lang == "en" {
+		return ""
+	}
+	if name, ok := languageNames[lang]; ok {
+		return " (" + name + ")"
+	}
+	return " (" + lang + ")"
+}
+
 // alertLine is one alert in a summary notification.
 func alertLine(a watchedAlert, reason string) string {
 	t := a.trend
 	since := fmt.Sprintf("%+.0f%% since release", -t.DropFromRelease*100)
 	name := a.product.SetName + " " + a.product.ProductType
 	if reason == AlertDeal && a.deal != nil {
-		return fmt.Sprintf("$ %s: $%.2f at %s, %.0f%% under market", name, a.deal.Price, a.deal.Store, a.deal.Discount*100)
+		return fmt.Sprintf("$ %s: $%.2f at %s%s, %.0f%% under market", name, a.deal.Price, a.deal.Store, languageNote(a.deal.Language), a.deal.Discount*100)
 	}
 	if reason == AlertDip && t.Usual != nil && t.VsUsual != nil {
 		return fmt.Sprintf("▽ %s: $%.2f, %.0f%% under its usual $%.2f", name, t.Current, -*t.VsUsual*100, *t.Usual)

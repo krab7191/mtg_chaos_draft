@@ -89,7 +89,7 @@
                 </td>
                 <td>
                   <a href={o.url} target="_blank" rel="noopener noreferrer">{o.store}</a>
-                  <span class="sub">{o.available ? 'In stock' : 'Sold out'}</span>
+                  <span class="sub">{o.available ? 'In stock' : 'Sold out'}{o.preorder ? ' · Preorder' : ''}</span>
                 </td>
                 <td class="num">{money(o.price)}</td>
                 <td class="num">{money(o.marketPrice)}</td>

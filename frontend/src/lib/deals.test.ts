@@ -27,6 +27,8 @@ describe('deals', () => {
       .toEqual(['Miniature Market (all MTG packs)', "Dave & Adam's", 'Magic Omens (EU, all MTG)', 'Star City Games', 'Cardmarket (EU)']);
     expect(searchLinks("Dragon's Maze", 'Booster Pack').find(l => l.store === 'Star City Games')!.url)
       .toBe('https://starcitygames.com/mtg/dragons-maze/sealed/');
+    expect(searchLinks('Fallen Empires', 'Booster Pack').find(l => l.store === 'ABU Games')!.url)
+      .toBe('https://abugames.com/magic-the-gathering/packs?search=Fallen%20Empires%20Booster%20Pack');
     expect(searchLinks("Dragon's Maze", 'Booster Pack').find(l => l.store === 'Cardmarket (EU)')!.url)
       .toBe('https://www.cardmarket.com/en/Magic/Products/Boosters/Dragon-s-Maze-Booster'); // the user's real link
     expect(links.find(l => l.store === "Dave & Adam's")!.url)

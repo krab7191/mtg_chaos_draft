@@ -88,6 +88,7 @@ describe('trends helpers', () => {
     expect(alertsFor(null, w, 0, deal)).toEqual(['deal']);
     expect(alertsFor(null, null, 0, deal)).toEqual([]);
     expect(alertText(row({ deal }), 'deal')).toBe('$40.00 at Collector Store, 29% under market');
+    expect(alertText(row({ deal: { ...deal, language: 'ja' } }), 'deal')).toBe('$40.00 at Collector Store (Japanese), 29% under market');
     // An older pack well under its usual price.
     const dip = trend({ current: 4, usual: 5, vsUsual: -0.2, dip: true });
     expect(alertsFor(dip, w)).toEqual(['dip']);
@@ -105,9 +106,9 @@ describe('trends helpers', () => {
   });
 
   it('notes low stock only', () => {
-    expect(stockNote(row({ stock: 0 }))).toBe('none in stock');
-    expect(stockNote(row({ stock: undefined }))).toBe('none in stock');
-    expect(stockNote(row({ stock: 6 }))).toBe('6 in stock');
+    expect(stockNote(row({ stock: 0 }))).toBe('you own none');
+    expect(stockNote(row({ stock: undefined }))).toBe('you own none');
+    expect(stockNote(row({ stock: 6 }))).toBe('you own 6');
     expect(stockNote(row({ stock: 10 }))).toBeNull();
   });
 

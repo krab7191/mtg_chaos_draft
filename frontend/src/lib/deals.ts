@@ -17,6 +17,8 @@ export interface StoreOffer {
   /** Below market: 0.2 = 20% under; negative = above market. */
   discount: number;
   isDeal: boolean;
+  /** Not released yet: never a deal (its market price is preorder hype). */
+  preorder?: boolean;
   /** The pack's TCGplayer page, where known. */
   tcgUrl?: string;
 }
@@ -104,10 +106,10 @@ export function searchLinks(setName: string, productType: string, tcgUrl?: strin
     { store: 'Collector Store', url: `https://www.collectorstore.com/search?q=${q}` },
     // A sealed page per set: "Dragon's Maze" → /mtg/dragons-maze/sealed/.
     { store: 'Star City Games', url: `https://starcitygames.com/mtg/${slug(setName)}/sealed/` },
-    { store: 'ABU Games', url: `https://abugames.com/magic-the-gathering/sealed?search=${q}` },
+    // Their packs section; no language filter, so foreign packs show too.
+    { store: 'ABU Games', url: `https://abugames.com/magic-the-gathering/packs?search=${q}` },
     { store: 'CoolStuffInc', url: `https://www.coolstuffinc.com/main_search.php?pa=searchOnName&page=1&resultsPerPage=25&q=${q}` },
     { store: 'Gamenerdz', url: `https://www.gamenerdz.com/search.php?search_query=${q}` },
-    { store: 'Mercari', url: `https://www.mercari.com/search/?keyword=${q}` },
     { store: 'Hareruya', url: `https://www.hareruyamtg.com/en/products/search?product=${q}` },
     { store: 'Cardmarket (EU)', url: `https://www.cardmarket.com/en/Magic/Products/Boosters/${cardmarketSlug(setName, productType)}` },
   ];

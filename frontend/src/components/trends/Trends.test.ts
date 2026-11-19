@@ -153,7 +153,7 @@ describe('Trends page', () => {
       row(4),
     ]);
     // Muted: the signal shows, with the reason.
-    expect(container.querySelector('#trend-3')?.textContent).toContain('alert muted · 36 in stock');
+    expect(container.querySelector('#trend-3')?.textContent).toContain('alert muted · you own 36');
     expect(container.querySelector('#trend-1')?.textContent).not.toContain('muted');
 
     await act(() => fireEvent.click(button(container, 'Needs a look (2)')));
@@ -337,7 +337,7 @@ describe('Trends page', () => {
     });
     const { container } = await mount([alerting(1, 0), alerting(2, 6), alerting(3, 24)]);
     const items = Array.from(container.querySelectorAll('.alerts li')).map(li => li.querySelector('.stock-note')?.textContent ?? null);
-    expect(items).toEqual(['none in stock', '6 in stock', null]);
+    expect(items).toEqual(['you own none', 'you own 6', null]);
   });
 
   it("shows no since-release change for preorders", async () => {
