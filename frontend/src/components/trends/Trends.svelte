@@ -495,6 +495,4 @@
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
 
-  /* Price line color for the charts (a calm blue, distinct from signal colors). */
-  :global(:root) { --chart-line: #7aa2f7; }
 </style>

@@ -86,6 +86,7 @@ func run(ctx context.Context, getenv func(string) string, viewerPath string) err
 	}
 
 	handlers.ConfigureNotifications(getenv("NTFY_URL"), siteOrigin(redirectURL))
+	handlers.ConfigureCardTrader(getenv("CARDTRADER_TOKEN"))
 
 	viewerEmails := loadViewerEmails(viewerPath, getenv("VIEWER_EMAILS"))
 	secureCookies := strings.HasPrefix(redirectURL, "https://")

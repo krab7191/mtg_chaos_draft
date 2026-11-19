@@ -4,7 +4,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import { money, pct } from '../../lib/trends';
-  import { filterOffers, searchLinks, type OffersResponse, type OfferView, type StoreOffer } from '../../lib/deals';
+  import { filterOffers, searchLinks, languageLabel, type OffersResponse, type OfferView, type StoreOffer } from '../../lib/deals';
 
   let { canEdit = false }: { canEdit?: boolean } = $props();
 
@@ -45,7 +45,8 @@
     <p class="deals__sub">
       Single packs at {data.stores.length ? data.stores.join(', ') : 'online stores'}, checked daily and compared with
       TCGplayer's market price. A <strong>deal</strong> is in stock and {Math.round(data.dealDiscount * 100)}%+ under market;
-      watched packs alert your phone when one appears. Prices don't include shipping.
+      watched packs alert your phone when one appears. Foreign-language packs are labelled and compared with the English
+      pack's market price. Prices don't include shipping.
     </p>
   {/if}
 
@@ -83,6 +84,7 @@
               <tr class:deal={o.isDeal} class:soldout={!o.available}>
                 <td class="name">
                   {o.setName}
+                  {#if languageLabel(o.language)}<span class="lang">{languageLabel(o.language)}</span>{/if}
                   <span class="sub">{packName(o)} · {year(o.releasedAt)}</span>
                 </td>
                 <td>
@@ -152,6 +154,10 @@
   .offers tr.soldout td { color: var(--color-text-muted); }
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
+  .lang {
+    margin-left: 0.35rem; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 999px;
+    border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap;
+  }
 
   .elsewhere summary { cursor: pointer; color: var(--color-accent); font-size: 0.8rem; }
   .elsewhere ul { list-style: none; padding: 0.3rem 0 0; margin: 0; font-size: 0.8rem; }

@@ -7,6 +7,8 @@ export interface StoreOffer {
   title: string;
   price: number;
   available: boolean;
+  /** Pack language: "en", "ja", "de", … ("other" if the store didn't say). */
+  language?: string;
   seenAt: string;
   setName: string;
   productType: string;
@@ -26,6 +28,17 @@ export interface OffersResponse {
   /** Watched product ids. */
   watched: number[];
   dealDiscount: number;
+}
+
+const LANGUAGES: Record<string, string> = {
+  en: 'English', ja: 'Japanese', de: 'German', fr: 'French', it: 'Italian', es: 'Spanish',
+  pt: 'Portuguese', zh: 'Chinese', ko: 'Korean', ru: 'Russian', other: 'Foreign',
+};
+
+/** A listing's language for display; null for English (the default). */
+export function languageLabel(lang: string | undefined): string | null {
+  if (!lang || lang === 'en') return null;
+  return LANGUAGES[lang] ?? lang.toUpperCase();
 }
 
 export type OfferView = 'deals' | 'instock' | 'all';
@@ -60,6 +73,11 @@ export function daveAndAdamsSet(setName: string): string {
     .replace(/^Universes Beyond: /, '');      // "Universes Beyond: Final Fantasy" → "Final Fantasy"
 }
 
+/** Lowercase, apostrophes dropped, anything else non-alphanumeric as one hyphen. */
+function slug(s: string): string {
+  return s.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 /** Cardmarket's booster page name: "Dragon's Maze" → "Dragon-s-Maze-Booster",
  *  "Bloomburrow" Play Booster → "Bloomburrow-Play-Booster". */
 export function cardmarketSlug(setName: string, productType: string): string {
@@ -84,6 +102,12 @@ export function searchLinks(setName: string, productType: string, tcgUrl?: strin
     // European (prices in euros); their search mixes in other games, so open their Magic section.
     { store: 'Magic Omens (EU, all MTG)', url: 'https://magicomens.com/collections/mtg' },
     { store: 'Collector Store', url: `https://www.collectorstore.com/search?q=${q}` },
+    // A sealed page per set: "Dragon's Maze" → /mtg/dragons-maze/sealed/.
+    { store: 'Star City Games', url: `https://starcitygames.com/mtg/${slug(setName)}/sealed/` },
+    { store: 'ABU Games', url: `https://abugames.com/magic-the-gathering/sealed?search=${q}` },
+    { store: 'CoolStuffInc', url: `https://www.coolstuffinc.com/main_search.php?pa=searchOnName&page=1&resultsPerPage=25&q=${q}` },
+    { store: 'Gamenerdz', url: `https://www.gamenerdz.com/search.php?search_query=${q}` },
+    { store: 'Mercari', url: `https://www.mercari.com/search/?keyword=${q}` },
     { store: 'Hareruya', url: `https://www.hareruyamtg.com/en/products/search?product=${q}` },
     { store: 'Cardmarket (EU)', url: `https://www.cardmarket.com/en/Magic/Products/Boosters/${cardmarketSlug(setName, productType)}` },
   ];

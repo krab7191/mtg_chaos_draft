@@ -39,6 +39,8 @@ services:
       MTGSTOCKS_PROXY: ${MTGSTOCKS_PROXY:-}
       # Optional phone alerts for watched packs: an ntfy topic URL.
       NTFY_URL: ${NTFY_URL:-}
+      # Optional: CardTrader API token, for its pack listings on Cheap Packs.
+      CARDTRADER_TOKEN: ${CARDTRADER_TOKEN:-}
       PORT: "8080"
     volumes:
       - /etc/mtg-chaos-draft/viewer_emails:/etc/mtg-chaos-draft/viewer_emails:ro

@@ -35,9 +35,9 @@ func TestPackIndex_MatchesRealTitles(t *testing.T) {
 		"Magic the Gathering: Mirage Booster Pack":              "Mirage | Booster Pack",
 		"Magic the Gathering: Theros Beyond Death Booster":      "Theros: Beyond Death | Booster Pack",
 		"Theros Booster Pack":                                   "Theros | Booster Pack",
-		"Zendikar Rising Booster Pack":                          "", // draft or set booster? can't tell
-		"Magic the Gathering: Scourge Booster Box":              "", // a box
-		"Magic the Gathering: Prophecy Booster Pack (Japanese)": "",
+		"Zendikar Rising Booster Pack":                          "",                        // draft or set booster? can't tell
+		"Magic the Gathering: Scourge Booster Box":              "",                        // a box
+		"Magic the Gathering: Prophecy Booster Pack (Japanese)": "Prophecy | Booster Pack", // foreign packs are kept (labelled)
 		"Magic the Gathering: Onslaught Booster Pack Lot (3)":   "",
 		"Magic the Gathering: Mirage Booster Pack x2":           "",
 		"Magic the Gathering: Tempest Theme Deck":               "",

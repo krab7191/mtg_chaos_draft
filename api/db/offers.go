@@ -1,6 +1,7 @@
 package db
 
 import (
+	"cmp"
 	"context"
 	"time"
 
@@ -10,13 +11,15 @@ import (
 
 // Offer is one store listing of a single booster pack.
 type Offer struct {
-	Store       string    `json:"store"`
-	URL         string    `json:"url"`
-	MTGStocksID int       `json:"mtgstocksId"`
-	Title       string    `json:"title"`
-	Price       float64   `json:"price"`
-	Available   bool      `json:"available"`
-	SeenAt      time.Time `json:"seenAt"`
+	Store       string  `json:"store"`
+	URL         string  `json:"url"`
+	MTGStocksID int     `json:"mtgstocksId"`
+	Title       string  `json:"title"`
+	Price       float64 `json:"price"`
+	Available   bool    `json:"available"`
+	// Language of the pack: "en", "ja", "de", … ("other" if unspecified).
+	Language string    `json:"language"`
+	SeenAt   time.Time `json:"seenAt"`
 }
 
 // ReplaceStoreOffers swaps a store's listings for a fresh complete set.
@@ -32,9 +35,9 @@ func ReplaceStoreOffers(ctx context.Context, pool *pgxpool.Pool, store string, o
 	batch := &pgx.Batch{}
 	for _, o := range offers {
 		batch.Queue(`
-			INSERT INTO store_offers (store, url, mtgstocks_id, title, price, available, seen_at)
-			VALUES ($1, $2, $3, $4, $5, $6, NOW())
-			ON CONFLICT (store, url) DO NOTHING`, store, o.URL, o.MTGStocksID, o.Title, o.Price, o.Available)
+			INSERT INTO store_offers (store, url, mtgstocks_id, title, price, available, language, seen_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+			ON CONFLICT (store, url) DO NOTHING`, store, o.URL, o.MTGStocksID, o.Title, o.Price, o.Available, cmp.Or(o.Language, "en"))
 	}
 	if err := tx.SendBatch(ctx, batch).Close(); err != nil {
 		return err
@@ -45,7 +48,7 @@ func ReplaceStoreOffers(ctx context.Context, pool *pgxpool.Pool, store string, o
 // ListStoreOffers returns every stored listing, cheapest first.
 func ListStoreOffers(ctx context.Context, pool *pgxpool.Pool) ([]Offer, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT store, url, mtgstocks_id, title, price::float8, available, seen_at
+		SELECT store, url, mtgstocks_id, title, price::float8, available, language, seen_at
 		FROM store_offers ORDER BY price, store, url`)
 	if err != nil {
 		return nil, err
@@ -54,7 +57,7 @@ func ListStoreOffers(ctx context.Context, pool *pgxpool.Pool) ([]Offer, error) {
 	out := []Offer{}
 	for rows.Next() {
 		var o Offer
-		if err := rows.Scan(&o.Store, &o.URL, &o.MTGStocksID, &o.Title, &o.Price, &o.Available, &o.SeenAt); err != nil {
+		if err := rows.Scan(&o.Store, &o.URL, &o.MTGStocksID, &o.Title, &o.Price, &o.Available, &o.Language, &o.SeenAt); err != nil {
 			return nil, err
 		}
 		out = append(out, o)

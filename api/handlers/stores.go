@@ -38,6 +38,7 @@ type shopifyStore struct {
 
 var shopifyStores = []shopifyStore{
 	{Name: "Collector Store", Domain: "www.collectorstore.com", Collection: "games-magic-the-gathering"},
+	{Name: "Galactic Toys", Domain: "galactictoys.com", Collection: "magic-sealed-booster-packs"},
 }
 
 var (
@@ -144,7 +145,7 @@ func shopifyOffers(s shopifyStore, products []shopifyProduct, idx *packIndex) []
 			if multi {
 				url += fmt.Sprintf("?variant=%d", v.ID)
 			}
-			out = append(out, db.Offer{Store: s.Name, URL: url, MTGStocksID: pack.MTGStocksID, Title: title, Price: price, Available: v.Available})
+			out = append(out, db.Offer{Store: s.Name, URL: url, MTGStocksID: pack.MTGStocksID, Title: title, Price: price, Available: v.Available, Language: languageOf(title)})
 		}
 	}
 	return out
@@ -152,8 +153,33 @@ func shopifyOffers(s shopifyStore, products []shopifyProduct, idx *packIndex) []
 
 // ── Matching titles to packs ──────────────────────────────────
 
-// notAPack: listings that aren't one sealed, English booster pack.
-var notAPack = regexp.MustCompile(`\b(box|boxes|display|case|bundle|blister|lot|lots|theme|starter|tournament|prerelease|fat|gift|deck|decks|empty|opened|repack|repacked|resealed|wrapper|proxy|art|sample|japanese|german|french|italian|spanish|portuguese|chinese|korean|russian|foreign|jumpstart|commander|omega|collection|mystery|sleeve|sleeves|premium|foil|vip|anniversary)\b|\bspecial edition\b|\bset of\b|\bpack of\b|\b\d+\s*x\b|\bx\s*\d+\b|\b\d+\s*(packs|boosters)\b|\(\d+\)`)
+// languages by the words stores use for them; English when none appears.
+// Foreign packs are fine for chaos drafts, so they're kept and labelled.
+var languageWords = map[string]string{
+	"japanese": "ja", "jpn": "ja", "jp": "ja",
+	"german": "de", "deutsch": "de",
+	"french": "fr", "francais": "fr",
+	"italian": "it", "italiano": "it",
+	"spanish": "es", "espanol": "es",
+	"portuguese": "pt",
+	"chinese":    "zh", "simplified": "zh", "traditional": "zh",
+	"korean":  "ko",
+	"russian": "ru",
+	"foreign": "other",
+}
+
+// languageOf returns a listing title's pack language ("en" by default).
+func languageOf(title string) string {
+	for _, w := range strings.Fields(normTitle(title)) {
+		if lang, ok := languageWords[w]; ok {
+			return lang
+		}
+	}
+	return "en"
+}
+
+// notAPack: listings that aren't one sealed booster pack.
+var notAPack = regexp.MustCompile(`\b(box|boxes|display|case|bundle|blister|lot|lots|theme|starter|tournament|prerelease|fat|gift|deck|decks|empty|opened|repack|repacked|resealed|wrapper|proxy|art|sample|jumpstart|commander|omega|collection|mystery|sleeve|sleeves|premium|foil|vip|anniversary)\b|\bspecial edition\b|\b(six|6) card\b|\bset of\b|\bpack of\b|\b\d+\s*x\b|\bx\s*\d+\b|\b\d+\s*(packs|boosters)\b|\(\d+\)`)
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
@@ -367,7 +393,7 @@ func fetchCardKingdom(ctx context.Context, idx *packIndex) ([]db.Offer, int, err
 			continue
 		}
 		out = append(out, db.Offer{Store: cardKingdomName, URL: base + it.URL, MTGStocksID: pack.MTGStocksID,
-			Title: it.Name, Price: price, Available: it.QtyRetail > 0})
+			Title: it.Name, Price: price, Available: it.QtyRetail > 0, Language: languageOf(it.Name)})
 	}
 	return out, len(data.Data), nil
 }
@@ -403,6 +429,13 @@ func RefreshStoreOffers(ctx context.Context, pool *pgxpool.Pool) {
 			log.Printf("store listings: %v (keeping the last listing)", err)
 		} else {
 			save(cardKingdomName, offers, n)
+		}
+	}
+	if cardTraderToken != "" {
+		if offers, n, err := fetchCardTrader(ctx, pool, c, idx); err != nil {
+			log.Printf("store listings: %v (keeping the last listing)", err)
+		} else {
+			save(cardTraderName, offers, n)
 		}
 	}
 }
@@ -489,6 +522,9 @@ func (h *TrendsHandler) StoreOffers(w http.ResponseWriter, r *http.Request) {
 	}
 	if cardKingdomURL != "" {
 		resp.Stores = append(resp.Stores, cardKingdomName)
+	}
+	if cardTraderToken != "" {
+		resp.Stores = append(resp.Stores, cardTraderName)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)

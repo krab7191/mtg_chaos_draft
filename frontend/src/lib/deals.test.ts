@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterOffers, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, type StoreOffer } from './deals';
+import { filterOffers, searchQuery, searchLinks, daveAndAdamsSet, cardmarketSlug, languageLabel, type StoreOffer } from './deals';
 
 const offer = (over: Partial<StoreOffer> = {}): StoreOffer => ({
   store: 'Collector Store', url: 'https://x/p', mtgstocksId: 1, title: 'Prophecy Booster Pack', price: 40, available: true,
@@ -24,7 +24,9 @@ describe('deals', () => {
     // Every store searches for the pack, except those whose search doesn't work: Dave & Adam's
     // (filtered by set), Miniature Market and Magic Omens (their Magic sections).
     expect(links.filter(l => !l.url.includes('Shards%20of%20Alara%20Booster%20Pack')).map(l => l.store))
-      .toEqual(['Miniature Market (all MTG packs)', "Dave & Adam's", 'Magic Omens (EU, all MTG)', 'Cardmarket (EU)']);
+      .toEqual(['Miniature Market (all MTG packs)', "Dave & Adam's", 'Magic Omens (EU, all MTG)', 'Star City Games', 'Cardmarket (EU)']);
+    expect(searchLinks("Dragon's Maze", 'Booster Pack').find(l => l.store === 'Star City Games')!.url)
+      .toBe('https://starcitygames.com/mtg/dragons-maze/sealed/');
     expect(searchLinks("Dragon's Maze", 'Booster Pack').find(l => l.store === 'Cardmarket (EU)')!.url)
       .toBe('https://www.cardmarket.com/en/Magic/Products/Boosters/Dragon-s-Maze-Booster'); // the user's real link
     expect(links.find(l => l.store === "Dave & Adam's")!.url)
@@ -38,6 +40,14 @@ describe('deals', () => {
     expect(tcg('https://www.tcgplayer.com/product/67752/magic-dragons-maze-dragons-maze-booster-pack'))
       .toBe('https://www.tcgplayer.com/product/67752/magic-dragons-maze-dragons-maze-booster-pack?Language=English');
     expect(tcg()).toContain('/search/magic/product?q=Dragon');
+  });
+
+  it('labels foreign-language packs', () => {
+    expect(languageLabel(undefined)).toBeNull();
+    expect(languageLabel('en')).toBeNull();
+    expect(languageLabel('ja')).toBe('Japanese');
+    expect(languageLabel('other')).toBe('Foreign');
+    expect(languageLabel('xx')).toBe('XX');
   });
 
   it('builds Cardmarket booster page names', () => {

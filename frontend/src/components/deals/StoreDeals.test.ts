@@ -34,7 +34,7 @@ describe('StoreDeals', () => {
     offers: [
       offer(1),
       offer(2, { isDeal: false, discount: -0.1, price: 61.6 }),
-      offer(3, { isDeal: false, available: false, discount: 0.4 }),
+      offer(3, { isDeal: false, available: false, discount: 0.4, language: 'ja' }),
     ],
     stores: ['Collector Store'], watched: [2], dealDiscount: 0.15,
   };
@@ -53,6 +53,7 @@ describe('StoreDeals', () => {
     await act(() => fireEvent.click(button(container, 'All listings')));
     expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']);
     expect(container.textContent).toContain('Sold out');
+    expect(container.querySelector('.lang')?.textContent).toBe('Japanese');
     await act(() => fireEvent.click(button(container, 'Deals (1)')));
     expect(names(container)).toEqual(['Set 1']);
   });
