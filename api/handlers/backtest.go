@@ -439,8 +439,8 @@ func RunBacktest(ctx context.Context, pool *pgxpool.Pool) (*BacktestSummary, err
 				return nil, err
 			}
 			res.Proposed = true
-			proposals = append(proposals, fmt.Sprintf("%s: %.0f%% → %.0f%% above the low (median)",
-				kind, res.CurrentMetrics.Median*100, res.TunedMetrics.Median*100))
+			proposals = append(proposals, fmt.Sprintf("%s: alerts within 5%% of the low %.0f%% → %.0f%%",
+				kind, res.CurrentMetrics.Hit5*100, res.TunedMetrics.Hit5*100))
 		}
 		summary.Kinds[kind] = res
 	}

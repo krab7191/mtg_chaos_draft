@@ -383,6 +383,21 @@ func TestTrendsList(t *testing.T) {
 	if all := get("/api/trends?years=junk"); len(all.Products) != 3 {
 		t.Errorf("default 2 years should include both sets, got %d", len(all.Products))
 	}
+
+	// A watched product older than the window still shows (it alerts the
+	// phone too), with its full history: release price from release day.
+	_ = db.StoreHistory(ctx, pool, 4, series("2022-06-01", append(repeat(10, 20), repeat(6, 500)...)...))
+	_ = db.SetWatch(ctx, pool, db.Watch{MTGStocksID: 4, DropAlert: &drop})
+	resp = get("/api/trends?years=1")
+	var old *trendRow
+	for i := range resp.Products {
+		if resp.Products[i].MTGStocksID == 4 {
+			old = &resp.Products[i]
+		}
+	}
+	if len(resp.Products) != 3 || old == nil || old.Trend == nil || old.Trend.ReleasePrice != 10 || len(old.Alerts) == 0 {
+		t.Fatalf("old watched row: %d products, %+v", len(resp.Products), old)
+	}
 }
 
 func TestTrendsList_Errors(t *testing.T) {

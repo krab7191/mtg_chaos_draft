@@ -275,7 +275,10 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time, rul
 		t.Spark = append(t.Spark, last.Price)
 	}
 
-	t.NewLow, t.PrevLow = newLow(since)
+	// Preorder prices routinely slide toward release: not a new low.
+	if released == nil || !released.After(today) {
+		t.NewLow, t.PrevLow = newLow(since)
+	}
 	t.Signal = signalFor(t, released, today, rule)
 	return t
 }
@@ -448,8 +451,8 @@ type trendsResponse struct {
 	} `json:"thresholds"`
 }
 
-// List returns packs and boxes released in the last `years` years (default 2)
-// with their trend summaries, newest set first.
+// List returns packs and boxes released in the last `years` years (default 2),
+// plus any older watched ones, with their trend summaries, newest set first.
 func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 	years := 2
 	if y, err := strconv.Atoi(r.URL.Query().Get("years")); err == nil && y >= 1 && y <= 30 {
@@ -463,29 +466,37 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 	today := h.now().UTC().Truncate(24 * time.Hour)
 	cutoff := today.AddDate(-years, 0, 0)
 
+	watches, err := db.ListWatches(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	// Products released in the window, plus every watched product: an older
+	// one alerts the phone too, so it must show (and alert) here as well.
 	var picked []SearchResult
 	var ids []int
+	from := cutoff // history from the earliest release shown, plus preorders
 	all := trackedProducts(c)
 	for _, p := range all {
 		rel, err := time.Parse("2006-01-02", p.ReleasedAt)
-		if err != nil || rel.Before(cutoff) {
+		_, watched := watches[p.MTGStocksID]
+		if !watched && (err != nil || rel.Before(cutoff)) {
 			continue
+		}
+		if err == nil && rel.Before(from) {
+			from = rel
 		}
 		picked = append(picked, p)
 		ids = append(ids, p.MTGStocksID)
 	}
 
-	history, err := db.PriceHistory(r.Context(), h.pool, ids, cutoff.AddDate(0, -3, 0))
+	history, err := db.PriceHistory(r.Context(), h.pool, ids, from.AddDate(0, -3, 0))
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 	done, err := db.BackfilledIDs(r.Context(), h.pool)
-	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	watches, err := db.ListWatches(r.Context(), h.pool)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
