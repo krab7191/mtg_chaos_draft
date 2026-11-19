@@ -19,11 +19,16 @@ export interface Trend {
   sparkStart: string;
   historyDays: number;
   released: string | null;
+  /** Older packs: the usual price (6-month median), how far the last week is
+   *  from it, and whether that's a dip (well under usual). */
+  usual?: number;
+  vsUsual?: number;
+  dip?: boolean;
 }
 
 export interface Watch { mtgstocksId: number; dropAlert: number | null }
 
-export type AlertReason = 'floor' | 'drop' | 'new_low' | 'deal';
+export type AlertReason = 'floor' | 'drop' | 'new_low' | 'deal' | 'dip';
 
 /** The best store listing well under market (see lib/deals). */
 export interface RowDeal { store: string; url: string; price: number; marketPrice: number; discount: number }
@@ -156,6 +161,7 @@ export function alertText(r: TrendRow, reason: AlertReason): string {
   if (reason === 'deal' && r.deal) return `${money(r.deal.price)} at ${r.deal.store}, ${Math.round(r.deal.discount * 100)}% under market`;
   const t = r.trend!;
   if (reason === 'floor') return `possible floor at ${money(t.current)}, ${pct(-t.dropFromRelease)} since release`;
+  if (reason === 'dip') return `${money(t.current)}, ${Math.round(-(t.vsUsual ?? 0) * 100)}% under its usual ${money(t.usual)}`;
   if (reason === 'new_low') return `new low at ${money(t.current)}, below its previous low of ${money(t.prevLow)}`;
   return `${pct(-t.dropFromRelease)} since release, past your ${pct(-(r.watch?.dropAlert ?? 0))} alert`;
 }
@@ -170,6 +176,7 @@ export function alertsFor(t: Trend | null, w: Watch | null, stock = 0, deal: Row
     ...(t?.signal === 'floor' ? ['floor' as const] : []),
     ...(t && w.dropAlert != null && t.dropFromRelease >= w.dropAlert ? ['drop' as const] : []),
     ...(t?.newLow ? ['new_low' as const] : []),
+    ...(t?.dip ? ['dip' as const] : []),
     ...(deal ? ['deal' as const] : []),
   ];
 }

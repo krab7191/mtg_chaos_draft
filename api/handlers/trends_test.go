@@ -655,3 +655,83 @@ func TestNewLow(t *testing.T) {
 		t.Error("flat isn't a new low")
 	}
 }
+
+func TestDipBelowUsual(t *testing.T) {
+	rel := day("2020-01-01")
+	// Steady at $10 for years, then the last week at $8: 20% under usual.
+	prices := append(repeat(10, 1000), repeat(8, 10)...)
+	pts := series("2020-01-01", prices...)
+	today := pts[len(pts)-1].Day
+	tr := summarize(pts, &rel, today, defaultFloorRules["regular"])
+	if !tr.Dip || tr.Usual == nil || *tr.Usual != 10 || math.Abs(*tr.VsUsual+0.2) > 1e-9 {
+		t.Fatalf("dip: %v usual %v vs %v", tr.Dip, tr.Usual, tr.VsUsual)
+	}
+	if got := alertsFor(tr, &db.Watch{}, 0); !slices.Contains(got, AlertDip) {
+		t.Errorf("alerts: %v", got)
+	}
+	// 10% under: noted, not a dip.
+	small := summarize(series("2020-01-01", append(repeat(10, 1000), repeat(9, 10)...)...), &rel, today, defaultFloorRules["regular"])
+	if small.Dip || small.VsUsual == nil || math.Abs(*small.VsUsual+0.1) > 1e-9 {
+		t.Errorf("10%% under: dip %v vs %v", small.Dip, small.VsUsual)
+	}
+	// A pack under two years old: no usual price (new sets use the floor signals).
+	young := day("2025-06-01")
+	if y := summarize(pts, &young, today, defaultFloorRules["regular"]); y.Usual != nil || y.Dip {
+		t.Errorf("young pack: %+v", y)
+	}
+	// Too little history in the usual window.
+	if _, _, ok := usualPrice(series("2020-01-01", repeat(10, 40)...)); ok {
+		t.Error("40 days of history shouldn't give a usual price")
+	}
+	if _, _, ok := usualPrice(nil); ok {
+		t.Error("no history")
+	}
+	if m := median([]float64{3, 1, 2, 10}); m != 2.5 {
+		t.Errorf("median: %v", m)
+	}
+	// Message wording.
+	p := SearchResult{SetName: "Dragon's Maze", ProductType: "Booster Pack"}
+	title, body := alertMessage(watchedAlert{product: p, trend: tr}, AlertDip)
+	if title != "Below usual: Dragon's Maze Booster Pack" || body != "$8.00, 20% under its usual $10.00 (6-month median)." {
+		t.Errorf("message: %q / %q", title, body)
+	}
+	if line := alertLine(watchedAlert{product: p, trend: tr}, AlertDip); line != "▽ Dragon's Maze Booster Pack: $8.00, 20% under its usual $10.00" {
+		t.Errorf("line: %q", line)
+	}
+}
+
+func TestCheapest(t *testing.T) {
+	ctx := trendsDB(t)
+	pool := testhelper.Pool(t)
+	// fakeSetsJSON packs: 4 Another Set Draft $3.00 (2022-06-01), 1 Test Set Draft $4.50, 2 Test Set Collector $8.00 (2023-01-01).
+	_ = db.StoreHistory(ctx, pool, 4, series("2022-06-01", append(repeat(3.5, 600), repeat(2.8, 10)...)...))
+	_ = db.SetWatch(ctx, pool, db.Watch{MTGStocksID: 4})
+	h := NewTrendsHandler(pool)
+	h.now = func() time.Time { return day("2024-06-01") }
+	get := func(url string) (int, []trendRow) {
+		rr := httptest.NewRecorder()
+		withMockClient(200, fakeSetsJSON, func() { h.Cheapest(rr, httptest.NewRequest(http.MethodGet, url, nil)) })
+		var resp struct{ Products []trendRow }
+		_ = json.NewDecoder(rr.Body).Decode(&resp)
+		return rr.Code, resp.Products
+	}
+	code, rows := get("/api/cheapest/trends")
+	if code != 200 || len(rows) != 3 || rows[0].MTGStocksID != 4 || rows[2].MTGStocksID != 2 {
+		t.Fatalf("all: %d %+v", code, rows)
+	}
+	if rows[0].Trend == nil || rows[0].Watch == nil {
+		t.Fatalf("cheapest row should carry its trend and watch: %+v", rows[0])
+	}
+	if code, rows = get("/api/cheapest/trends?before=2023-01-01"); code != 200 || len(rows) != 1 || rows[0].MTGStocksID != 4 {
+		t.Errorf("before 2023: %d %+v", code, rows)
+	}
+	if code, _ = get("/api/cheapest/trends?before=junk"); code != http.StatusBadRequest {
+		t.Errorf("bad date: %d", code)
+	}
+	rr := httptest.NewRecorder()
+	resetProductsCache()
+	withMockClient(403, "", func() { h.Cheapest(rr, httptest.NewRequest(http.MethodGet, "/api/cheapest/trends", nil)) })
+	if rr.Code != http.StatusBadGateway {
+		t.Errorf("no catalog: %d", rr.Code)
+	}
+}

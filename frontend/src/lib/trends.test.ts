@@ -88,6 +88,10 @@ describe('trends helpers', () => {
     expect(alertsFor(null, w, 0, deal)).toEqual(['deal']);
     expect(alertsFor(null, null, 0, deal)).toEqual([]);
     expect(alertText(row({ deal }), 'deal')).toBe('$40.00 at Collector Store, 29% under market');
+    // An older pack well under its usual price.
+    const dip = trend({ current: 4, usual: 5, vsUsual: -0.2, dip: true });
+    expect(alertsFor(dip, w)).toEqual(['dip']);
+    expect(alertText(row({ trend: dip }), 'dip')).toBe('$4.00, 20% under its usual $5.00');
   });
 
   it('gives watch feedback with or without history', () => {

@@ -5,10 +5,12 @@
   import type { PricePoint } from '../../lib/trends';
   import { money } from '../../lib/trends';
 
-  let { points, released = null, low = null, perPackDivisor = 1, title }: {
+  let { points, released = null, low = null, lowLabel = 'low', perPackDivisor = 1, title }: {
     points: PricePoint[];
     released?: string | null;
     low?: number | null;
+    /** What the dashed line is: "low" (since release) or e.g. "usual". */
+    lowLabel?: string;
     /** Show a box's price per pack too when > 1. */
     perPackDivisor?: number;
     title: string;
@@ -165,7 +167,7 @@
       {/if}
       {#if low != null && low >= scale.lo && low <= scale.hi}
         <line class="low" x1={M.left} x2={W - M.right} y1={scale.y(low)} y2={scale.y(low)} />
-        <text class="marker__label" x={W - M.right} y={scale.y(low) - 4} text-anchor="end">low {money(low)}</text>
+        <text class="marker__label" x={W - M.right} y={scale.y(low) - 4} text-anchor="end">{lowLabel} {money(low)}</text>
       {/if}
 
       <path class="line" d={scale.path} />

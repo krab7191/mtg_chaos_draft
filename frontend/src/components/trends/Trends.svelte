@@ -379,6 +379,11 @@
         a floor raise an alert.</li>
       <li>Alerts are muted for products you already have {MUTE_AT_STOCK}+ packs of (counting loose packs of the
         same set and kind); the signal still shows in the table.</li>
+      <li><strong>▽ Below usual</strong> (watched packs 2+ years old): the week's median price is 15%+ under its usual
+        price (the median over the 6 months before the last 2 weeks). Older packs mostly drift up, so this means "cheaper than
+        usual right now", not "the bottom": in tests the price kept sliding about half the time.</li>
+      <li><strong>$ Store deal</strong> (watched packs): a store lists it in stock 15%+ under TCGplayer's market price
+        (see Cheap Packs).</li>
       <li>Not tracked here: Jumpstart (casual half-decks, not drafted) and sleeved retail packs (gone weeks after
         release). Both can still be added to the collection.</li>
       <li><strong>▼ New low</strong> (watched products): the week's median price broke at least 2% below its previous low,

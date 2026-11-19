@@ -217,6 +217,59 @@ type Trend struct {
 	SparkStart  time.Time  `json:"sparkStart"`
 	HistoryDays int        `json:"historyDays"`
 	Released    *time.Time `json:"released"`
+	// For older packs (dipMinAge+): the usual price (median over the 6
+	// months before the last 2 weeks), how far the last week's median is
+	// from it, and whether that's a dip worth a look.
+	Usual   *float64 `json:"usual,omitempty"`
+	VsUsual *float64 `json:"vsUsual,omitempty"`
+	Dip     bool     `json:"dip,omitempty"`
+}
+
+// Dips for older packs. Backtested on 2019–2024 sets' packs after age two
+// (88 packs): a 15%+ dip paid ~5% under the next 6 months' median price
+// (~4% on an average day) and was a 10%+ bargain 36% of the time (27%), but
+// half the time the price kept sliding. A "cheaper than usual" notice, not a
+// bottom.
+const (
+	dipMinAge     = 730 // days since release
+	dipUsualDays  = 180 // the usual price spans this many days...
+	dipUsualGap   = 14  // ...ending this many days ago
+	dipMinPoints  = 60  // prices needed in that span
+	dipBelowUsual = 0.15
+)
+
+// usualPrice: the median price over [last-gap-span, last-gap) and the median
+// of the last week; ok=false without enough history.
+func usualPrice(points []db.PricePoint) (usual, week float64, ok bool) {
+	if len(points) == 0 {
+		return 0, 0, false
+	}
+	last := points[len(points)-1].Day
+	from, to := last.AddDate(0, 0, -(dipUsualGap+dipUsualDays)), last.AddDate(0, 0, -dipUsualGap)
+	weekFrom := last.AddDate(0, 0, -6)
+	var span, recent []float64
+	for _, p := range points {
+		if !p.Day.Before(from) && p.Day.Before(to) {
+			span = append(span, p.Price)
+		}
+		if !p.Day.Before(weekFrom) {
+			recent = append(recent, p.Price)
+		}
+	}
+	if len(span) < dipMinPoints || len(recent) == 0 {
+		return 0, 0, false
+	}
+	return median(span), median(recent), true
+}
+
+func median(v []float64) float64 {
+	s := slices.Clone(v)
+	sort.Float64s(s)
+	n := len(s)
+	if n%2 == 1 {
+		return s[n/2]
+	}
+	return (s[n/2-1] + s[n/2]) / 2
 }
 
 // priceOn returns the last price on or before day.
@@ -285,6 +338,12 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time, rul
 	// Preorder prices routinely slide toward release: not a new low.
 	if released == nil || !released.After(today) {
 		t.NewLow, t.PrevLow = newLow(since)
+	}
+	if released != nil && today.Sub(*released) >= dipMinAge*24*time.Hour {
+		if usual, week, ok := usualPrice(points); ok {
+			vs := week/usual - 1
+			t.Usual, t.VsUsual, t.Dip = &usual, &vs, vs <= -dipBelowUsual
+		}
 	}
 	t.Signal = signalFor(t, released, today, rule)
 	return t
@@ -382,6 +441,7 @@ const (
 	AlertDrop   = "drop"    // at or past the watch's drop threshold
 	AlertNewLow = "new_low" // broke below its previous low
 	AlertDeal   = "deal"    // listed at a store well under market
+	AlertDip    = "dip"     // an older pack well under its usual price
 )
 
 // withDealAlert adds a deal alert for a watched product with a store deal,
@@ -454,6 +514,9 @@ func alertsFor(t *Trend, w *db.Watch, stock int) []string {
 	if t.NewLow {
 		alerts = append(alerts, AlertNewLow)
 	}
+	if t.Dip {
+		alerts = append(alerts, AlertDip)
+	}
 	return alerts
 }
 
@@ -500,7 +563,6 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 	// Products released in the window, plus every watched product: an older
 	// one alerts the phone too, so it must show (and alert) here as well.
 	var picked []SearchResult
-	var ids []int
 	from := cutoff // history from the earliest release shown, plus preorders
 	all := trackedProducts(c)
 	for _, p := range all {
@@ -513,10 +575,9 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 			from = rel
 		}
 		picked = append(picked, p)
-		ids = append(ids, p.MTGStocksID)
 	}
 
-	history, err := db.PriceHistory(r.Context(), h.pool, ids, from.AddDate(0, -3, 0))
+	rows, err := h.rows(r.Context(), c, picked, watches, from.AddDate(0, -3, 0), today)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
@@ -526,18 +587,6 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	collection, err := db.ListCollection(r.Context(), h.pool)
-	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	stock := newStockIndex(collection)
-	offers, err := db.ListStoreOffers(r.Context(), h.pool)
-	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	deals := bestDeals(offers, c.products)
 	proposals, err := openProposals(r.Context(), h.pool)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
@@ -549,7 +598,7 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := trendsResponse{Products: make([]trendRow, 0, len(picked)), Tracked: len(all), Notifications: notificationsOn()}
+	resp := trendsResponse{Products: rows, Tracked: len(all), Notifications: notificationsOn()}
 	for _, p := range all {
 		if done[p.MTGStocksID] {
 			resp.Backfilled++
@@ -562,25 +611,107 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 	th := &resp.Thresholds
 	th.NewSetDays, th.TrendWindow, th.TrendMove, th.MuteAtStock = newSetDays, trendWindow, trendMove, muteAtStock
 	th.FloorRules = activeRules()
-	for _, p := range picked {
+	sort.SliceStable(resp.Products, func(i, j int) bool {
+		return resp.Products[i].ReleasedAt > resp.Products[j].ReleasedAt
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// rows builds table rows for products: trend from their price history
+// (since from), watch, stock, best store deal and current alerts.
+func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchResult, watches map[int]db.Watch, from, today time.Time) ([]trendRow, error) {
+	ids := make([]int, len(products))
+	for i, p := range products {
+		ids[i] = p.MTGStocksID
+	}
+	history, err := db.PriceHistory(ctx, h.pool, ids, from)
+	if err != nil {
+		return nil, err
+	}
+	collection, err := db.ListCollection(ctx, h.pool)
+	if err != nil {
+		return nil, err
+	}
+	stock := newStockIndex(collection)
+	offers, err := db.ListStoreOffers(ctx, h.pool)
+	if err != nil {
+		return nil, err
+	}
+	deals := bestDeals(offers, c.products)
+	out := make([]trendRow, 0, len(products))
+	for _, p := range products {
 		var released *time.Time
 		if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err == nil {
 			released = &rel
 		}
-		trend := summarize(history[p.MTGStocksID], released, today, ruleFor(p.ProductType))
-		row := trendRow{SearchResult: p, Trend: trend, Stock: stock.of(p)}
+		row := trendRow{SearchResult: p, Trend: summarize(history[p.MTGStocksID], released, today, ruleFor(p.ProductType)), Stock: stock.of(p)}
 		if wt, ok := watches[p.MTGStocksID]; ok {
 			row.Watch = &wt
 		}
 		row.Alerts = alertsFor(row.Trend, row.Watch, row.Stock)
 		row.Deal = deals[p.MTGStocksID]
 		row.Alerts = withDealAlert(row.Alerts, row.Watch, row.Deal, row.Stock)
-		resp.Products = append(resp.Products, row)
+		out = append(out, row)
 	}
-	sort.SliceStable(resp.Products, func(i, j int) bool {
-		return resp.Products[i].ReleasedAt > resp.Products[j].ReleasedAt
-	})
+	return out, nil
+}
 
+// cheapestLimit is how many packs the cheapest list shows.
+const cheapestLimit = 10
+
+// Cheapest lists the cheapest single packs (draftable: no sleeved or
+// Jumpstart) released before ?before=YYYY-MM-DD (any date if empty), with
+// trends, watches and alerts like the trends page.
+func (h *TrendsHandler) Cheapest(w http.ResponseWriter, r *http.Request) {
+	var before time.Time
+	if b := strings.TrimSpace(r.URL.Query().Get("before")); b != "" {
+		t, err := time.Parse("2006-01-02", b)
+		if err != nil {
+			http.Error(w, "invalid before date, expected YYYY-MM-DD", http.StatusBadRequest)
+			return
+		}
+		before = t
+	}
+	c, err := getCatalog()
+	if err != nil {
+		http.Error(w, "couldn't reach MTGStocks — try again shortly", http.StatusBadGateway)
+		return
+	}
+	var packs []SearchResult
+	for _, p := range trackedProducts(c) {
+		if p.PacksPerBox > 0 || p.MarketPrice == nil || *p.MarketPrice <= 0 {
+			continue
+		}
+		if !before.IsZero() {
+			if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err != nil || !rel.Before(before) {
+				continue
+			}
+		}
+		packs = append(packs, p)
+	}
+	sort.SliceStable(packs, func(i, j int) bool { return *packs[i].MarketPrice < *packs[j].MarketPrice })
+	packs = packs[:min(len(packs), cheapestLimit)]
+	for i := range packs {
+		packs[i].TCGURL = tcgLink(packs[i].MTGStocksID)
+	}
+	watches, err := db.ListWatches(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	rows, err := h.rows(r.Context(), c, packs, watches, time.Time{}, h.now().UTC().Truncate(24*time.Hour))
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	resp := struct {
+		Products      []trendRow `json:"products"`
+		DipBelowUsual float64    `json:"dipBelowUsual"`
+		MuteAtStock   int        `json:"muteAtStock"`
+		Notifications bool       `json:"notifications"`
+	}{rows, dipBelowUsual, muteAtStock, notificationsOn()}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }
