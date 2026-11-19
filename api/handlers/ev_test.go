@@ -27,18 +27,19 @@ const tstBoosters = `{"data":{"cards":[{"uuid":"card-a","name":"Alpha Card"},{"u
 		"sheets":{"shiny":{"foil":true,"totalWeight":1,"cards":{"card-c":1}}}},
 	"jumpstart":{"boostersTotalWeight":1,"boosters":[{"weight":1,"contents":{"main":1}}],"sheets":{}}}}}`
 
-// Prices: card-a $1 then $2 (day 2); card-b $4; card-c $10 foil (only etched
-// for day 2: falls back to etched); an unwanted card is skipped.
-const allPrices = `{"meta":{"date":"2026-11-02"},"data":{
-	"card-a":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-01":1,"2026-11-02":2}}},"cardmarket":{"retail":{"normal":{"2026-11-01":9}}}}},
-	"card-b":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-01":4}}}}},
-	"card-c":{"paper":{"tcgplayer":{"retail":{"foil":{"2026-11-01":10},"etched":{"2026-11-02":12}}}}},
+// The 90-day file (dated 11-08, so its weekly days are 11-08, 11-01, …):
+// card-a $1 then $2 (11-05); card-b $4; card-c $10 foil, then only etched
+// $12 (11-08); an unwanted card is skipped.
+const allPrices = `{"meta":{"date":"2026-11-08"},"data":{
+	"card-a":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-01":1,"2026-11-05":2}}},"cardmarket":{"retail":{"normal":{"2026-11-01":9}}}}},
+	"card-b":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-10-30":4}}}}},
+	"card-c":{"paper":{"tcgplayer":{"retail":{"foil":{"2026-11-01":10},"etched":{"2026-11-08":12}}}}},
 	"other":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-01":100}}}}}}}`
 
-const todayPrices = `{"meta":{"date":"2026-11-03"},"data":{
-	"card-a":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-03":3}}}}},
-	"card-b":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-03":4}}}}},
-	"card-c":{"paper":{"tcgplayer":{"retail":{"foil":{"2026-11-03":10}}}}}}}`
+const todayPrices = `{"meta":{"date":"2026-11-09"},"data":{
+	"card-a":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-09":3}}}}},
+	"card-b":{"paper":{"tcgplayer":{"retail":{"normal":{"2026-11-09":4}}}}},
+	"card-c":{"paper":{"tcgplayer":{"retail":{"foil":{"2026-11-09":10}}}}}}}`
 
 func gz(s string) []byte {
 	var b bytes.Buffer
@@ -131,7 +132,7 @@ func TestRefreshEV(t *testing.T) {
 		t.Errorf("requests: %v", *requests)
 	}
 	evs, _ := db.LatestEV(ctx, pool, []int{1, 2, 4}, 1)
-	// TST draft (id 1) on 11-02: main 3/4 x $2 + 1/4 x $4 = $2.50, foil etched $12 -> $14.50; 11-01: $11.75.
+	// TST draft (id 1) on 11-08: main 3/4 x $2 + 1/4 x $4 = $2.50, foil etched $12 -> $14.50; a week before: $11.75.
 	if e := evs[1]; math.Abs(e.Value-14.5) > 0.001 || e.Before == nil || math.Abs(*e.Before-11.75) > 0.001 {
 		t.Fatalf("draft EV: %+v", e)
 	}
@@ -146,11 +147,7 @@ func TestRefreshEV(t *testing.T) {
 		t.Errorf("change: %+v", info)
 	}
 
-	// Two weeks of history now? No (2 days): it would read the 90-day file
-	// again. Pretend it has 14 days, then the next run reads only today.
-	for d := 3; d <= 16; d++ {
-		_ = db.RecordEV(ctx, pool, map[time.Time]map[int]float64{day("2026-10-01").AddDate(0, 0, d): {99: 1}})
-	}
+	// Seeded once: the next run reads only today's prices.
 	*requests = nil
 	withMockClient(200, fakeSetsJSON, func() {
 		if err := RefreshEV(ctx, pool); err != nil {
@@ -233,8 +230,16 @@ func TestRefreshEV_Failures(t *testing.T) {
 			t.Error("bad prices file: want an error")
 		}
 	})
-	if _, err := readPrices(strings.NewReader(`{"meta":{}}`), nil); err == nil {
-		t.Error("no data: want an error")
+	noTargets := func(string) []string { return nil }
+	for _, bad := range []string{`{"meta":{}}`, `{"meta":"x"`, ``, `{"other":[1,2],"data":{"u":{"paper":"x"}}}`, `{"data":{"u":`, `{"data":`, `{"x":`} {
+		if _, _, err := pricesAt(strings.NewReader(bad), map[string]bool{"u": true}, noTargets); err == nil {
+			t.Errorf("%q: want an error", bad)
+		}
+	}
+	// No meta: today's date.
+	days, _, err := pricesAt(strings.NewReader(`{"data":{}}`), nil, func(d string) []string { return []string{d} })
+	if err != nil || len(days) != 1 || days[0] != time.Now().UTC().Format(time.DateOnly) {
+		t.Errorf("no meta: %v %v", days, err)
 	}
 	if _, _, err := fetchBoosters(ctx, "tst"); err == nil {
 		t.Error("500: want an error")
@@ -284,5 +289,22 @@ func TestAssignBoosters_DraftAndPlainBoosterPacks(t *testing.T) {
 	got := assignBoosters(targets, boosters)
 	if len(got) != 2 || got[0].id != 1 || got[1].id != 2 {
 		t.Errorf("assigned: %+v", got)
+	}
+}
+
+func TestWeeklyDaysAndOnOrBefore(t *testing.T) {
+	if got := weeklyDays("2026-11-08", 2); strings.Join(got, ",") != "2026-11-08,2026-11-01,2026-10-25" {
+		t.Errorf("weekly: %v", got)
+	}
+	if got := weeklyDays("junk", 3); len(got) != 1 {
+		t.Errorf("bad date: %v", got)
+	}
+	foil := map[string]float64{"2026-11-01": 10, "2026-11-03": 11}
+	etched := map[string]float64{"2026-11-03": 12, "2026-11-05": 0}
+	if v := onOrBefore("2026-11-04", foil, etched); v != 11 { // same day: foil wins
+		t.Errorf("tie: %v", v)
+	}
+	if v := onOrBefore("2026-10-01", foil); v != 0 {
+		t.Errorf("before any price: %v", v)
 	}
 }

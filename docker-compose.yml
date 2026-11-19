@@ -58,7 +58,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          # 512m: the daily card-price download (pack EV) streams ~1GB of JSON
+          # while store reads run; at 256m the first EV run was killed.
+          memory: 512m
     logging:
       driver: json-file
       options:

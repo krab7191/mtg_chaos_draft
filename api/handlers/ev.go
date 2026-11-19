@@ -214,24 +214,50 @@ func assignBoosters(targets map[string]map[string]SearchResult, boosters map[str
 	return out
 }
 
-// cardPrices are one printing's TCGplayer market prices by day.
-type cardPrices struct{ normal, foil, etched map[string]float64 }
+// evHistoryWeeks: the first run seeds EV for the file's day and each of the
+// weeks before it (from MTGJSON's 90-day file), enough for the 2-week change.
+const evHistoryWeeks = 12
 
-// readPrices streams MTGJSON's AllPrices / AllPricesToday JSON and keeps the
-// TCGplayer retail prices of the wanted printings.
-func readPrices(r io.Reader, want map[string]bool) (map[string]cardPrices, error) {
+// pricesAt streams MTGJSON's AllPrices / AllPricesToday JSON and keeps, for
+// each wanted printing, its newest non-foil and foil (or etched) TCGplayer
+// price on or before each target day. Each card is reduced to those few
+// values as it streams past: 90 days of history for every card would not fit
+// in the server's memory. targets gets the file's date (its newest day).
+func pricesAt(r io.Reader, want map[string]bool, targets func(fileDay string) []string) ([]string, map[string][]cardPrice, error) {
 	dec := json.NewDecoder(bufio.NewReaderSize(r, 1<<20))
+	if _, err := dec.Token(); err != nil {
+		return nil, nil, fmt.Errorf("prices: %w", err)
+	}
+	var days []string
 	for {
 		t, err := dec.Token()
 		if err != nil {
-			return nil, fmt.Errorf("prices: no data: %w", err)
+			return nil, nil, fmt.Errorf("prices: no data: %w", err)
 		}
-		if s, ok := t.(string); ok && s == "data" {
+		key, _ := t.(string)
+		if key == "data" {
 			break
 		}
+		if key == "meta" {
+			var meta struct {
+				Date string `json:"date"`
+			}
+			if err := dec.Decode(&meta); err != nil {
+				return nil, nil, fmt.Errorf("prices meta: %w", err)
+			}
+			days = targets(meta.Date)
+			continue
+		}
+		var skip json.RawMessage
+		if err := dec.Decode(&skip); err != nil {
+			return nil, nil, err
+		}
+	}
+	if days == nil {
+		days = targets(time.Now().UTC().Format(time.DateOnly))
 	}
 	if _, err := dec.Token(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var entry struct {
 		Paper struct {
@@ -244,28 +270,59 @@ func readPrices(r io.Reader, want map[string]bool) (map[string]cardPrices, error
 			} `json:"tcgplayer"`
 		} `json:"paper"`
 	}
-	out := map[string]cardPrices{}
+	out := map[string][]cardPrice{}
 	for dec.More() {
 		t, err := dec.Token()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		uuid, _ := t.(string)
 		if !want[uuid] {
 			var skip json.RawMessage
 			if err := dec.Decode(&skip); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			continue
 		}
 		entry.Paper.TCG.Retail.Normal, entry.Paper.TCG.Retail.Foil, entry.Paper.TCG.Retail.Etched = nil, nil, nil
 		if err := dec.Decode(&entry); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		rt := entry.Paper.TCG.Retail
-		out[uuid] = cardPrices{normal: rt.Normal, foil: rt.Foil, etched: rt.Etched}
+		ps := make([]cardPrice, len(days))
+		for i, d := range days {
+			ps[i] = cardPrice{normal: onOrBefore(d, rt.Normal), foil: onOrBefore(d, rt.Foil, rt.Etched)}
+		}
+		out[uuid] = ps
 	}
-	return out, nil
+	return days, out, nil
+}
+
+// onOrBefore is the newest positive price on or before day across the
+// series; on the same day the first series wins (foil over etched).
+func onOrBefore(day string, series ...map[string]float64) float64 {
+	best, v := "", 0.0
+	for _, m := range series {
+		for d, p := range m {
+			if d <= day && d > best && p > 0 {
+				best, v = d, p
+			}
+		}
+	}
+	return v
+}
+
+// weeklyDays is fileDay and each of the `weeks` weeks before it.
+func weeklyDays(fileDay string, weeks int) []string {
+	d, err := time.Parse(time.DateOnly, fileDay)
+	if err != nil {
+		return []string{fileDay}
+	}
+	out := make([]string, 0, weeks+1)
+	for i := 0; i <= weeks; i++ {
+		out = append(out, d.AddDate(0, 0, -7*i).Format(time.DateOnly))
+	}
+	return out
 }
 
 // packEV is a pack's expected value with the given card prices: foil slots
@@ -292,61 +349,41 @@ func packEV(b mjBooster, price func(uuid string, foil bool) (float64, bool)) flo
 	return total
 }
 
-// evByDay computes every pack's EV for each day in the price data, carrying
-// each card's last known price forward.
-func evByDay(packs []evPack, prices map[string]cardPrices) map[time.Time]map[int]float64 {
-	daySet := map[string]bool{}
-	for _, cp := range prices {
-		for _, m := range []map[string]float64{cp.normal, cp.foil, cp.etched} {
-			for d := range m {
-				daySet[d] = true
-			}
-		}
-	}
-	days := make([]string, 0, len(daySet))
-	for d := range daySet {
-		days = append(days, d)
-	}
-	sort.Strings(days)
-	type key struct {
-		uuid string
-		foil bool
-	}
-	cur := map[key]float64{}
+// evForDays computes every pack's EV on each target day.
+func evForDays(packs []evPack, days []string, prices map[string][]cardPrice) map[time.Time]map[int]float64 {
 	out := map[time.Time]map[int]float64{}
-	for _, d := range days {
-		for uuid, cp := range prices {
-			if v, ok := cp.normal[d]; ok && v > 0 {
-				cur[key{uuid, false}] = v
-			}
-			if v, ok := cp.foil[d]; ok && v > 0 {
-				cur[key{uuid, true}] = v
-			} else if v, ok := cp.etched[d]; ok && v > 0 {
-				cur[key{uuid, true}] = v
-			}
-		}
+	for i, d := range days {
 		day, err := time.Parse(time.DateOnly, d)
 		if err != nil {
 			continue
 		}
+		price := func(uuid string, foil bool) (float64, bool) {
+			ps := prices[uuid]
+			if len(ps) <= i {
+				return 0, false
+			}
+			v := ps[i].normal
+			if foil {
+				v = ps[i].foil
+			}
+			return v, v > 0
+		}
 		evs := map[int]float64{}
 		for _, p := range packs {
-			ev := packEV(p.booster, func(uuid string, foil bool) (float64, bool) {
-				v, ok := cur[key{uuid, foil}]
-				return v, ok
-			})
-			if ev > 0 {
+			if ev := packEV(p.booster, price); ev > 0 {
 				evs[p.id] = ev
 			}
 		}
-		out[day] = evs
+		if len(evs) > 0 {
+			out[day] = evs
+		}
 	}
 	return out
 }
 
 // RefreshEV updates pull rates where due and records today's pack EVs. The
-// first run (fewer than two weeks stored) reads MTGJSON's 90-day history
-// instead, so EV trends show right away.
+// very first run reads MTGJSON's 90-day file instead and records a weekly
+// history from it, so the 2-week change shows right away.
 func RefreshEV(ctx context.Context, pool *pgxpool.Pool) error {
 	c, err := getCatalog()
 	if err != nil {
@@ -370,9 +407,9 @@ func RefreshEV(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
-	file := "AllPricesToday.json.gz"
-	if days < evMomentumDays {
-		file = "AllPrices.json.gz" // ~150MB once: 90 days of history
+	file, weeks := "AllPricesToday.json.gz", 0
+	if days == 0 {
+		file, weeks = "AllPrices.json.gz", evHistoryWeeks // ~150MB once: weekly history
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, mtgjsonBase+"/"+file, nil)
 	if err != nil {
@@ -390,15 +427,19 @@ func RefreshEV(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("mtgjson %s: %w", file, err)
 	}
-	prices, err := readPrices(zr, want)
+	targetDays, prices, err := pricesAt(zr, want, func(fileDay string) []string { return weeklyDays(fileDay, weeks) })
 	if err != nil {
 		return err
 	}
-	byDay := evByDay(packs, prices)
+	byDay := evForDays(packs, targetDays, prices)
 	if err := db.RecordEV(ctx, pool, byDay); err != nil {
 		return err
 	}
-	setContents(packs, latestPrices(prices), names)
+	latest := make(map[string]cardPrice, len(prices))
+	for uuid, ps := range prices {
+		latest[uuid] = ps[0]
+	}
+	setContents(packs, latest, names)
 	log.Printf("pack EV: %d packs over %d days (%s)", len(packs), len(byDay), file)
 	return nil
 }

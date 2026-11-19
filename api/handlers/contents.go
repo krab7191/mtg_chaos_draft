@@ -38,28 +38,6 @@ func packValue(id int) float64 {
 	return contentsValue[id]
 }
 
-// latestPrices keeps each printing's most recent non-foil and foil (or etched) price.
-func latestPrices(prices map[string]cardPrices) map[string]cardPrice {
-	// The newest price across the given series (foil and etched count as one
-	// finish, as in evByDay; on the same day foil wins).
-	latest := func(series ...map[string]float64) float64 {
-		day, v := "", 0.0
-		for _, m := range series {
-			for d, p := range m {
-				if d > day && p > 0 {
-					day, v = d, p
-				}
-			}
-		}
-		return v
-	}
-	out := make(map[string]cardPrice, len(prices))
-	for uuid, cp := range prices {
-		out[uuid] = cardPrice{normal: latest(cp.normal), foil: latest(cp.foil, cp.etched)}
-	}
-	return out
-}
-
 func setContents(packs []evPack, prices map[string]cardPrice, names map[string]string) {
 	m := make(map[int]mjBooster, len(packs))
 	values := make(map[int]float64, len(packs))

@@ -37,10 +37,11 @@ type shopifyStore struct {
 	Collection string // e.g. games-magic-the-gathering
 }
 
-var shopifyStores = []shopifyStore{
-	{Name: "Collector Store", Domain: "www.collectorstore.com", Collection: "games-magic-the-gathering"},
-	{Name: "Galactic Toys", Domain: "galactictoys.com", Collection: "magic-sealed-booster-packs"},
-}
+// shopifyStores read daily. Collector Store and Galactic Toys refuse the
+// server (403), even through the home proxy, so they're search links only:
+// {Name: "Collector Store", Domain: "www.collectorstore.com", Collection: "games-magic-the-gathering"},
+// {Name: "Galactic Toys", Domain: "galactictoys.com", Collection: "magic-sealed-booster-packs"},
+var shopifyStores []shopifyStore
 
 var (
 	storePageDelay  = 2 * time.Minute

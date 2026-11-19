@@ -88,11 +88,17 @@ func (c *ctClient) get(ctx context.Context, path string, out any) error {
 		req.Header.Set("Accept", "application/json")
 		resp, err := storeClient.Do(req)
 		if err != nil {
+			if attempt == 0 && ctx.Err() == nil {
+				continue // a dropped connection (e.g. through the tunnel): try once more
+			}
 			return err
 		}
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 		resp.Body.Close()
 		if err != nil {
+			if attempt == 0 && ctx.Err() == nil {
+				continue
+			}
 			return err
 		}
 		if resp.StatusCode == http.StatusTooManyRequests && attempt == 0 {
