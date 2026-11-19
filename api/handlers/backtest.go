@@ -124,11 +124,15 @@ func LoadFloorRules(ctx context.Context, pool *pgxpool.Pool) error {
 		if err := json.Unmarshal(s.Rule, &r); err != nil {
 			return fmt.Errorf("rule %d: %w", s.ID, err)
 		}
+		// A default rather than an approved rule: marked seeded, or saved
+		// without metrics by older code (approvals always carry the
+		// backtest's metrics).
 		var marks struct {
 			Seeded bool `json:"seeded"`
 		}
 		_ = json.Unmarshal(s.Metrics, &marks)
-		if def, ok := defaultFloorRules[s.Kind]; ok && marks.Seeded && r != def {
+		isDefault := marks.Seeded || len(s.Metrics) == 0 || string(s.Metrics) == "null"
+		if def, ok := defaultFloorRules[s.Kind]; ok && isDefault && r != def {
 			continue // an outdated default: replaced below
 		}
 		setRule(s.Kind, r)

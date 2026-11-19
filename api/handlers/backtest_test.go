@@ -348,7 +348,7 @@ func TestLoadFloorRules(t *testing.T) {
 	// A stored active rule wins over the default.
 	custom := FloorRule{MinAge: 120, Drop: 0.2, Window: 28, Band: 0.06, Near: 0.05}
 	raw, _ := json.Marshal(custom)
-	_ = db.SetActiveRule(ctx, pool, "regular", raw, nil)
+	_ = db.SetActiveRule(ctx, pool, "regular", raw, json.RawMessage(`{"proposed":{}}`))
 	setRule("regular", defaultFloorRules["regular"])
 	if err := LoadFloorRules(ctx, pool); err != nil || ruleFor("Play Booster") != custom {
 		t.Errorf("loaded: %+v %v", ruleFor("Play Booster"), err)

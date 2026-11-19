@@ -562,7 +562,7 @@ func TestLoadFloorRules_ReplacesOutdatedSeededDefaults(t *testing.T) {
 	_ = db.SetActiveRule(ctx, pool, "regular", raw, seededMarker)
 	approved := FloorRule{MinAge: 120, Drop: 0.2, Window: 28, Band: 0.06, Near: 0.05, Recent: 30}
 	rawApproved, _ := json.Marshal(approved)
-	_ = db.SetActiveRule(ctx, pool, "collector", rawApproved, nil)
+	_ = db.SetActiveRule(ctx, pool, "collector", rawApproved, json.RawMessage(`{"proposed":{"hit5":0.3}}`))
 
 	if err := LoadFloorRules(ctx, pool); err != nil {
 		t.Fatal(err)
@@ -572,6 +572,29 @@ func TestLoadFloorRules_ReplacesOutdatedSeededDefaults(t *testing.T) {
 	}
 	if ruleFor("Collector Booster") != approved {
 		t.Errorf("approved rule replaced: %+v", ruleFor("Collector Booster"))
+	}
+	active, _ := db.RulesByStatus(ctx, pool, "active")
+	if len(active) != 2 {
+		t.Errorf("active rows: %+v", active)
+	}
+}
+
+// Older code seeded the defaults without any metrics; those are defaults
+// too, so newer defaults replace them (this kept stale floors alive).
+func TestLoadFloorRules_ReplacesDefaultsSeededWithoutMetrics(t *testing.T) {
+	restoreRules(t)
+	ctx := context.Background()
+	pool := testhelper.Pool(t)
+	testhelper.Truncate(t, pool, "floor_rules")
+	old := FloorRule{MinAge: 150, Drop: 0, Window: 14, Band: 0.08, Near: 0.20}
+	raw, _ := json.Marshal(old)
+	_ = db.SetActiveRule(ctx, pool, "collector", raw, nil)
+	_ = db.SetActiveRule(ctx, pool, "regular", raw, json.RawMessage(`null`))
+	if err := LoadFloorRules(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+	if ruleFor("Collector Booster") != defaultFloorRules["collector"] || ruleFor("Play Booster") != defaultFloorRules["regular"] {
+		t.Errorf("old defaults kept: %+v / %+v", ruleFor("Collector Booster"), ruleFor("Play Booster"))
 	}
 	active, _ := db.RulesByStatus(ctx, pool, "active")
 	if len(active) != 2 {
