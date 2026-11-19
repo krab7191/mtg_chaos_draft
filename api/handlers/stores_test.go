@@ -464,3 +464,61 @@ func TestOffersWithMarket_DropsAbsurdPrices(t *testing.T) {
 		t.Errorf("want only the listing under 2x market, got %+v", got)
 	}
 }
+
+// Box and pack prices that don't add up are flagged (real catalog): MTGStocks'
+// LotR Collector "Booster Box" is priced like a case of 4.
+func TestPriceDoubts_RealCatalog(t *testing.T) {
+	c, _ := loadRealCatalog(t)
+	find := func(list []SearchResult, set, typ string) SearchResult {
+		for _, p := range list {
+			if p.SetName == set && p.ProductType == typ {
+				return p
+			}
+		}
+		t.Fatalf("no %s %s", set, typ)
+		return SearchResult{}
+	}
+	lotr := "The Lord of the Rings: Tales of Middle-earth"
+	box := find(c.boxes, lotr, "Collector Booster Box")
+	if !strings.Contains(box.PriceDoubt, "may be priced as a case") || find(c.products, lotr, "Collector Booster").PriceDoubt == "" {
+		t.Errorf("LotR collector: box %q", box.PriceDoubt)
+	}
+	if d := find(c.boxes, "Bloomburrow", "Play Booster Box").PriceDoubt; d != "" {
+		t.Errorf("an ordinary box flagged: %q", d)
+	}
+	n := 0
+	for _, b := range c.boxes {
+		if b.PriceDoubt != "" {
+			n++
+		}
+	}
+	if n == 0 || n > 10 {
+		t.Errorf("%d boxes flagged; expected a handful", n)
+	}
+	// Doubtful products show no store listings.
+	pack := find(c.products, lotr, "Collector Booster")
+	if got := offersWithMarket([]db.Offer{{Store: "S", URL: "u", MTGStocksID: pack.MTGStocksID, Title: lotr + " Collector Booster Pack", Price: 100, Available: true}}, c.products); len(got) != 0 {
+		t.Errorf("listings against a doubtful price: %+v", got)
+	}
+}
+
+// An English listing 60%+ under market is flagged for checking, not a deal;
+// a foreign one that cheap is plausible.
+func TestOffersWithMarket_SuspiciouslyCheap(t *testing.T) {
+	price := 10.0
+	products := []SearchResult{{MTGStocksID: 1, SetName: "Old", ProductType: "Booster Pack", ReleasedAt: "2010-01-01", MarketPrice: &price}}
+	got := offersWithMarket([]db.Offer{
+		{Store: "S", URL: "en", MTGStocksID: 1, Title: "Old Booster Pack", Price: 3, Available: true},
+		{Store: "S", URL: "it", MTGStocksID: 1, Title: "Old Booster Pack", Price: 3, Available: true, Language: "it"},
+	}, products)
+	byURL := map[string]Deal{}
+	for _, d := range got {
+		byURL[d.URL] = d
+	}
+	if !byURL["en"].Suspicious || byURL["en"].IsDeal {
+		t.Errorf("English 70%% under: %+v", byURL["en"])
+	}
+	if byURL["it"].Suspicious || !byURL["it"].IsDeal {
+		t.Errorf("Italian 70%% under: %+v", byURL["it"])
+	}
+}

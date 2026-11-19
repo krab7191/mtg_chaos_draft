@@ -35,7 +35,7 @@ const checkbox = (c: HTMLElement, label: string) =>
 describe('StoreDeals', () => {
   const resp: OffersResponse = {
     offers: [
-      offer(1, { contents: 31 }),
+      offer(1, { contents: 31, suspicious: true }),
       offer(2, { isDeal: false, discount: -0.1, price: 61.6, contents: 12, premium: true }),
       offer(3, { isDeal: false, available: false, discount: 0.4, language: 'ja' }),
     ],
@@ -48,8 +48,9 @@ describe('StoreDeals', () => {
     expect(container.textContent).toContain('Single packs at Collector Store');
     expect(container.querySelector('tbody')?.textContent).toContain('29% under');
     expect(container.querySelector('tbody')?.textContent).toContain('contents $31.00');
+    expect(container.querySelector('tbody')?.textContent).toContain('⚠ unusually cheap, check it');
     // $40 for $31 of cards: red. Under the contents would be green.
-    expect(Array.from(container.querySelectorAll('tbody .sub')).find(e => e.textContent?.includes('contents $31.00'))?.classList.contains('tone--higher')).toBe(true);
+    expect(Array.from(container.querySelectorAll('tbody .contents-note')).find(e => e.textContent?.includes('contents $31.00'))?.classList.contains('tone--higher')).toBe(true);
     expect(container.querySelector('tbody a')?.getAttribute('href')).toBe('https://x/1');
     // The store's own name, then what it's priced against.
     expect(container.querySelector('tbody td.name')?.textContent).toContain('Set 1 Draft Booster Pack');
@@ -149,7 +150,7 @@ describe('StoreDeals filters', () => {
     await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3']));
     expect(Array.from(container.querySelectorAll('.langs label')).map(l => l.textContent?.trim()))
       .toEqual(['English', 'Italian', 'Japanese']);
-    expect(Array.from(container.querySelectorAll('tbody .sub')).find(e => e.textContent?.includes('contents $6.00'))?.classList.contains('tone--great')).toBe(true);
+    expect(Array.from(container.querySelectorAll('tbody .contents-note')).find(e => e.textContent?.includes('contents $6.00'))?.classList.contains('tone--great')).toBe(true);
     await act(() => fireEvent.click(checkbox(container, 'Japanese')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);
     const max = container.querySelector('.maxprice input') as HTMLInputElement;

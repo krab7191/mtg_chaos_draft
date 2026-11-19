@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -57,6 +58,10 @@ var (
 
 // dealDiscount: a listing this far under TCGplayer's market price is a deal.
 const dealDiscount = 0.15
+
+// suspiciousDiscount: an English listing this far under market is flagged
+// for checking instead of called a deal.
+const suspiciousDiscount = 0.6
 
 // maxOverMarket: listings priced above this many times the market price
 // aren't shown (wrong matches, joke prices).
@@ -504,6 +509,9 @@ type Deal struct {
 	// means this listing costs premiumRatio× that or more.
 	Contents float64 `json:"contents,omitempty"`
 	Premium  bool    `json:"premium,omitempty"`
+	// Suspicious: an English listing so far under market that it's more
+	// likely a mistake than a deal; worth checking by hand.
+	Suspicious bool `json:"suspicious,omitempty"`
 }
 
 // offersWithMarket joins listings with market prices, best discount first.
@@ -519,7 +527,7 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 		p, ok := byID[o.MTGStocksID]
 		// No market price, or only asking prices (no recent sales): there's
 		// nothing real to compare with, so the listing isn't shown.
-		if !ok || p.MarketPrice == nil || *p.MarketPrice <= 0 || p.NoSales {
+		if !ok || p.MarketPrice == nil || *p.MarketPrice <= 0 || p.NoSales || p.PriceDoubt != "" {
 			continue
 		}
 		// Re-check stored listings against today's matcher, so a matcher fix
@@ -544,7 +552,10 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 			d.Contents = v
 			d.Premium = o.Price >= premiumRatio*v
 		}
-		d.IsDeal = o.Available && d.Discount >= dealDiscount
+		// An English pack 60%+ under market is more likely a mislisting (or a
+		// market price that's off) than a bargain: shown, flagged, not a deal.
+		d.Suspicious = cmp.Or(o.Language, "en") == "en" && d.Discount >= suspiciousDiscount
+		d.IsDeal = o.Available && d.Discount >= dealDiscount && !d.Suspicious
 		out = append(out, d)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Discount > out[j].Discount })

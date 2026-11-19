@@ -145,6 +145,9 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 		n := stock.of(p)
 		a := watchedAlert{product: p, trend: t, watch: w, deal: deals[p.MTGStocksID], alerts: alertsFor(t, &w, n)}
 		a.alerts = withDealAlert(a.alerts, &w, a.deal, n)
+		if p.PriceDoubt != "" {
+			a.alerts, a.deal = []string{}, nil
+		}
 		out = append(out, a)
 	}
 	return out, nil

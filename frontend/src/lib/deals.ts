@@ -19,6 +19,8 @@ export interface StoreOffer {
   isDeal: boolean;
   /** The pack's TCGplayer page, where known. */
   tcgUrl?: string;
+  /** An English listing 60%+ under market: more likely a mistake than a deal. */
+  suspicious?: boolean;
   /** Value of the cards inside (absent if unknown); premium: this listing costs 3×+ that. */
   contents?: number;
   premium?: boolean;

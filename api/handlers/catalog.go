@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -236,7 +237,49 @@ func parseCatalog(raw []byte) (*catalog, error) {
 			c.boxes = append(c.boxes, box)
 		}
 	}
+	flagPriceDoubts(c)
 	return c, nil
+}
+
+// A box normally costs 0.5–1.5× its packs bought singly (median 0.82 over
+// 245 boxes); outside these bounds (~2% of boxes) one of the two prices is
+// very likely wrong, e.g. MTGStocks' LotR Collector "Booster Box" priced like
+// a case of 4 boxes. Sealed vintage boxes run up to ~2.8×, so the high bound
+// is loose.
+const (
+	boxPackRatioLow  = 0.4
+	boxPackRatioHigh = 2.5
+)
+
+// flagPriceDoubts marks boxes and packs whose prices disagree, so nothing is
+// recommended or alerted on numbers that don't add up.
+func flagPriceDoubts(c *catalog) {
+	packs := map[string]int{} // set code | kind -> index in c.products
+	for i, p := range c.products {
+		packs[strings.ToLower(p.SetCode)+"|"+packKind(p.ProductType)] = i
+	}
+	for bi := range c.boxes {
+		box := &c.boxes[bi]
+		pi, ok := packs[strings.ToLower(box.SetCode)+"|"+packKind(box.ProductType)]
+		if !ok || box.MarketPrice == nil || c.products[pi].MarketPrice == nil || box.PacksPerBox <= 0 {
+			continue
+		}
+		pack := &c.products[pi]
+		perPack := *box.MarketPrice / float64(box.PacksPerBox)
+		ratio := perPack / *pack.MarketPrice
+		switch {
+		case ratio > boxPackRatioHigh:
+			box.PriceDoubt = fmt.Sprintf("box price ($%.0f) is %.1f× its %d packs ($%.2f each): it may be priced as a case or a different product",
+				*box.MarketPrice, ratio, box.PacksPerBox, *pack.MarketPrice)
+			pack.PriceDoubt = fmt.Sprintf("its box's price ($%.0f) is %.1f× this pack's for %d packs: one of the two is likely wrong",
+				*box.MarketPrice, ratio, box.PacksPerBox)
+		case ratio < boxPackRatioLow:
+			box.PriceDoubt = fmt.Sprintf("box price ($%.0f, $%.2f a pack) is only %.0f%% of its single pack's ($%.2f): one of the two is likely wrong",
+				*box.MarketPrice, perPack, ratio*100, *pack.MarketPrice)
+			pack.PriceDoubt = fmt.Sprintf("this pack ($%.2f) costs %.1f× its box's per-pack price ($%.2f): one of the two is likely wrong",
+				*pack.MarketPrice, 1/ratio, perPack)
+		}
+	}
 }
 
 // CatalogHandler lets admins see and seed the saved MTGStocks catalog.

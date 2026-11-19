@@ -44,6 +44,8 @@ export interface TrendRow {
   releasedAt: string;
   productType: string;
   marketPrice: number | null;
+  /** Why the price looks wrong (box and pack prices disagree); no alerts or colours then. */
+  priceDoubt?: string;
   packsPerBox?: number;
   trend: Trend | null;
   watch: Watch | null;
@@ -234,7 +236,7 @@ export function evText(r: TrendRow): { value: string; change: string | null } | 
 
 /** How a price compares with what the cards inside are worth, the same scale
  *  for every pack (so a colour always means the same thing): great (20%+
- *  under) · good (2–20% under) · even (within 2%) · high (2–25% over) ·
+ *  under) · good (1–20% under) · even (within 1%) · high (1–25% over) ·
  *  higher (25%–2×) · highest (over 2×). Collector packs mostly land in the
  *  orange and red: they usually sell well above their cards. */
 export type ValueTone = 'great' | 'good' | 'even' | 'high' | 'higher' | 'highest';
@@ -243,8 +245,8 @@ export function valueTone(price: number | null | undefined, contents: number | n
   if (price == null || !contents || contents <= 0) return null;
   const r = price / contents;
   if (r < 0.8) return 'great';
-  if (r < 0.98) return 'good';
-  if (r <= 1.02) return 'even';
+  if (r < 0.99) return 'good';
+  if (r <= 1.01) return 'even';
   if (r <= 1.25) return 'high';
   if (r <= 2) return 'higher';
   return 'highest';
@@ -252,6 +254,7 @@ export function valueTone(price: number | null | undefined, contents: number | n
 
 /** A trends row's price against its contents value; null if unknown. */
 export function contentsTone(r: TrendRow): ValueTone | null {
+  if (r.priceDoubt) return null; // a price that looks wrong isn't compared
   return valueTone(r.trend?.current ?? r.marketPrice, r.ev?.value);
 }
 

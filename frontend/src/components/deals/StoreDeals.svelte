@@ -169,7 +169,7 @@
                   {money(o.price)}
                   {#if o.contents}
                     <!-- Coloured by price vs what the cards inside are worth (one scale for all packs). -->
-                    <span class="sub tone--{valueTone(o.price, o.contents)}"
+                    <span class="contents-note tone--{valueTone(o.price, o.contents)}"
                       title="Value of the cards inside (pull rates × card prices). Green: price under it; yellow to red: over">
                       {o.premium ? `⚠ ${(o.price / o.contents).toFixed(1)}× contents` : `contents ${money(o.contents)}`}
                     </span>
@@ -178,6 +178,7 @@
                 <td class="num">{money(o.marketPrice)}</td>
                 <td class="num">
                   {o.discount > 0 ? `${Math.round(o.discount * 100)}% under` : o.discount < 0 ? `${Math.round(-o.discount * 100)}% over` : 'at market'}
+                  {#if o.suspicious}<span class="contents-note doubt" title="An English pack this far under market is more often a mislisting or a market price that's off than a bargain">⚠ unusually cheap, check it</span>{/if}
                 </td>
                 {#if canEdit}
                   <td>
@@ -240,6 +241,9 @@
   .offers tr.soldout td { color: var(--color-text-muted); }
   .name { white-space: normal !important; min-width: 10rem; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
+  /* Like .sub but coloured by its tone (a .sub colour here would override it). */
+  .contents-note { display: block; font-size: 0.72rem; }
+  .doubt { color: var(--tone-higher); cursor: help; }
   .more { background: none; border: none; padding: 0; margin-top: 0.15rem; font: inherit; font-size: 0.72rem; color: var(--color-accent); cursor: pointer; }
   .others { list-style: none; margin: 0.2rem 0 0; padding: 0; font-size: 0.75rem; color: var(--color-text-muted); }
   .others li { padding: 0.1rem 0; }

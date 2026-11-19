@@ -45,6 +45,9 @@ type SearchResult struct {
 	// NoSales: MarketPrice is only the average asking price (no recent
 	// sales), so it says little about what the product is worth.
 	NoSales bool `json:"noSales,omitempty"`
+	// PriceDoubt explains why MarketPrice looks wrong (box and pack prices
+	// disagree); such products raise no alerts or deals.
+	PriceDoubt string `json:"priceDoubt,omitempty"`
 }
 
 var knownPackTypes = map[string]string{

@@ -316,6 +316,7 @@
             <td class="num">
               {money(t?.current ?? r.marketPrice)}
               {#if isBox(r)}<span class="sub">{money(perPack(r))} / pack · {r.packsPerBox} packs</span>{/if}
+              {#if r.priceDoubt}<span class="doubt" title={r.priceDoubt}>⚠ prices disagree</span>{/if}
             </td>
             <!-- Preorders have no release price yet: their change is only since listing. -->
             <td class="num" title={t?.signal === 'preorder' ? 'Not released yet' : undefined}>
@@ -417,7 +418,7 @@
         and TCGplayer card prices, and how that moved over 2 weeks. When the cards are heating up (spoilers, new decks),
         packs have tended to follow over the next few weeks; when they cool off, waiting tends to pay. In a 90-day test the
         effect was a few percent, so it's a hint, not an alert. Its colour compares the price with the contents, on one scale
-        for every pack: dark green 20%+ under, light green 2–20% under, plain within 2%, yellow up to 25% over, orange up to
+        for every pack: dark green 20%+ under, light green 1–20% under, plain within 1%, yellow up to 25% over, orange up to
         2×, red over 2×. Collector packs are mostly orange or red: they usually sell well above their cards.</li>
       <li>Not tracked here: Jumpstart (casual half-decks, not drafted) and sleeved retail packs (gone weeks after
         release). Both can still be added to the collection.</li>
@@ -514,6 +515,7 @@
   .signal { font-size: 0.78rem; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid var(--color-border); white-space: nowrap; }
   .signal--floor { border-color: var(--color-success); color: var(--color-text); font-weight: 600; }
   .signal--falling { color: var(--color-text-muted); }
+  .doubt { display: block; font-size: 0.72rem; color: var(--tone-higher); cursor: help; }
   .signal--climbing { color: var(--color-text); font-weight: 600; }
 
   .watch { display: flex; gap: 0.4rem; align-items: center; }

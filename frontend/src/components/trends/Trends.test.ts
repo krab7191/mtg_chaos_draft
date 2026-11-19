@@ -173,8 +173,9 @@ describe('Trends page', () => {
       row(2, { packsPerBox: undefined, productType: 'Collector Booster', trend: trend({ newLow: true, prevLow: 130, signal: 'climbing', change365: 0.62 }), watch: w(2), alerts: ['new_low'] }),
       row(3, { trend: trend({ signal: 'floor' }), watch: w(3), alerts: [], stock: 36, // muted by stock
         ev: { value: 43.2, change: -0.12, day: '2026-11-19' } }),
-      row(4),
+      row(4, { priceDoubt: 'box price ($6987) is 3.0× its 12 packs' }),
     ]);
+    expect(container.querySelector('#trend-4 .doubt')?.getAttribute('title')).toContain('3.0× its 12 packs');
     // Muted: the signal shows, with the reason.
     expect(container.querySelector('#trend-3')?.textContent).toContain('alert muted · you own 36');
     expect(container.querySelector('#trend-1')?.textContent).not.toContain('muted');

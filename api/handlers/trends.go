@@ -685,6 +685,9 @@ func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchR
 		row.Alerts = alertsFor(row.Trend, row.Watch, row.Stock)
 		row.Deal = deals[p.MTGStocksID]
 		row.Alerts = withDealAlert(row.Alerts, row.Watch, row.Deal, row.Stock)
+		if p.PriceDoubt != "" { // nothing is alerted on prices that don't add up
+			row.Alerts, row.Deal = []string{}, nil
+		}
 		if e, ok := evs[p.MTGStocksID]; ok {
 			row.EV = evInfo(e)
 		} else if e, ok := evs[packOf[p.MTGStocksID]]; ok && p.PacksPerBox > 0 {

@@ -120,7 +120,10 @@
                   <span class="alert-note">{r.alerts.map(a => alertText(r, a)).join('; ')}</span>
                 {/if}
               </td>
-              <td class="num">{money(t?.current ?? r.marketPrice)}</td>
+              <td class="num">
+                {money(t?.current ?? r.marketPrice)}
+                {#if r.priceDoubt}<span class="doubt" title={r.priceDoubt}>⚠ prices disagree</span>{/if}
+              </td>
               <td class="num" class:dip={t?.dip}>{vsUsual(r) ?? '—'}</td>
               <td class="num">{t ? pct(t.change30) : '—'}</td>
               <td class="num">
@@ -205,6 +208,7 @@
   .packs td.dip { color: var(--color-text); font-weight: 600; }
   .name { white-space: normal !important; min-width: 11rem; }
   .muted { color: var(--color-text-muted); }
+  .doubt { display: block; font-size: 0.72rem; color: var(--tone-higher); cursor: help; }
   .sub { display: block; font-size: 0.72rem; color: var(--color-text-muted); }
   .alert-note { display: block; font-size: 0.75rem; color: var(--color-text); margin-top: 0.15rem; }
   .link { background: none; border: none; padding: 0; font: inherit; color: var(--color-text); cursor: pointer; text-align: left; }

@@ -735,3 +735,19 @@ func TestCheapest(t *testing.T) {
 		t.Errorf("no catalog: %d", rr.Code)
 	}
 }
+
+// A product whose price looks wrong raises no alerts, even when watched.
+func TestRows_DoubtfulPricesRaiseNoAlerts(t *testing.T) {
+	ctx := trendsDB(t)
+	pool := testhelper.Pool(t)
+	c, _ := parseCatalog([]byte(fakeSetsJSON))
+	c.products[0].PriceDoubt = "box and pack disagree"
+	drop := 0.1
+	_ = db.SetWatch(ctx, pool, db.Watch{MTGStocksID: c.products[0].MTGStocksID, DropAlert: &drop})
+	_ = db.StoreHistory(ctx, pool, c.products[0].MTGStocksID, series("2023-01-01", append(repeat(10, 20), repeat(5, 300)...)...))
+	watches, _ := db.ListWatches(ctx, pool)
+	rows, err := NewTrendsHandler(pool).rows(ctx, c, c.products[:1], watches, time.Time{}, day("2024-01-01"))
+	if err != nil || len(rows) != 1 || len(rows[0].Alerts) != 0 || rows[0].PriceDoubt == "" {
+		t.Errorf("rows: %+v %v", rows, err)
+	}
+}

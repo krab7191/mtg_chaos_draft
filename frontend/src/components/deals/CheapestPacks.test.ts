@@ -44,7 +44,7 @@ describe('CheapestPacks', () => {
       row(1, { watch: { mtgstocksId: 1, dropAlert: null }, alerts: ['dip'], ev: { value: 4.4, change: 0.08, day: '2026-11-19' } }),
       row(2, { trend: trend({ vsUsual: 0.05, dip: false }) }),
       row(3, { trend: trend({ vsUsual: 0.001, dip: false }) }),
-      row(4, { trend: null, marketPrice: 6 }),
+      row(4, { trend: null, marketPrice: 6, priceDoubt: 'one of the two is likely wrong' }),
     ]);
     await waitFor(() => expect(names(container)).toEqual(['Set 1', 'Set 2', 'Set 3', 'Set 4']));
     expect(fetchMock).toHaveBeenCalledWith('/api/cheapest/trends?before=2020-01-01', undefined);
@@ -56,6 +56,7 @@ describe('CheapestPacks', () => {
     expect(text(2)).toContain('5% over usual');
     expect(text(3)).toContain('at usual');
     expect(text(4)).toContain('$6.00');
+    expect(text(4)).toContain('⚠ prices disagree');
 
     await act(() => fireEvent.click(button(container, 'Set 1')));
     await waitFor(() => expect(container.querySelector('.detail svg')).not.toBeNull());

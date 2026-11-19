@@ -116,11 +116,12 @@ describe('trends helpers', () => {
     expect(contentsTone(row({ trend: trend({ current: 43 }), ev: { value: 43.2, day: 'd' } }))).toBe('even');
     expect(contentsTone(row({ trend: trend({ current: 50 }), ev: { value: 43.2, day: 'd' } }))).toBe('high');
     // One scale for every pack, by price / contents.
-    expect([0.5, 0.9, 1, 1.01, 1.2, 1.5, 2, 3].map(r => valueTone(r * 10, 10)))
-      .toEqual(['great', 'good', 'even', 'even', 'high', 'higher', 'higher', 'highest']);
+    expect([0.5, 0.9, 0.985, 1, 1.01, 1.015, 1.2, 1.5, 2, 3].map(r => valueTone(r * 10, 10)))
+      .toEqual(['great', 'good', 'good', 'even', 'even', 'high', 'high', 'higher', 'higher', 'highest']);
     expect(valueTone(10, 0)).toBeNull();
     expect(contentsTone(row({ trend: null, marketPrice: null, ev: { value: 1, day: 'd' } }))).toBeNull();
     expect(contentsTone(row({}))).toBeNull();
+    expect(contentsTone(row({ trend: trend({ current: 40 }), ev: { value: 43.2, day: 'd' }, priceDoubt: 'x' }))).toBeNull();
   });
 
   it('opens the trends window wide enough for the oldest watched pack', () => {

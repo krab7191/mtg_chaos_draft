@@ -1,0 +1,33 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import BestDeals from '../../components/deals/BestDeals.svelte';
+
+const apiUrl = import.meta.env.API_URL ?? 'http://api:8080';
+const cookie = Astro.request.headers.get('cookie') ?? '';
+
+let meRes: Response;
+try {
+  meRes = await fetch(`${apiUrl}/api/auth/me`, { headers: { cookie } });
+} catch {
+  return Astro.redirect('/login');
+}
+if (!meRes.ok) return Astro.redirect('/login');
+const user = await meRes.json();
+const ADMIN_ROLES = ['admin', 'viewer'];
+if (!ADMIN_ROLES.includes(user.role)) return Astro.redirect('/select');
+---
+
+<Layout title="Best Deals" user={user}>
+  <div class="page">
+    <h1 class="page__title">Best Deals</h1>
+    <p class="page__sub">The 3 packs that give you the most cards for your money right now, and aren't likely to get cheaper soon.</p>
+    <BestDeals client:load />
+  </div>
+</Layout>
+
+<style>
+  .page {
+    &__title { font-size: 1.4rem; margin-bottom: 0.3rem; }
+    &__sub   { color: var(--color-text-muted); margin-bottom: 1.25rem; font-size: 0.9rem; }
+  }
+</style>
