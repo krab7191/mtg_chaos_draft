@@ -60,7 +60,7 @@ func (h realHistory) points() []db.PricePoint {
 }
 
 var signalLetter = map[Signal]string{
-	SignalPreorder: "p", SignalNew: "n", SignalFloor: "F", SignalFalling: "d", SignalRising: "r", SignalStable: "s",
+	SignalPreorder: "p", SignalNew: "n", SignalFloor: "F", SignalFalling: "d", SignalRising: "r", SignalStable: "s", SignalClimbing: "c",
 }
 
 func TestRealHistories(t *testing.T) {
@@ -70,7 +70,7 @@ func TestRealHistories(t *testing.T) {
 	}
 	var b strings.Builder
 	b.WriteString("# Signal every 30 days from the first price, as of that day (history up to it only).\n")
-	b.WriteString("# p preorder, n new, F possible floor, d falling, r rising, s stable; ! = new low.\n")
+	b.WriteString("# p preorder, n new, F possible floor, c climbing, d falling, r rising, s stable; ! = new low.\n")
 	byKind := map[string][]btProduct{}
 	for _, h := range hs {
 		if isJumpstart(h.Set, h.Type) {

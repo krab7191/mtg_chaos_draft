@@ -315,6 +315,7 @@
             <td>
               {#if s}
                 <span class="signal signal--{t!.signal}" title={s.hint}><span aria-hidden="true">{s.icon}</span> {s.label}</span>
+                {#if t!.signal === 'climbing' && t!.change365 != null}<span class="sub">{pct(t!.change365)} in a year</span>{/if}
                 {#if mutedStock(r) != null}
                   <span class="sub" title="Alerts are muted once you have {MUTE_AT_STOCK}+ packs">alert muted · you own {mutedStock(r)}</span>
                 {/if}
@@ -390,6 +391,9 @@
         usual right now", not "the bottom": in tests the price kept sliding about half the time.</li>
       <li><strong>$ Store deal</strong> (watched packs, once released): a store lists it in stock 15%+ under TCGplayer's
         market price (see Cheap Packs). Preorder listings don't count: before release the market price is preorder hype.</li>
+      <li><strong>↗ Climbing</strong>: a year or more after release, up 25%+ over the past year and not falling over the
+        last 30 days. In tests such packs were higher 6 months later 85–93% of the time (median +16–26%), and only about
+        1 in 10 dipped 10%+ below the price meanwhile: if you want one, waiting for a dip has rarely paid.</li>
       <li><strong>Contents</strong> (packs): what the cards inside are worth on average, from MTGJSON's pull rates
         and TCGplayer card prices, and how that moved over 2 weeks. When the cards are heating up (spoilers, new decks),
         packs have tended to follow over the next few weeks; when they cool off, waiting tends to pay. In a 90-day test the
@@ -487,6 +491,7 @@
   .signal { font-size: 0.78rem; padding: 0.1rem 0.45rem; border-radius: 999px; border: 1px solid var(--color-border); white-space: nowrap; }
   .signal--floor { border-color: var(--color-success); color: var(--color-text); font-weight: 600; }
   .signal--falling { color: var(--color-text-muted); }
+  .signal--climbing { color: var(--color-text); font-weight: 600; }
 
   .watch { display: flex; gap: 0.4rem; align-items: center; }
   .watch__all { display: inline-flex; gap: 0.35rem; align-items: center; cursor: pointer; }

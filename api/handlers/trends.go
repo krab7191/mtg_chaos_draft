@@ -149,6 +149,12 @@ const (
 	trendWindow = 30   // days the trend is measured over
 	trendMove   = 0.05 // ±5% over the window counts as falling/rising
 
+	// Climbing: a year+ after release, up climbMove over the past year and not
+	// falling over trendWindow. Backtest (2019–2026 packs, checked every two
+	// weeks): 6 months later such packs were higher 93% (Collector) / 85%
+	// (regular) of the time, median +26% / +16%, vs 73% / 71% for the rest;
+	// only 8–10% dipped 10%+ below the price within 6 months. Waiting rarely pays.
+	climbMove = 0.25
 )
 
 // FloorRule says when a product counts as a possible floor: old enough,
@@ -192,6 +198,7 @@ const (
 	SignalFloor    Signal = "floor"    // fell from release, then flat near its low
 	SignalRising   Signal = "rising"   // up over trendMove in trendWindow
 	SignalStable   Signal = "stable"   // flat, well above its low
+	SignalClimbing Signal = "climbing" // up climbMove over a year and not falling
 )
 
 // Trend summarizes a product's price history.
@@ -205,6 +212,8 @@ type Trend struct {
 	lastDay  time.Time // day of the latest price
 	AboveLow float64   `json:"aboveLow"` // fraction above the low
 	Change30 *float64  `json:"change30"` // fraction over trendWindow; nil without enough history
+	// Change365 is the change over the past year; nil without a year of history.
+	Change365 *float64 `json:"change365,omitempty"`
 	// ReleasePrice is the first price on or after release; DropFromRelease
 	// how far below it the price is now (negative when above).
 	ReleasePrice    float64 `json:"releasePrice"`
@@ -309,6 +318,10 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time, rul
 		change := t.Current/before - 1
 		t.Change30 = &change
 	}
+	if yearAgo, ok := priceOn(points, last.Day.AddDate(-1, 0, 0)); ok && yearAgo > 0 {
+		change := t.Current/yearAgo - 1
+		t.Change365 = &change
+	}
 
 	t.ReleasePrice = since[0].Price
 	t.DropFromRelease = 1 - t.Current/t.ReleasePrice
@@ -357,6 +370,9 @@ func signalFor(t *Trend, released *time.Time, today time.Time, rule FloorRule) S
 		return SignalNew
 	case isFloor(t, released, today, rule):
 		return SignalFloor
+	case released != nil && today.Sub(*released) >= 365*24*time.Hour &&
+		t.Change365 != nil && *t.Change365 >= climbMove && t.Change30 != nil && *t.Change30 > -trendMove:
+		return SignalClimbing
 	case t.Change30 != nil && *t.Change30 <= -trendMove:
 		return SignalFalling
 	case t.Change30 != nil && *t.Change30 >= trendMove:

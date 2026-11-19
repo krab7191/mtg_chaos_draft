@@ -1,7 +1,7 @@
 // Types and helpers for the price trends page.
 import { languageLabel } from './deals';
 
-export type Signal = 'preorder' | 'new' | 'floor' | 'falling' | 'rising' | 'stable';
+export type Signal = 'preorder' | 'new' | 'floor' | 'climbing' | 'falling' | 'rising' | 'stable';
 
 export interface Trend {
   current: number;
@@ -9,6 +9,8 @@ export interface Trend {
   lowDay: string;
   aboveLow: number;
   change30: number | null;
+  /** Change over the past year (absent without a year of history). */
+  change365?: number;
   releasePrice: number;
   dropFromRelease: number;
   band: number | null;
@@ -111,6 +113,7 @@ export interface PricePoint { day: string; price: number }
 /** Signal labels and icons: a signal is never shown by color alone. */
 export const SIGNALS: Record<Signal, { label: string; icon: string; hint: string }> = {
   floor:    { label: 'Possible floor', icon: '◆', hint: 'Fell a lot since release, then held steady near its low' },
+  climbing: { label: 'Climbing',       icon: '↗', hint: "Up 25%+ over the past year and not falling: waiting has rarely paid off" },
   falling:  { label: 'Falling',        icon: '↓', hint: 'Still dropping' },
   rising:   { label: 'Rising',         icon: '↑', hint: 'Climbing' },
   stable:   { label: 'Stable',         icon: '–', hint: 'Not moving much' },

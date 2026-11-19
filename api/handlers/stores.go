@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"slices"
 	"sort"
@@ -45,7 +46,10 @@ var (
 	storePageDelay  = 2 * time.Minute
 	storeRetryDelay = 10 * time.Minute
 	storeMaxPages   = 20
-	storeClient     = &http.Client{Timeout: 60 * time.Second}
+	// Store requests go through MTGSTOCKS_PROXY (the home connection over
+	// WireGuard) when set, like MTGStocks: some stores refuse data-center
+	// addresses. If the tunnel is down they fail fast and keep the last listing.
+	storeClient = newProxiedClient(os.Getenv("MTGSTOCKS_PROXY"), 60*time.Second)
 	// storeBaseURL overrides https://<domain> in tests.
 	storeBaseURL = func(domain string) string { return "https://" + domain }
 )

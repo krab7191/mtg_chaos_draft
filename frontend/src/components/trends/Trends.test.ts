@@ -148,7 +148,7 @@ describe('Trends page', () => {
     const w = (id: number) => ({ mtgstocksId: id, dropAlert: null });
     const { container } = await mount([
       row(1, { trend: trend({ signal: 'floor' }), watch: w(1), alerts: ['floor'] }),
-      row(2, { packsPerBox: undefined, productType: 'Collector Booster', trend: trend({ newLow: true, prevLow: 130 }), watch: w(2), alerts: ['new_low'] }),
+      row(2, { packsPerBox: undefined, productType: 'Collector Booster', trend: trend({ newLow: true, prevLow: 130, signal: 'climbing', change365: 0.62 }), watch: w(2), alerts: ['new_low'] }),
       row(3, { trend: trend({ signal: 'floor' }), watch: w(3), alerts: [], stock: 36, // muted by stock
         ev: { value: 43.2, change: -0.12, day: '2026-11-19' } }),
       row(4),
@@ -161,6 +161,9 @@ describe('Trends page', () => {
 
     await act(() => fireEvent.click(button(container, 'Needs a look (2)')));
     expect(names(container)).toEqual(['Set 1', 'Set 2']);
+    // A climber says how much it rose in a year.
+    expect(container.querySelector('#trend-2')?.textContent).toContain('Climbing');
+    expect(container.querySelector('#trend-2')?.textContent).toContain('+62% in a year');
     expect(button(container, 'Booster boxes').getAttribute('aria-pressed')).toBe('false');
     // Picking a kind leaves it for all of that kind.
     await act(() => fireEvent.click(button(container, 'Single packs')));

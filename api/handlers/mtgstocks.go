@@ -50,13 +50,19 @@ var mtgstocksClient = newMTGStocksClient(os.Getenv("MTGSTOCKS_PROXY"))
 // is set (e.g. an HTTP proxy reached over WireGuard), only these requests go
 // through it; everything else the server does is unaffected.
 func newMTGStocksClient(proxyURL string) *http.Client {
-	c := &http.Client{Timeout: 10 * time.Second}
+	return newProxiedClient(proxyURL, 10*time.Second)
+}
+
+// newProxiedClient is a client whose requests go through proxyURL when it's
+// set and valid, and directly otherwise. Store requests use it too.
+func newProxiedClient(proxyURL string, timeout time.Duration) *http.Client {
+	c := &http.Client{Timeout: timeout}
 	if proxyURL == "" {
 		return c
 	}
 	u, err := url.Parse(proxyURL)
 	if err != nil || u.Host == "" {
-		log.Printf("mtgstocks: ignoring invalid MTGSTOCKS_PROXY %q", proxyURL)
+		log.Printf("ignoring invalid MTGSTOCKS_PROXY %q", proxyURL)
 		return c
 	}
 	t := http.DefaultTransport.(*http.Transport).Clone()
@@ -64,7 +70,7 @@ func newMTGStocksClient(proxyURL string) *http.Client {
 	// Fail fast when the tunnel to the proxy is down.
 	t.DialContext = (&net.Dialer{Timeout: 3 * time.Second}).DialContext
 	c.Transport = t
-	log.Printf("mtgstocks: requests go through proxy %s", u.Host)
+	log.Printf("MTGStocks and store requests go through proxy %s", u.Host)
 	return c
 }
 

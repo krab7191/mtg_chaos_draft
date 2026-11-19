@@ -358,3 +358,26 @@ func TestDeals_PreordersAndLanguages(t *testing.T) {
 		t.Errorf("unknown language: %q", got)
 	}
 }
+
+// Store requests can go through the home proxy (MTGSTOCKS_PROXY), as
+// MTGStocks requests do.
+func TestStoreClient_ThroughProxy(t *testing.T) {
+	var seen string
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.URL.String() // a forward proxy is asked for the full URL
+		_, _ = w.Write([]byte(`{"products":[]}`))
+	}))
+	defer proxy.Close()
+	c := newProxiedClient(proxy.URL, 5*time.Second)
+	resp, err := c.Get("http://store.example/collections/mtg/products.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if seen != "http://store.example/collections/mtg/products.json" {
+		t.Errorf("proxy saw %q", seen)
+	}
+	if newProxiedClient("::bad", time.Second).Transport != nil || newProxiedClient("", time.Second).Transport != nil {
+		t.Error("no valid proxy means direct")
+	}
+}
