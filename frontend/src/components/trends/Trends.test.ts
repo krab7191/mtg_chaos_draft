@@ -126,6 +126,8 @@ describe('Trends page', () => {
   });
 
   it('a watched floor alerts, and clicking it opens that row on the right tab', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
     const floorPack = row(2, { packsPerBox: undefined, productType: 'Play Booster', trend: trend({ signal: 'floor', current: 4 }),
       watch: { mtgstocksId: 2, dropAlert: null }, alerts: ['floor'] });
     const { container } = await mount([row(1), floorPack], { canEdit: true }, { '/api/trends/2/history': [] });
@@ -134,6 +136,12 @@ describe('Trends page', () => {
     await act(() => fireEvent.click(container.querySelector('.alerts .link')!));
     expect(names(container)).toEqual(['Set 2']);
     await waitFor(() => expect(container.textContent).toContain('Not enough price history'));
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(container.querySelector('#trend-2'));
+    // Clicking the alert again keeps the graph open (and scrolls back to it).
+    await act(() => fireEvent.click(container.querySelector('.alerts .link')!));
+    expect(container.querySelector('#trend-2')?.classList.contains('open')).toBe(true);
+    expect(scroll).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the watch unchanged when saving fails', async () => {

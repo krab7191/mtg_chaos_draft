@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Sparkline from './Sparkline.svelte';
   import PriceChart from './PriceChart.svelte';
   import { getJSON } from '../../lib/api';
@@ -33,12 +33,22 @@
   const alertGroups = $derived(groupBySet(alerting));
   const th = $derived(data?.thresholds);
 
-  async function toggle(r: TrendRow) {
-    open = open === r.mtgstocksId ? null : r.mtgstocksId;
+  async function toggle(r: TrendRow, keepOpen = false) {
+    open = keepOpen || open !== r.mtgstocksId ? r.mtgstocksId : null;
     if (open != null && !history[open]) {
       const pts = await getJSON<PricePoint[]>(`/api/trends/${r.mtgstocksId}/history`, "Couldn't load price history");
       if (pts) history[r.mtgstocksId] = pts;
     }
+  }
+
+  /** From an alert: show the product's row in the table, scroll to it and open its graph. */
+  async function reveal(r: TrendRow) {
+    kind = isBox(r) ? 'box' : 'pack';
+    show = 'all';
+    const loading = toggle(r, true);
+    await tick();
+    document.getElementById(`trend-${r.mtgstocksId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    await loading;
   }
 
   async function setWatch(r: TrendRow, watch: boolean, dropAlert: number | null = r.watch?.dropAlert ?? null) {
@@ -176,7 +186,7 @@
       <ul>
         {#each g.rows as r (r.mtgstocksId)}
           <li>
-            <button class="link" onclick={() => { kind = isBox(r) ? 'box' : 'pack'; show = 'all'; toggle(r); }}>
+            <button class="link" onclick={() => reveal(r)}>
               {kindLabel(r)}
             </button>
             — {r.alerts.map(a => alertText(r, a)).join('; ')}
@@ -264,7 +274,7 @@
         {#each rows as r (r.mtgstocksId)}
           {@const t = r.trend}
           {@const s = t ? SIGNALS[t.signal] : null}
-          <tr class:open={open === r.mtgstocksId} class:alerting={r.alerts.length > 0}>
+          <tr id="trend-{r.mtgstocksId}" class:open={open === r.mtgstocksId} class:alerting={r.alerts.length > 0}>
             <td class="name">
               <button class="link" aria-expanded={open === r.mtgstocksId} onclick={() => toggle(r)}>{r.setName}</button>
               <span class="muted">{kindLabel(r)}</span>
@@ -366,6 +376,8 @@
 {/if}
 
 <style>
+  /* Rows scrolled to from an alert clear the sticky nav. */
+  tbody tr { scroll-margin-top: 4rem; }
   .proposal {
     border: 1px solid var(--color-accent);
     border-radius: var(--radius);
