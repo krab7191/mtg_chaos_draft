@@ -22,23 +22,27 @@
   const all = $derived(points.map(p => ({ t: new Date(p.day).getTime(), v: p.price })));
   const spanDays = $derived(all.length > 1 ? (all[all.length - 1].t - all[0].t) / DAY : 0);
 
-  // Visible range: the past year by default, with 3 years or everything a click away.
-  type Range = '1y' | '3y' | 'all';
+  // Visible range: the past year by default (everything, for younger
+  // products), with shorter and longer views a click away. Only ranges
+  // shorter than the history are offered, plus "All".
+  type Range = '3m' | '6m' | '1y' | '3y' | 'all';
   const RANGES: { id: Range; label: string; days: number }[] = [
+    { id: '3m', label: '3M', days: 91 },
+    { id: '6m', label: '6M', days: 182 },
     { id: '1y', label: '1Y', days: 365 },
     { id: '3y', label: '3Y', days: 1095 },
     { id: 'all', label: 'All', days: Infinity },
   ];
-  let range = $state<Range>('1y');
-  // Only offer ranges that show something different.
-  const ranges = $derived(RANGES.filter((r, i) => i === 0 || spanDays > RANGES[i - 1].days));
+  let picked = $state<Range | null>(null);
+  const ranges = $derived(RANGES.filter(r => r.days < spanDays || r.id === 'all'));
+  const range = $derived<Range>(picked ?? (spanDays > 365 ? '1y' : 'all'));
   const data = $derived.by(() => {
     const days = RANGES.find(r => r.id === range)!.days;
     if (!all.length || !Number.isFinite(days)) return all;
     const cutoff = all[all.length - 1].t - days * DAY;
     return all.filter(p => p.t >= cutoff);
   });
-  function pickRange(r: Range) { range = r; hover = null; }
+  function pickRange(r: Range) { picked = r; hover = null; }
 
   const scale = $derived.by(() => {
     if (data.length < 2) return null;
