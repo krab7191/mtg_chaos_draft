@@ -154,17 +154,15 @@ type FloorRule struct {
 	Near   float64 `json:"near"`   // and within this of the low since release
 }
 
-// floorRules are tuned by backtesting on real price histories (sets 2019 to
-// mid 2025), with leave-one-release-year-out cross-validation:
+// The active rules (floorRules, ruleFor) and their defaults live in
+// backtest.go, which re-tunes them quarterly. The defaults came from
+// backtesting real price histories (sets 2019 to mid 2025) with
+// leave-one-release-year-out cross-validation:
 //   - regular packs and boxes (102): fires on ~79%, buying ~10% (median)
 //     above the eventual low, against ~17% for "wait 3 months";
 //   - Collector packs and boxes (61) get their own rule: their prices often
 //     don't drop much, so no minimum drop and a wider "near the low"; fires
 //     on ~79% at ~16% above the low, against ~22% for "wait 3 months".
-var floorRules = map[string]FloorRule{
-	"regular":   {MinAge: 150, Drop: 0.10, Window: 14, Band: 0.12, Near: 0.10},
-	"collector": {MinAge: 150, Drop: 0.00, Window: 14, Band: 0.08, Near: 0.20},
-}
 
 // ruleKind is which floor rule applies to a product type.
 func ruleKind(productType string) string {
@@ -380,6 +378,10 @@ func alertsFor(t *Trend, w *db.Watch) []string {
 
 type trendsResponse struct {
 	Products []trendRow `json:"products"`
+	// Proposals are floor rules the quarterly backtest suggests.
+	Proposals []RuleProposal `json:"proposals"`
+	// LastBacktest is when the backtest last ran (null if never).
+	LastBacktest *time.Time `json:"lastBacktest"`
 	// Notifications says whether phone alerts (ntfy) are set up.
 	Notifications bool `json:"notifications"`
 	Backfilled    int  `json:"backfilled"`
@@ -440,6 +442,16 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	stock := newStockIndex(collection)
+	proposals, err := openProposals(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	lastRun, _, err := db.LastBacktest(r.Context(), h.pool)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
 
 	resp := trendsResponse{Products: make([]trendRow, 0, len(picked)), Tracked: len(all), Notifications: notificationsOn()}
 	for _, p := range all {
@@ -447,15 +459,19 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 			resp.Backfilled++
 		}
 	}
+	resp.Proposals = proposals
+	if !lastRun.IsZero() {
+		resp.LastBacktest = &lastRun
+	}
 	th := &resp.Thresholds
 	th.NewSetDays, th.TrendWindow, th.TrendMove = newSetDays, trendWindow, trendMove
-	th.FloorRules = floorRules
+	th.FloorRules = activeRules()
 	for _, p := range picked {
 		var released *time.Time
 		if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err == nil {
 			released = &rel
 		}
-		trend := summarize(history[p.MTGStocksID], released, today, floorRules[ruleKind(p.ProductType)])
+		trend := summarize(history[p.MTGStocksID], released, today, ruleFor(p.ProductType))
 		row := trendRow{SearchResult: p, Trend: trend, Stock: stock.of(p)}
 		if wt, ok := watches[p.MTGStocksID]; ok {
 			row.Watch = &wt

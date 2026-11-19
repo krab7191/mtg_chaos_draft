@@ -6,8 +6,8 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule,
-    type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter,
+    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet,
+    type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
   } from '../../lib/trends';
 
   let { canEdit = false }: { canEdit?: boolean } = $props();
@@ -30,6 +30,7 @@
 
   const rows = $derived(data ? filterRows(data.products, kind, show) : []);
   const alerting = $derived(data ? data.products.filter(r => r.alerts.length > 0) : []);
+  const alertGroups = $derived(groupBySet(alerting));
   const th = $derived(data?.thresholds);
 
   async function toggle(r: TrendRow) {
@@ -89,6 +90,35 @@
     testing = false;
   }
 
+  // ── Floor rule proposals from the quarterly backtest ─────────
+  const kindName = (k: string) => (k === 'collector' ? 'Collector packs & boxes' : 'Regular packs & boxes');
+  const pct0 = (f: number) => `${Math.round(f * 100)}%`;
+  const resultRows = (m: BTMetrics) => [
+    ['Bought above the eventual low (median)', pct0(m.median)],
+    ['Bought above the eventual low (average)', pct0(m.mean)],
+    ['Fired on', `${pct0(m.coverage)} of products`],
+    ['Price fell another 10%+ afterwards', pct0(m.falseRate)],
+  ];
+  let deciding = $state(false);
+  async function decide(p: RuleProposal, apply: boolean) {
+    deciding = true;
+    const ok = await send(`/api/trends/rules/${p.id}/${apply ? 'apply' : 'dismiss'}`, 'POST', null,
+      apply ? "Couldn't apply the rule" : "Couldn't dismiss the proposal");
+    deciding = false;
+    if (!ok) return;
+    toast.show(apply ? `New ${kindName(p.kind).toLowerCase()} rule applied` : 'Proposal dismissed', 'success');
+    await load(); // signals recompute with the active rules
+  }
+  let running = $state(false);
+  async function runBacktest() {
+    running = true;
+    const ok = await send('/api/trends/backtest', 'POST', null, 'Backtest failed');
+    running = false;
+    if (!ok) return;
+    await load();
+    toast.show(data?.proposals?.length ? 'Backtest done: a better rule was found, see the top of the page' : 'Backtest done: the current rules are still the best', 'success');
+  }
+
   /** Mixed selection shows as the checkbox's in-between state. */
   function indeterminate(node: HTMLInputElement, value: boolean) {
     node.indeterminate = value;
@@ -105,21 +135,54 @@
   const kindLabel = (r: TrendRow) => r.productType;
 </script>
 
+<!-- ── Proposed floor rules ──────────────────────────────── -->
+{#each data?.proposals ?? [] as p (p.id)}
+  <section class="proposal" aria-label="Proposed floor rule">
+    <h2 class="proposal__title">The quarterly backtest found a better floor rule for {kindName(p.kind).toLowerCase()}</h2>
+    <table class="proposal__table">
+      <thead><tr><th></th><th>Current</th><th>Proposed</th></tr></thead>
+      <tbody>
+        <tr><td>Rule</td><td>{describeRule(p.current)}</td><td>{describeRule(p.rule)}</td></tr>
+        {#if p.metrics}
+          {@const cur = resultRows(p.metrics.current)}
+          {@const prop = resultRows(p.metrics.proposed)}
+          {#each cur as [label, value], i (label)}
+            <tr><td>{label}</td><td>{value}</td><td>{prop[i][1]}</td></tr>
+          {/each}
+        {/if}
+      </tbody>
+    </table>
+    {#if p.metrics}<p class="note">Tested on {p.metrics.products} products, each scored by a rule tuned without its release year.</p>{/if}
+    {#if canEdit}
+      <div class="proposal__actions">
+        <button class="btn-apply" disabled={deciding} onclick={() => decide(p, true)}>Apply</button>
+        <button class="link link--btn" disabled={deciding} onclick={() => decide(p, false)}>Dismiss</button>
+      </div>
+    {/if}
+  </section>
+{/each}
+
 <!-- ── Alerts ─────────────────────────────────────────────── -->
 {#if alerting.length > 0}
   <section class="alerts" aria-label="Alerts">
-    <h2 class="alerts__title">◆ {alerting.length} watched {alerting.length === 1 ? 'product needs' : 'products need'} a look</h2>
-    <ul>
-      {#each alerting as r (r.mtgstocksId)}
-        <li>
-          <button class="link" onclick={() => { kind = isBox(r) ? 'box' : 'pack'; show = 'all'; toggle(r); }}>
-            {r.setName} {kindLabel(r)}
-          </button>
-          — {r.alerts.map(a => alertText(r, a)).join('; ')}
-          {#if stockNote(r)}<span class="stock-note">{stockNote(r)}</span>{/if}
-        </li>
-      {/each}
-    </ul>
+    <h2 class="alerts__title">
+      ◆ {alerting.length} watched {alerting.length === 1 ? 'product' : 'products'}{alertGroups.length > 1 ? ` in ${alertGroups.length} sets` : ''}
+      {alerting.length === 1 ? 'needs' : 'need'} a look
+    </h2>
+    {#each alertGroups as g (g.setName)}
+      <h3 class="alerts__set">{g.setName}</h3>
+      <ul>
+        {#each g.rows as r (r.mtgstocksId)}
+          <li>
+            <button class="link" onclick={() => { kind = isBox(r) ? 'box' : 'pack'; show = 'all'; toggle(r); }}>
+              {kindLabel(r)}
+            </button>
+            — {r.alerts.map(a => alertText(r, a)).join('; ')}
+            {#if stockNote(r)}<span class="stock-note">{stockNote(r)}</span>{/if}
+          </li>
+        {/each}
+      </ul>
+    {/each}
   </section>
 {/if}
 
@@ -284,6 +347,13 @@
         it (median), against ~17% for waiting 3 months. Collector: ~16% above the low against ~22% for waiting 3 months.
         It's a hint, not a guarantee: about half the time the price dipped another 10%+ later. Watched products that hit
         a floor raise an alert.</li>
+      <li>The rules are re-tested every quarter on the latest price history; a clearly better rule is proposed here
+        for you to apply.
+        {#if data?.lastBacktest}Last run: {new Date(data.lastBacktest).toLocaleDateString()}.{:else}Not run yet.{/if}
+        {#if canEdit}
+          <button class="link link--btn" onclick={runBacktest} disabled={running}>{running ? 'Running…' : 'Run backtest now'}</button>
+        {/if}
+      </li>
       <li><strong>↓ Falling / ↑ Rising</strong>: moved more than {Math.round(th.trendMove * 100)}% over {th.trendWindow} days.</li>
       <li><strong>★ New</strong>: released under {th.newSetDays} days ago, when prices still carry release hype.</li>
       <li>Prices are TCGplayer market prices via MTGStocks. A box's per-pack price assumes its standard pack count.</li>
@@ -292,6 +362,27 @@
 {/if}
 
 <style>
+  .proposal {
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+  }
+  .proposal__title { font-size: 0.95rem; margin: 0 0 0.5rem; }
+  .proposal__table { width: 100%; border-collapse: collapse; }
+  .proposal__table th, .proposal__table td {
+    text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--color-border);
+  }
+  .proposal__table th { font-size: 0.72rem; color: var(--color-text-muted); font-weight: 500; }
+  .proposal__table td:first-child { color: var(--color-text-muted); white-space: nowrap; }
+  .proposal__actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.6rem; }
+  .btn-apply {
+    background: var(--color-accent); color: var(--color-text); border: none; border-radius: var(--radius);
+    padding: 0.35rem 0.9rem; font: inherit; cursor: pointer;
+  }
+  .btn-apply:disabled { opacity: 0.6; cursor: default; }
+
   .alerts {
     border: 1px solid var(--color-success);
     border-radius: var(--radius);
@@ -299,7 +390,8 @@
     margin-bottom: 1rem;
   }
   .alerts__title { font-size: 0.95rem; margin: 0 0 0.4rem; }
-  .alerts ul { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; }
+  .alerts ul { margin: 0 0 0.35rem; padding-left: 1.1rem; font-size: 0.85rem; }
+  .alerts__set { font-size: 0.85rem; font-weight: 600; margin: 0.5rem 0 0.15rem; }
   .stock-note {
     margin-left: 0.4rem; font-size: 0.75rem; padding: 0 0.4rem; border-radius: 999px;
     border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap;

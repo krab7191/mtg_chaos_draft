@@ -71,7 +71,7 @@ func loadRealHistory(t *testing.T, file string) []db.PricePoint {
 func TestSummarize_RealWildsOfEldraineSetBooster(t *testing.T) {
 	points := loadRealHistory(t, "history_5382_woe_set_booster.json.gz")
 	released := day("2023-09-08")
-	tr := summarize(points, &released, day("2026-11-17"), floorRules["regular"])
+	tr := summarize(points, &released, day("2026-11-17"), defaultFloorRules["regular"])
 
 	// Real history: bottomed at $4.58 two weeks after release (2023-09-22 UTC), now ~$16.70.
 	if tr.Low != 4.58 || !tr.LowDay.Equal(day("2023-09-22")) {
@@ -95,7 +95,7 @@ func TestSummarize_RealWildsOfEldraineSetBooster(t *testing.T) {
 func TestSummarize_RealRealityFracturePlayBooster(t *testing.T) {
 	points := loadRealHistory(t, "history_12545_rfa_play_booster.json.gz")
 	released := day("2026-10-02")
-	tr := summarize(points, &released, day("2026-11-17"), floorRules["regular"])
+	tr := summarize(points, &released, day("2026-11-17"), defaultFloorRules["regular"])
 	if tr.Signal != SignalNew && tr.Signal != SignalFalling && tr.Signal != SignalFloor {
 		t.Errorf("a six-week-old set at its low: got %s", tr.Signal)
 	}
@@ -132,7 +132,7 @@ func TestSignals(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			start := tc.today.AddDate(0, 0, -len(tc.prices)).Format("2006-01-02")
-			tr := summarize(series(start, tc.prices...), tc.rel, tc.today, floorRules["regular"])
+			tr := summarize(series(start, tc.prices...), tc.rel, tc.today, defaultFloorRules["regular"])
 			if tr.Signal != tc.want {
 				t.Errorf("want %s, got %s (drop %.2f, band %v, above low %.2f, change30 %v)",
 					tc.want, tr.Signal, tr.DropFromRelease, deref(tr.Band), tr.AboveLow, deref(tr.Change30))
@@ -151,17 +151,17 @@ func deref(f *float64) float64 {
 }
 
 func TestSummarize_Edges(t *testing.T) {
-	if summarize(nil, nil, day("2026-01-01"), floorRules["regular"]) != nil {
+	if summarize(nil, nil, day("2026-01-01"), defaultFloorRules["regular"]) != nil {
 		t.Error("no history should give no trend")
 	}
 	// Short history: no 30-day change or band yet.
-	tr := summarize(series("2025-12-25", 5, 5.1), nil, day("2026-01-01"), floorRules["regular"])
+	tr := summarize(series("2025-12-25", 5, 5.1), nil, day("2026-01-01"), defaultFloorRules["regular"])
 	if tr.Change30 != nil || tr.Band != nil {
 		t.Errorf("short history: change %v band %v", tr.Change30, tr.Band)
 	}
 	// History that starts after release still finds a low and release price.
 	rel := day("2020-01-01")
-	tr = summarize(series("2025-06-01", 7, 6, 8), &rel, day("2026-01-01"), floorRules["regular"])
+	tr = summarize(series("2025-06-01", 7, 6, 8), &rel, day("2026-01-01"), defaultFloorRules["regular"])
 	if tr.Low != 6 || tr.ReleasePrice != 7 {
 		t.Errorf("late history: low %v release %v", tr.Low, tr.ReleasePrice)
 	}
@@ -371,7 +371,7 @@ func TestTrendsList(t *testing.T) {
 	if watched == nil || watched.Trend == nil || watched.Watch == nil || !strings.Contains(strings.Join(watched.Alerts, ","), AlertDrop) {
 		t.Fatalf("watched row: %+v", watched)
 	}
-	if resp.Thresholds.FloorRules["collector"] != floorRules["collector"] || resp.Thresholds.FloorRules["regular"] != floorRules["regular"] {
+	if resp.Thresholds.FloorRules["collector"] != ruleFor("Collector Booster") || resp.Thresholds.FloorRules["regular"] != ruleFor("Play Booster") {
 		t.Error("both floor rules should be reported")
 	}
 
@@ -520,10 +520,10 @@ func TestFloorRulesDifferForCollectorProducts(t *testing.T) {
 	rel := today.AddDate(0, 0, -200)
 	prices := append(repeat(100, 30), repeat(95, 170)...)
 	pts := series(rel.Format("2006-01-02"), prices...)
-	if s := summarize(pts, &rel, today, floorRules["collector"]).Signal; s != SignalFloor {
+	if s := summarize(pts, &rel, today, defaultFloorRules["collector"]).Signal; s != SignalFloor {
 		t.Errorf("collector rule: want floor, got %s", s)
 	}
-	if s := summarize(pts, &rel, today, floorRules["regular"]).Signal; s == SignalFloor {
+	if s := summarize(pts, &rel, today, defaultFloorRules["regular"]).Signal; s == SignalFloor {
 		t.Errorf("regular rule needs a 10%% drop: got %s", s)
 	}
 }

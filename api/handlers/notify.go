@@ -70,7 +70,7 @@ func alertMessage(p SearchResult, t *Trend, w *db.Watch, reason string) (title, 
 			fmt.Sprintf("%s, %s (your alert: -%.0f%%). Low since release $%.2f.", price, since, *w.DropAlert*100, t.Low)
 	}
 	return "Possible floor: " + name,
-		fmt.Sprintf("%s, %s. Steady near its low ($%.2f) for %d days.", price, since, t.Low, floorRules[ruleKind(p.ProductType)].Window)
+		fmt.Sprintf("%s, %s. Steady near its low ($%.2f) for %d days.", price, since, t.Low, ruleFor(p.ProductType).Window)
 }
 
 // watchedAlert is a watched product with its current trend and alerts.
@@ -116,7 +116,7 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 			released = &rel
 		}
 		w := watches[p.MTGStocksID]
-		t := summarize(history[p.MTGStocksID], released, today, floorRules[ruleKind(p.ProductType)])
+		t := summarize(history[p.MTGStocksID], released, today, ruleFor(p.ProductType))
 		out = append(out, watchedAlert{product: p, trend: t, watch: w, alerts: alertsFor(t, &w)})
 	}
 	return out, nil

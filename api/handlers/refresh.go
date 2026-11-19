@@ -31,4 +31,7 @@ func RefreshPrices(ctx context.Context, pool *pgxpool.Pool) {
 	if _, err := NotifyAlerts(ctx, pool); err != nil {
 		log.Printf("price alerts: %v", err)
 	}
+	if err := MaybeRunBacktest(ctx, pool); err != nil {
+		log.Printf("backtest: %v", err)
+	}
 }

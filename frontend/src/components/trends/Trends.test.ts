@@ -129,7 +129,7 @@ describe('Trends page', () => {
     const floorPack = row(2, { packsPerBox: undefined, productType: 'Play Booster', trend: trend({ signal: 'floor', current: 4 }),
       watch: { mtgstocksId: 2, dropAlert: null }, alerts: ['floor'] });
     const { container } = await mount([row(1), floorPack], { canEdit: true }, { '/api/trends/2/history': [] });
-    expect(container.querySelector('.alerts')?.textContent).toContain('1 watched product needs a look');
+    expect(container.querySelector('.alerts')?.textContent?.replace(/\s+/g, ' ')).toContain('1 watched product needs a look');
     expect(container.querySelector('.alerts')?.textContent).toContain('possible floor at $4.00');
     await act(() => fireEvent.click(container.querySelector('.alerts .link')!));
     expect(names(container)).toEqual(['Set 2']);
@@ -306,5 +306,108 @@ describe('Trends page', () => {
     ]);
     const sinceRelease = Array.from(container.querySelectorAll('tbody tr')).map(r => r.querySelectorAll('td')[2].textContent?.trim());
     expect(sinceRelease).toEqual(['—', '−13%']);
+  });
+
+  it('groups alerts by set, boxes before packs and regular before Collector', async () => {
+    const alerting = (id: number, setName: string, productType: string, packsPerBox?: number) => row(id, {
+      setName, productType, packsPerBox, trend: trend({ signal: 'floor' }),
+      watch: { mtgstocksId: id, dropAlert: null }, alerts: ['floor'],
+    });
+    const { container } = await mount([
+      alerting(1, 'Marvel', 'Collector Booster'),
+      alerting(2, 'Avatar', 'Play Booster Box', 36),
+      alerting(3, 'Marvel', 'Play Booster'),
+      alerting(4, 'Marvel', 'Collector Booster Box', 12),
+      alerting(5, 'Marvel', 'Play Booster Box', 36),
+    ]);
+    const alerts = container.querySelector('.alerts')!;
+    expect(alerts.querySelector('h2')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('◆ 5 watched products in 2 sets need a look');
+    expect(Array.from(alerts.querySelectorAll('h3')).map(h => h.textContent)).toEqual(['Marvel', 'Avatar']);
+    const marvel = Array.from(alerts.querySelectorAll('ul')[0].querySelectorAll('.link')).map(b => b.textContent?.trim());
+    expect(marvel).toEqual(['Play Booster Box', 'Collector Booster Box', 'Play Booster', 'Collector Booster']);
+  });
+
+  describe('floor rule proposals', () => {
+    const metrics = (median: number) => ({ products: 61, coverage: 0.79, median, mean: median + 0.04, falseRate: 0.5 });
+    const proposal = {
+      id: 7, kind: 'collector', createdAt: '2027-02-01T00:00:00Z',
+      current: { minAge: 150, drop: 0, window: 14, band: 0.08, near: 0.2 },
+      rule: { minAge: 120, drop: 0, window: 28, band: 0.06, near: 0.1 },
+      metrics: { current: metrics(0.16), proposed: metrics(0.11), products: 61 },
+    };
+
+    it('shows current vs proposed with tested results, and applies on request', async () => {
+      const show = vi.spyOn(toast, 'show');
+      let applied = false;
+      api({
+        '/api/trends?': () => ok(response([row(1)], { proposals: applied ? [] : [proposal], lastBacktest: '2027-02-01T00:00:00Z' })),
+        '/api/trends/rules/7/apply': () => { applied = true; return ok(null, 204); },
+      });
+      const { container } = render(Trends, { props: { canEdit: true } });
+      await waitFor(() => expect(container.querySelector('.proposal')).not.toBeNull());
+      const text = container.querySelector('.proposal')!.textContent!.replace(/\s+/g, ' ');
+      expect(text).toContain('better floor rule for collector packs & boxes');
+      expect(text).toContain('released at least 120 days ago');
+      const medianRow = Array.from(container.querySelectorAll('.proposal__table tr'))
+        .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent?.trim()))
+        .find(cells => cells[0] === 'Bought above the eventual low (median)');
+      expect(medianRow).toEqual(['Bought above the eventual low (median)', '16%', '11%']);
+      expect(text).toContain('Tested on 61 products');
+
+      await act(() => fireEvent.click(button(container, 'Apply')));
+      await waitFor(() => expect(container.querySelector('.proposal')).toBeNull());
+      expect(show).toHaveBeenCalledWith('New collector packs & boxes rule applied', 'success');
+      expect(container.querySelector('.explain')?.textContent).toContain('Last run:');
+    });
+
+    it('dismisses, and viewers see the proposal without buttons', async () => {
+      const show = vi.spyOn(toast, 'show');
+      let dismissed = false;
+      api({
+        '/api/trends?': () => ok(response([row(1)], { proposals: dismissed ? [] : [{ ...proposal, metrics: null }] })),
+        '/api/trends/rules/7/dismiss': () => { dismissed = true; return ok(null, 204); },
+      });
+      const viewer = render(Trends, { props: {} });
+      await waitFor(() => expect(viewer.container.querySelector('.proposal')).not.toBeNull());
+      expect(viewer.container.querySelector('.proposal__actions')).toBeNull();
+      expect(viewer.container.querySelector('.proposal')?.textContent).not.toContain('Tested on');
+      viewer.unmount();
+
+      const admin = render(Trends, { props: { canEdit: true } });
+      await waitFor(() => expect(admin.container.querySelector('.proposal')).not.toBeNull());
+      await act(() => fireEvent.click(button(admin.container, 'Dismiss')));
+      await waitFor(() => expect(show).toHaveBeenCalledWith('Proposal dismissed', 'success'));
+    });
+
+    it('keeps the proposal when deciding fails', async () => {
+      api({
+        '/api/trends?': response([row(1)], { proposals: [proposal] }),
+        '/api/trends/rules/7/apply': () => ({ ok: false, status: 409, text: async () => 'that proposal was already decided or replaced' }),
+      });
+      const show = vi.spyOn(toast, 'show');
+      const { container } = render(Trends, { props: { canEdit: true } });
+      await waitFor(() => expect(container.querySelector('.proposal')).not.toBeNull());
+      await act(() => fireEvent.click(button(container, 'Apply')));
+      await waitFor(() => expect(show).toHaveBeenCalledWith("Couldn't apply the rule: that proposal was already decided or replaced", 'error'));
+      expect(container.querySelector('.proposal')).not.toBeNull();
+    });
+
+    it('runs the backtest on request and says what it found', async () => {
+      const show = vi.spyOn(toast, 'show');
+      let ran = 0;
+      api({
+        '/api/trends?': () => ok(response([row(1)], { proposals: ran > 1 ? [proposal] : [] })),
+        '/api/trends/backtest': () => { ran++; return ran === 3 ? { ok: false, status: 502, text: async () => 'backtest failed' } : ok({}); },
+      });
+      const { container } = render(Trends, { props: { canEdit: true } });
+      await waitFor(() => expect(container.querySelector('.explain')).not.toBeNull());
+      expect(container.querySelector('.explain')?.textContent).toContain('Not run yet');
+      await act(() => fireEvent.click(button(container, 'Run backtest now')));
+      await waitFor(() => expect(show).toHaveBeenCalledWith('Backtest done: the current rules are still the best', 'success'));
+      await act(() => fireEvent.click(button(container, 'Run backtest now')));
+      await waitFor(() => expect(show).toHaveBeenCalledWith('Backtest done: a better rule was found, see the top of the page', 'success'));
+      await act(() => fireEvent.click(button(container, 'Run backtest now')));
+      await waitFor(() => expect(show).toHaveBeenLastCalledWith('Backtest failed: backtest failed', 'error'));
+    });
   });
 });

@@ -64,6 +64,9 @@ func run(ctx context.Context, getenv func(string) string, viewerPath string) err
 
 	// Must precede the first price refresh so it can fall back to the saved catalog.
 	handlers.UseCatalogStore(pool)
+	if err := handlers.LoadFloorRules(ctx, pool); err != nil {
+		log.Printf("floor rules: using defaults: %v", err)
+	}
 
 	bgCtx, bgCancel := context.WithCancel(ctx)
 	defer bgCancel()
@@ -287,6 +290,9 @@ func newRouter(pool *pgxpool.Pool, oauthConfig *oauth2.Config, adminEmail string
 			r.Put("/api/catalog", catalogHandler.Upload)
 			r.Put("/api/trends/watch", trendsHandler.SetWatchMany)
 			r.Post("/api/trends/notify-test", trendsHandler.NotifyTest)
+			r.Post("/api/trends/backtest", trendsHandler.Backtest)
+			r.Post("/api/trends/rules/{id}/apply", trendsHandler.ApplyRule)
+			r.Post("/api/trends/rules/{id}/dismiss", trendsHandler.DismissRule)
 			r.Put("/api/trends/{mtgstocksId}/watch", trendsHandler.SetWatch)
 			r.Post("/api/drafts", draftHandler.Create)
 			r.Delete("/api/drafts/{id}", draftHandler.Delete)

@@ -57,8 +57,22 @@ export function describeRule(r: FloorRule): string {
   ].join(', ');
 }
 
+export interface BTMetrics { products: number; coverage: number; median: number; mean: number; falseRate: number }
+
+export interface RuleProposal {
+  id: number;
+  kind: 'regular' | 'collector' | string;
+  rule: FloorRule;
+  current: FloorRule;
+  metrics: { current: BTMetrics; proposed: BTMetrics; products: number } | null;
+  createdAt: string;
+}
+
 export interface TrendsResponse {
   products: TrendRow[];
+  /** Floor rules the quarterly backtest suggests, awaiting a decision. */
+  proposals?: RuleProposal[];
+  lastBacktest?: string | null;
   /** Phone alerts (ntfy) are set up on the server. */
   notifications: boolean;
   backfilled: number;
@@ -150,4 +164,19 @@ export function stockNote(r: TrendRow): string | null {
   const n = r.stock ?? 0;
   if (n >= LOW_STOCK) return null;
   return n === 0 ? 'none in stock' : `${n} in stock`;
+}
+
+/** Alerting rows grouped by set (sets in first-seen order); within a set,
+ *  boxes before packs and regular before Collector. */
+export function groupBySet(rows: TrendRow[]): { setName: string; rows: TrendRow[] }[] {
+  const groups = new Map<string, TrendRow[]>();
+  for (const r of rows) {
+    if (!groups.has(r.setName)) groups.set(r.setName, []);
+    groups.get(r.setName)!.push(r);
+  }
+  const rank = (r: TrendRow) => (isBox(r) ? 0 : 2) + (r.productType.includes('Collector') ? 1 : 0);
+  return [...groups].map(([setName, list]) => ({
+    setName,
+    rows: [...list].sort((a, b) => rank(a) - rank(b) || a.productType.localeCompare(b.productType)),
+  }));
 }
