@@ -144,6 +144,39 @@ describe('Trends page', () => {
     expect(scroll).toHaveBeenCalledTimes(2);
   });
 
+  it('"Needs a look" lists every alerting product, boxes and packs; muted ones say why', async () => {
+    const w = (id: number) => ({ mtgstocksId: id, dropAlert: null });
+    const { container } = await mount([
+      row(1, { trend: trend({ signal: 'floor' }), watch: w(1), alerts: ['floor'] }),
+      row(2, { packsPerBox: undefined, productType: 'Collector Booster', trend: trend({ newLow: true, prevLow: 130 }), watch: w(2), alerts: ['new_low'] }),
+      row(3, { trend: trend({ signal: 'floor' }), watch: w(3), alerts: [], stock: 36 }), // muted by stock
+      row(4),
+    ]);
+    // Muted: the signal shows, with the reason.
+    expect(container.querySelector('#trend-3')?.textContent).toContain('alert muted · 36 in stock');
+    expect(container.querySelector('#trend-1')?.textContent).not.toContain('muted');
+
+    await act(() => fireEvent.click(button(container, 'Needs a look (2)')));
+    expect(names(container)).toEqual(['Set 1', 'Set 2']);
+    expect(button(container, 'Booster boxes').getAttribute('aria-pressed')).toBe('false');
+    // Picking a kind leaves it for all of that kind.
+    await act(() => fireEvent.click(button(container, 'Single packs')));
+    expect(names(container)).toEqual(['Set 2']);
+    expect(button(container, 'All').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('leaves "Needs a look" once nothing alerts', async () => {
+    const { container } = await mount([
+      row(1, { trend: trend({ signal: 'floor' }), watch: { mtgstocksId: 1, dropAlert: null }, alerts: ['floor'] }),
+    ], { canEdit: true }, { '/api/trends/1/watch': {} });
+    await act(() => fireEvent.click(button(container, 'Needs a look (1)')));
+    expect(names(container)).toEqual(['Set 1']);
+    // Unwatching clears its alert.
+    await act(() => fireEvent.click(container.querySelector('#trend-1 .watch input[type=checkbox]')!));
+    await waitFor(() => expect(button(container, 'All').getAttribute('aria-pressed')).toBe('true'));
+    expect(container.textContent).not.toContain('Needs a look');
+  });
+
   it('keeps the watch unchanged when saving fails', async () => {
     const show = vi.spyOn(toast, 'show');
     const { container } = await mount([row(1)], { canEdit: true }, {

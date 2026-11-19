@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perPack, money, pct, age, filterRows, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
+import { perPack, money, pct, age, filterRows, mutedStock, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 120, low: 100, lowDay: '2026-03-01', aboveLow: 0.2, change30: -0.02, releasePrice: 150,
@@ -51,6 +51,20 @@ describe('trends helpers', () => {
     expect(ids(filterRows(rows, 'pack', 'all'))).toEqual([2]);
     expect(ids(filterRows(rows, 'box', 'watched'))).toEqual([3]);
     expect(ids(filterRows(rows, 'box', 'floor'))).toEqual([4]);
+    // "Needs a look": every alerting row, boxes and packs alike.
+    rows[1].alerts = ['new_low'];
+    rows[3].alerts = ['floor'];
+    expect(ids(filterRows(rows, 'box', 'alerting'))).toEqual([2, 4]);
+    expect(ids(filterRows(rows, 'pack', 'alerting'))).toEqual([2, 4]);
+  });
+
+  it('says when plenty of stock is what mutes an alert', () => {
+    const watch = { mtgstocksId: 1, dropAlert: null };
+    const floor = trend({ signal: 'floor' });
+    expect(mutedStock(row({ trend: floor, watch, stock: 36 }))).toBe(36);
+    expect(mutedStock(row({ trend: floor, watch, stock: 19 }))).toBeNull(); // alerts normally
+    expect(mutedStock(row({ trend: floor, watch: null, stock: 36 }))).toBeNull(); // not watched
+    expect(mutedStock(row({ trend: trend({ signal: 'rising' }), watch, stock: 36 }))).toBeNull(); // nothing to mute
   });
 
   it('explains alerts in words', () => {

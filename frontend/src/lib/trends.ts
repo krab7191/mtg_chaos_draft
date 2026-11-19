@@ -135,9 +135,12 @@ export function age(iso: string, today = new Date()): string {
 }
 
 export type KindFilter = 'pack' | 'box';
-export type ShowFilter = 'all' | 'watched' | 'floor';
+export type ShowFilter = 'all' | 'alerting' | 'floor' | 'watched';
 
+/** Rows to show. "Needs a look" (alerting) lists every alerting product,
+ *  boxes and packs alike, like the alert box; the others keep to one kind. */
 export function filterRows(rows: TrendRow[], kind: KindFilter, show: ShowFilter): TrendRow[] {
+  if (show === 'alerting') return rows.filter(r => r.alerts.length > 0);
   return rows.filter(r =>
     (kind === 'box') === isBox(r) &&
     (show === 'all' || (show === 'watched' ? r.watch != null : r.trend?.signal === 'floor')),
@@ -163,6 +166,12 @@ export function alertsFor(t: Trend | null, w: Watch | null, stock = 0): AlertRea
     ...(w.dropAlert != null && t.dropFromRelease >= w.dropAlert ? ['drop' as const] : []),
     ...(t.newLow ? ['new_low' as const] : []),
   ];
+}
+
+/** Packs in stock when that is what silences a watched product's alerts; null otherwise. */
+export function mutedStock(r: TrendRow): number | null {
+  const n = r.stock ?? 0;
+  return n >= MUTE_AT_STOCK && alertsFor(r.trend, r.watch).length > 0 ? n : null;
 }
 
 /** Feedback right after starting to watch: would it alert now, and why? */

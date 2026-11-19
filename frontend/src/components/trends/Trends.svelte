@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK,
+    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule, groupBySet, MUTE_AT_STOCK, mutedStock,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter, type RuleProposal, type BTMetrics,
   } from '../../lib/trends';
 
@@ -31,6 +31,8 @@
   const rows = $derived(data ? filterRows(data.products, kind, show) : []);
   const alerting = $derived(data ? data.products.filter(r => r.alerts.length > 0) : []);
   const alertGroups = $derived(groupBySet(alerting));
+  // Leave "Needs a look" once nothing alerts (its button is hidden then).
+  $effect(() => { if (show === 'alerting' && alerting.length === 0) show = 'all'; });
   const th = $derived(data?.thresholds);
 
   async function toggle(r: TrendRow, keepOpen = false) {
@@ -41,10 +43,18 @@
     }
   }
 
+  // "Needs a look" spans boxes and packs; picking a kind goes back to all of that kind.
+  function pickKind(k: KindFilter) {
+    kind = k;
+    if (show === 'alerting') show = 'all';
+  }
+
   /** From an alert: show the product's row in the table, scroll to it and open its graph. */
   async function reveal(r: TrendRow) {
-    kind = isBox(r) ? 'box' : 'pack';
-    show = 'all';
+    if (show !== 'alerting') { // "Needs a look" already lists it
+      kind = isBox(r) ? 'box' : 'pack';
+      show = 'all';
+    }
     const loading = toggle(r, true);
     await tick();
     document.getElementById(`trend-${r.mtgstocksId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -201,11 +211,14 @@
 <!-- ── Filters ────────────────────────────────────────────── -->
 <div class="filters">
   <div class="seg" role="group" aria-label="Product kind">
-    <button class:on={kind === 'box'} aria-pressed={kind === 'box'} onclick={() => (kind = 'box')}>Booster boxes</button>
-    <button class:on={kind === 'pack'} aria-pressed={kind === 'pack'} onclick={() => (kind = 'pack')}>Single packs</button>
+    <button class:on={kind === 'box' && show !== 'alerting'} aria-pressed={kind === 'box' && show !== 'alerting'} onclick={() => pickKind('box')}>Booster boxes</button>
+    <button class:on={kind === 'pack' && show !== 'alerting'} aria-pressed={kind === 'pack' && show !== 'alerting'} onclick={() => pickKind('pack')}>Single packs</button>
   </div>
   <div class="seg" role="group" aria-label="Show">
     <button class:on={show === 'all'} aria-pressed={show === 'all'} onclick={() => (show = 'all')}>All</button>
+    {#if alerting.length > 0}
+      <button class:on={show === 'alerting'} aria-pressed={show === 'alerting'} onclick={() => (show = 'alerting')}>Needs a look ({alerting.length})</button>
+    {/if}
     <button class:on={show === 'floor'} aria-pressed={show === 'floor'} onclick={() => (show = 'floor')}>◆ Possible floors</button>
     <button class:on={show === 'watched'} aria-pressed={show === 'watched'} onclick={() => (show = 'watched')}>Watched</button>
   </div>
@@ -296,6 +309,9 @@
             <td>
               {#if s}
                 <span class="signal signal--{t!.signal}" title={s.hint}><span aria-hidden="true">{s.icon}</span> {s.label}</span>
+                {#if mutedStock(r) != null}
+                  <span class="sub" title="Alerts are muted once you have {MUTE_AT_STOCK}+ packs">alert muted · {mutedStock(r)} in stock</span>
+                {/if}
               {:else}
                 <span class="muted">no history yet</span>
               {/if}
