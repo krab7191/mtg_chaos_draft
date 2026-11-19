@@ -89,11 +89,21 @@ func TestReplayAndMetrics(t *testing.T) {
 		t.Errorf("early: %+v", early)
 	}
 
-	m := metricsOf([]btOutcome{{fired: true, premium: 0.1}, {fired: true, premium: 0.3, false_: true}, {}, {fired: true, premium: 0.2}})
-	if m.Products != 4 || m.Coverage != 0.75 || math.Abs(m.Median-0.2) > 1e-9 || math.Abs(m.Mean-0.2) > 1e-9 || math.Abs(m.FalseRate-1.0/3) > 1e-9 {
+	j := func(fired bool, premium float64, false_ bool) btOutcome {
+		return btOutcome{judged: true, fired: fired, premium: premium, false_: false_}
+	}
+	m := metricsOf([]btOutcome{j(true, 0.03, false), j(true, 0.3, true), j(false, 0, false), j(true, 0.08, false), {} /* too young */})
+	if m.Products != 4 || m.Coverage != 0.75 || math.Abs(m.Median-0.08) > 1e-9 || math.Abs(m.FalseRate-1.0/3) > 1e-9 ||
+		math.Abs(m.Hit5-1.0/3) > 1e-9 || math.Abs(m.Hit10-2.0/3) > 1e-9 {
 		t.Errorf("metrics: %+v", m)
 	}
-	even := metricsOf([]btOutcome{{fired: true, premium: 0.1}, {fired: true, premium: 0.3}})
+	// Hitting within 5% more often scores better (lower), even at a higher average.
+	precise := BTMetrics{Coverage: 0.5, Hit5: 0.4, Mean: 0.15}
+	loose := BTMetrics{Coverage: 0.9, Hit5: 0.1, Mean: 0.10}
+	if precise.score() >= loose.score() {
+		t.Errorf("score should favor hitting the bottom: %v vs %v", precise.score(), loose.score())
+	}
+	even := metricsOf([]btOutcome{j(true, 0.1, false), j(true, 0.3, false)})
 	if math.Abs(even.Median-0.2) > 1e-9 {
 		t.Errorf("even median: %v", even.Median)
 	}
@@ -102,6 +112,20 @@ func TestReplayAndMetrics(t *testing.T) {
 	}
 	if empty := metricsOf(nil); empty.Coverage != 0 {
 		t.Errorf("empty: %+v", empty)
+	}
+	// A product younger than a rule's minimum age (+30 days) isn't judged.
+	young := newBTProduct("2026", 0, floorShape(150), []int{14, 28})
+	if o := replay(young, FloorRule{MinAge: 150, Window: 14, Band: 1, Near: 1}); o.judged {
+		t.Errorf("too young to judge: %+v", o)
+	}
+	// A stale low blocks the rule when recency is required.
+	stale := append(append(repeat(10, 20), repeat(6, 10)...), repeat(6.2, 400)...)
+	ps := newBTProduct("2024", 0, stale, []int{14, 28})
+	if o := replay(ps, FloorRule{MinAge: 150, Window: 14, Band: 0.1, Near: 0.1, Recent: 60}); o.fired {
+		t.Errorf("stale low fired: %+v", o)
+	}
+	if o := replay(ps, FloorRule{MinAge: 150, Window: 14, Band: 0.1, Near: 0.1}); !o.fired {
+		t.Errorf("no recency check: should fire: %+v", o)
 	}
 }
 
@@ -324,13 +348,13 @@ func TestLoadFloorRules(t *testing.T) {
 	// A stored active rule wins over the default.
 	custom := FloorRule{MinAge: 120, Drop: 0.2, Window: 28, Band: 0.06, Near: 0.05}
 	raw, _ := json.Marshal(custom)
-	_ = db.SetActiveRule(ctx, pool, "regular", raw)
+	_ = db.SetActiveRule(ctx, pool, "regular", raw, nil)
 	setRule("regular", defaultFloorRules["regular"])
 	if err := LoadFloorRules(ctx, pool); err != nil || ruleFor("Play Booster") != custom {
 		t.Errorf("loaded: %+v %v", ruleFor("Play Booster"), err)
 	}
 	// Corrupt JSON is reported.
-	_ = db.SetActiveRule(ctx, pool, "collector", []byte(`{"minAge":"x"}`))
+	_ = db.SetActiveRule(ctx, pool, "collector", []byte(`{"minAge":"x"}`), nil)
 	if err := LoadFloorRules(ctx, pool); err == nil {
 		t.Error("bad rule JSON should fail")
 	}

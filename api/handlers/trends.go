@@ -152,6 +152,9 @@ type FloorRule struct {
 	Window int     `json:"window"` // days the band is measured over
 	Band   float64 `json:"band"`   // highest/lowest in the window within this
 	Near   float64 `json:"near"`   // and within this of the low since release
+	// Recent, if > 0: the low must have happened within this many days, so
+	// a low that came and went months ago doesn't read as a floor now.
+	Recent int `json:"recent"`
 }
 
 // The active rules (floorRules, ruleFor) and their defaults live in
@@ -186,9 +189,13 @@ const (
 
 // Trend summarizes a product's price history.
 type Trend struct {
-	Current  float64   `json:"current"`
-	Low      float64   `json:"low"`
-	LowDay   time.Time `json:"lowDay"`
+	Current float64   `json:"current"`
+	Low     float64   `json:"low"`
+	LowDay  time.Time `json:"lowDay"`
+	// NewLow: the 7-day median price broke below its previous low (PrevLow).
+	NewLow   bool      `json:"newLow"`
+	PrevLow  float64   `json:"prevLow"`
+	lastDay  time.Time // day of the latest price
 	AboveLow float64   `json:"aboveLow"` // fraction above the low
 	Change30 *float64  `json:"change30"` // fraction over trendWindow; nil without enough history
 	// ReleasePrice is the first price on or after release; DropFromRelease
@@ -221,7 +228,7 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time, rul
 		return nil
 	}
 	last := points[len(points)-1]
-	t := &Trend{Current: last.Price, HistoryDays: len(points), Released: released}
+	t := &Trend{Current: last.Price, HistoryDays: len(points), Released: released, lastDay: last.Day}
 
 	since := points
 	if released != nil {
@@ -268,6 +275,7 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time, rul
 		t.Spark = append(t.Spark, last.Price)
 	}
 
+	t.NewLow, t.PrevLow = newLow(since)
 	t.Signal = signalFor(t, released, today, rule)
 	return t
 }
@@ -293,7 +301,8 @@ func signalFor(t *Trend, released *time.Time, today time.Time, rule FloorRule) S
 // near the low since release.
 func isFloor(t *Trend, released *time.Time, today time.Time, rule FloorRule) bool {
 	oldEnough := released != nil && today.Sub(*released) >= time.Duration(rule.MinAge)*24*time.Hour
-	return oldEnough && t.DropFromRelease >= rule.Drop && t.Band != nil && *t.Band <= rule.Band && t.AboveLow <= rule.Near
+	recentLow := rule.Recent <= 0 || t.lastDay.Sub(t.LowDay) <= time.Duration(rule.Recent)*24*time.Hour
+	return oldEnough && recentLow && t.DropFromRelease >= rule.Drop && t.Band != nil && *t.Band <= rule.Band && t.AboveLow <= rule.Near
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -357,9 +366,51 @@ func (idx stockIndex) of(p SearchResult) int {
 
 // Alert reasons for watched products.
 const (
-	AlertFloor = "floor" // signal is a possible floor
-	AlertDrop  = "drop"  // at or past the watch's drop threshold
+	AlertFloor  = "floor"   // signal is a possible floor
+	AlertDrop   = "drop"    // at or past the watch's drop threshold
+	AlertNewLow = "new_low" // broke below its previous low
 )
+
+// New-low detection works on 7-day median prices, so a single cheap sale
+// can't trigger it, and compares with the lowest weekly median from before
+// the last two weeks.
+const (
+	newLowMinDays = 60   // post-release history needed (skips the release slide)
+	newLowGap     = 14   // the previous low is from before the last this-many days
+	newLowBreak   = 0.02 // at least this far below the previous low
+)
+
+// newLow reports whether the latest 7-day median price is a new low, and
+// the previous low it broke.
+func newLow(since []db.PricePoint) (bool, float64) {
+	if len(since) < 21 || since[len(since)-1].Day.Sub(since[0].Day) < newLowMinDays*24*time.Hour {
+		return false, 0
+	}
+	avg := make([]float64, len(since)) // trailing 7-day medians
+	for i := range since {
+		var week []float64
+		for j := max(0, i-6); j <= i; j++ {
+			week = append(week, since[j].Price)
+		}
+		sort.Float64s(week)
+		if n := len(week); n%2 == 1 {
+			avg[i] = week[n/2]
+		} else {
+			avg[i] = (week[n/2-1] + week[n/2]) / 2
+		}
+	}
+	cutoff := since[len(since)-1].Day.AddDate(0, 0, -newLowGap)
+	prev := math.Inf(1)
+	for i, p := range since {
+		if !p.Day.After(cutoff) {
+			prev = math.Min(prev, avg[i])
+		}
+	}
+	if math.IsInf(prev, 1) {
+		return false, 0
+	}
+	return avg[len(avg)-1] < prev*(1-newLowBreak), prev
+}
 
 // alertsFor lists why a watched product needs attention.
 func alertsFor(t *Trend, w *db.Watch) []string {
@@ -372,6 +423,9 @@ func alertsFor(t *Trend, w *db.Watch) []string {
 	}
 	if w.DropAlert != nil && t.DropFromRelease >= *w.DropAlert {
 		alerts = append(alerts, AlertDrop)
+	}
+	if t.NewLow {
+		alerts = append(alerts, AlertNewLow)
 	}
 	return alerts
 }

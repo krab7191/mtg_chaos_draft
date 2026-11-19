@@ -65,6 +65,10 @@ func alertMessage(p SearchResult, t *Trend, w *db.Watch, reason string) (title, 
 		price += fmt.Sprintf(" ($%.2f/pack)", t.Current/float64(p.PacksPerBox))
 	}
 	since := fmt.Sprintf("%+.0f%% since release", -t.DropFromRelease*100)
+	if reason == AlertNewLow {
+		return "New low: " + name,
+			fmt.Sprintf("%s, %s. Its weekly price broke below its previous low ($%.2f).", price, since, t.PrevLow)
+	}
 	if reason == AlertDrop && w.DropAlert != nil {
 		return "Price drop: " + name,
 			fmt.Sprintf("%s, %s (your alert: -%.0f%%). Low since release $%.2f.", price, since, *w.DropAlert*100, t.Low)
@@ -127,6 +131,9 @@ func alertLine(a watchedAlert, reason string) string {
 	t := a.trend
 	since := fmt.Sprintf("%+.0f%% since release", -t.DropFromRelease*100)
 	name := a.product.SetName + " " + a.product.ProductType
+	if reason == AlertNewLow {
+		return fmt.Sprintf("▼ %s: new low at $%.2f, below its previous low of $%.2f", name, t.Current, t.PrevLow)
+	}
 	if reason == AlertDrop && a.watch.DropAlert != nil {
 		return fmt.Sprintf("↓ %s: $%.2f, %s (alert -%.0f%%)", name, t.Current, since, *a.watch.DropAlert*100)
 	}

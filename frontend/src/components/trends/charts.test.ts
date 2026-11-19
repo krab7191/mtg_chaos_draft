@@ -119,4 +119,13 @@ describe('PriceChart', () => {
     const brandNew = render(PriceChart, { props: { points: points(60, () => 4), title: 'Brand new' } });
     expect(brandNew.container.querySelector('.chart__ranges')).toBeNull();
   });
+
+  it('keeps the tooltip inside the chart at either edge', async () => {
+    const { container } = render(PriceChart, { props: { points: points(60, i => 5 + i / 10), title: 'Pack' } });
+    const svg = container.querySelector('svg')!;
+    await act(() => fireEvent.keyDown(svg, { key: 'ArrowLeft' })); // last-but-one day: right edge
+    expect(container.querySelector('.tip')?.classList.contains('tip--right')).toBe(true);
+    for (let i = 0; i < 60; i++) await act(() => fireEvent.keyDown(svg, { key: 'ArrowLeft' }));
+    expect(container.querySelector('.tip')?.classList.contains('tip--left')).toBe(true);
+  });
 });

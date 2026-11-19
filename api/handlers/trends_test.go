@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -515,15 +517,92 @@ func TestFloorRulesDifferForCollectorProducts(t *testing.T) {
 		t.Fatal("rule kinds")
 	}
 	// Released 200 days ago, slipped only ~5% from release, then steady near
-	// its low for weeks: typical for a Collector box.
+	// a recent low for weeks: typical for a Collector box.
 	today := day("2026-01-01")
 	rel := today.AddDate(0, 0, -200)
-	prices := append(repeat(100, 30), repeat(95, 170)...)
+	prices := append(append(repeat(100, 30), repeat(96, 140)...), repeat(95, 30)...)
 	pts := series(rel.Format("2006-01-02"), prices...)
 	if s := summarize(pts, &rel, today, defaultFloorRules["collector"]).Signal; s != SignalFloor {
 		t.Errorf("collector rule: want floor, got %s", s)
 	}
 	if s := summarize(pts, &rel, today, defaultFloorRules["regular"]).Signal; s == SignalFloor {
 		t.Errorf("regular rule needs a 10%% drop: got %s", s)
+	}
+}
+
+func TestFloorNeedsARecentLow(t *testing.T) {
+	// Fell to $6 early, recovered to $6.50 and sat there: the low (day 40) was
+	// months ago, so this isn't a floor any more, it's a recovery.
+	today := day("2026-01-01")
+	rel := today.AddDate(0, 0, -300)
+	prices := append(append(append(repeat(10, 20), repeat(8, 20)...), repeat(6, 10)...), repeat(6.2, 250)...)
+	pts := series(rel.Format("2006-01-02"), prices...)
+	stale := summarize(pts, &rel, today, defaultFloorRules["collector"])
+	if stale.Signal == SignalFloor {
+		t.Error("a low from months ago shouldn't read as a floor")
+	}
+	noRecency := defaultFloorRules["collector"]
+	noRecency.Recent = 0
+	if summarize(pts, &rel, today, noRecency).Signal != SignalFloor {
+		t.Error("without the recency check it would (wrongly) be a floor")
+	}
+}
+
+func TestLoadFloorRules_ReplacesOutdatedSeededDefaults(t *testing.T) {
+	restoreRules(t)
+	ctx := context.Background()
+	pool := testhelper.Pool(t)
+	testhelper.Truncate(t, pool, "floor_rules")
+	if _, err := pool.Exec(ctx, `TRUNCATE floor_rules`); err != nil {
+		t.Fatal(err)
+	}
+	old := FloorRule{MinAge: 150, Drop: 0.10, Window: 14, Band: 0.12, Near: 0.10}
+	raw, _ := json.Marshal(old)
+	// An old seeded default is replaced; an approved rule is kept.
+	_ = db.SetActiveRule(ctx, pool, "regular", raw, seededMarker)
+	approved := FloorRule{MinAge: 120, Drop: 0.2, Window: 28, Band: 0.06, Near: 0.05, Recent: 30}
+	rawApproved, _ := json.Marshal(approved)
+	_ = db.SetActiveRule(ctx, pool, "collector", rawApproved, nil)
+
+	if err := LoadFloorRules(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+	if ruleFor("Play Booster") != defaultFloorRules["regular"] {
+		t.Errorf("outdated default kept: %+v", ruleFor("Play Booster"))
+	}
+	if ruleFor("Collector Booster") != approved {
+		t.Errorf("approved rule replaced: %+v", ruleFor("Collector Booster"))
+	}
+	active, _ := db.RulesByStatus(ctx, pool, "active")
+	if len(active) != 2 {
+		t.Errorf("active rows: %+v", active)
+	}
+}
+
+func TestNewLow(t *testing.T) {
+	rel := day("2025-01-01")
+	today := day("2026-01-01")
+	// Settled around $6 for months, then broke clearly lower in the last week.
+	broke := append(append(repeat(10, 20), repeat(6, 200)...), repeat(5.5, 10)...)
+	tr := summarize(series("2025-01-01", broke...), &rel, today, defaultFloorRules["regular"])
+	if !tr.NewLow || math.Abs(tr.PrevLow-6) > 1e-9 {
+		t.Errorf("break below $6: newLow=%v prev=%v", tr.NewLow, tr.PrevLow)
+	}
+	if got := alertsFor(tr, &db.Watch{}); !slices.Contains(got, AlertNewLow) {
+		t.Errorf("alerts: %v", got)
+	}
+	// One cheap sale isn't a new low: the weekly average barely moves.
+	blip := append(append(repeat(10, 20), repeat(6, 205)...), 5.0, 6, 6, 6, 6)
+	if summarize(series("2025-01-01", blip...), &rel, today, defaultFloorRules["regular"]).NewLow {
+		t.Error("a one-day dip shouldn't count")
+	}
+	// The post-release slide isn't a "new low" every day: too little history.
+	slide := []float64{10, 9.8, 9.6, 9.4, 9.2, 9, 8.8, 8.6, 8.4, 8.2, 8, 7.8, 7.6, 7.4, 7.2, 7, 6.8, 6.6, 6.4, 6.2, 6, 5.8, 5.6}
+	if summarize(series("2025-01-01", slide...), &rel, today, defaultFloorRules["regular"]).NewLow {
+		t.Error("the release slide shouldn't count")
+	}
+	// Flat: no new low.
+	if summarize(series("2025-01-01", repeat(6, 200)...), &rel, today, defaultFloorRules["regular"]).NewLow {
+		t.Error("flat isn't a new low")
 	}
 }

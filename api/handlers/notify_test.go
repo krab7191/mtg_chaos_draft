@@ -41,14 +41,14 @@ func newFakeNtfy(t *testing.T) *fakeNtfy {
 
 func (f *fakeNtfy) count() int { f.mu.Lock(); defer f.mu.Unlock(); return len(f.got) }
 
-// seedFloor: product 1 (released 2023-01-01) fell from $10 to price and has
-// sat there since, up to today.
+// seedFloor: product 1 (released 2023-01-01) fell from $10 to just above
+// price, then settled at price for the last 30 days (a recent low), up to today.
 func seedFloor(t *testing.T, ctx context.Context, price float64) {
 	t.Helper()
 	pool := testhelper.Pool(t)
 	start := day("2023-01-01")
 	days := int(time.Now().UTC().Sub(start).Hours()/24) + 1
-	prices := append(repeat(10, 20), repeat(price, days-20)...)
+	prices := append(append(repeat(10, 20), repeat(price+0.5, days-50)...), repeat(price, 30)...)
 	if _, err := pool.Exec(ctx, `TRUNCATE price_history`); err != nil {
 		t.Fatal(err)
 	}
@@ -235,5 +235,18 @@ func TestNotifyTestEndpoint(t *testing.T) {
 	ntfy.status = 500
 	if rr := call(); rr.Code != 502 {
 		t.Errorf("ntfy down: %d", rr.Code)
+	}
+}
+
+func TestAlertTextForNewLow(t *testing.T) {
+	p := SearchResult{SetName: "Bloomburrow", ProductType: "Play Booster Box", PacksPerBox: 36}
+	tr := &Trend{Current: 108, PrevLow: 112.5, DropFromRelease: 0.4}
+	title, body := alertMessage(p, tr, &db.Watch{}, AlertNewLow)
+	if title != "New low: Bloomburrow Play Booster Box" || !strings.Contains(body, "previous low ($112.50)") {
+		t.Errorf("%q %q", title, body)
+	}
+	line := alertLine(watchedAlert{product: p, trend: tr}, AlertNewLow)
+	if line != "▼ Bloomburrow Play Booster Box: new low at $108.00, below its previous low of $112.50" {
+		t.Errorf("line: %q", line)
 	}
 }

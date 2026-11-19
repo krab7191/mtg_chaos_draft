@@ -179,7 +179,9 @@
     </svg>
     {#if hover != null}
       {@const p = data[hover]}
-      <div class="tip" style:left="{(scale.x(p.t) / W) * 100}%">
+      {@const at = scale.x(p.t) / W}
+      <!-- Near an edge the tooltip aligns to it instead of centering, so it never sticks out of the chart. -->
+      <div class="tip" class:tip--left={at < 0.15} class:tip--right={at > 0.85} style:left="{at * 100}%">
         <span class="tip__day">{fmtDay(p.t)}</span>
         <strong>{money(p.v)}</strong>
         {#if perPackDivisor > 1}<span class="tip__sub">{money(p.v / perPackDivisor)} / pack</span>{/if}
@@ -191,7 +193,7 @@
 </figure>
 
 <style>
-  .chart { position: relative; margin: 0; }
+  .chart { position: relative; margin: 0; overflow: hidden; }
   .chart__head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
   .chart__title { font-size: 0.8rem; color: var(--color-text-muted); }
   .chart__ranges { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius); overflow: hidden; }
@@ -230,5 +232,7 @@
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
+  .tip--left { transform: translateX(-0.5rem); }
+  .tip--right { transform: translateX(calc(-100% + 0.5rem)); }
   .tip__day, .tip__sub { color: var(--color-text-muted); font-size: 0.72rem; }
 </style>

@@ -27,24 +27,28 @@ import (
 // the admin approves it on the trends page.
 
 const (
-	btHorizon      = 540  // days after release the true low is searched in
-	btMinHistory   = 365  // a product needs this much post-release history
+	btHorizon      = 540  // days after release the low is searched in
+	btMinHistory   = 120  // a product needs this much post-release history...
 	btMaxLateStart = 30   // ...starting within this many days of release
+	btJudgeAfter   = 30   // a rule is judged on a product only if it has this many days past the rule's minimum age
 	btFalseFloor   = 0.10 // price later fell this much more = false floor
+	btHit          = 0.05 // an alert within this of the low is a hit
 	btMinProducts  = 30   // fewer products than this: too little to tune on
-	btMinCoverage  = 0.5  // a rule must fire on at least half the products
-	btMargin       = 0.02 // a proposal must beat the current score by this
+	btMinCoverage  = 0.40 // a rule must fire on at least this share of products
+	btMargin       = 0.03 // a proposal must beat the current score by this
 	backtestEvery  = 90 * 24 * time.Hour
 )
 
 var btGrid = func() []FloorRule {
 	var g []FloorRule
-	for _, drop := range []float64{0, 0.10, 0.20, 0.30} {
+	for _, drop := range []float64{0, 0.10, 0.20} {
 		for _, window := range []int{14, 28} {
 			for _, band := range []float64{0.06, 0.08, 0.12, 0.20} {
 				for _, near := range []float64{0.05, 0.10, 0.20} {
-					for _, age := range []int{45, 90, 120, 150, 180, 210} {
-						g = append(g, FloorRule{MinAge: age, Drop: drop, Window: window, Band: band, Near: near})
+					for _, age := range []int{90, 120, 150, 180} {
+						for _, recent := range []int{14, 30, 60, 0} {
+							g = append(g, FloorRule{MinAge: age, Drop: drop, Window: window, Band: band, Near: near, Recent: recent})
+						}
 					}
 				}
 			}
@@ -55,12 +59,24 @@ var btGrid = func() []FloorRule {
 
 // ── Active rules ──────────────────────────────────────────────
 
-// defaultFloorRules are the rules found by the first (manual) backtest; they
-// seed the database and apply until a backtest proposal is approved.
+// defaultFloorRules come from the manual backtest (195 products, sets 2019 to
+// mid 2026, leave-one-release-year-out CV, scored on alerts landing within 5%
+// of the eventual low). They seed the database and apply until a backtest
+// proposal is approved.
+//   - regular: within 5% of the low on 31% of alerts (vs 15% before), median
+//     ~10% above it; fires on ~half of products.
+//   - collector: the earlier rule plus a recent low; within 5% on 26% (vs 16%).
+//
+// "Low within 60 days" keeps a low that came and went months ago from
+// reading as a floor.
 var defaultFloorRules = map[string]FloorRule{
-	"regular":   {MinAge: 150, Drop: 0.10, Window: 14, Band: 0.12, Near: 0.10},
-	"collector": {MinAge: 150, Drop: 0.00, Window: 14, Band: 0.08, Near: 0.20},
+	"regular":   {MinAge: 180, Drop: 0.20, Window: 14, Band: 0.20, Near: 0.05, Recent: 60},
+	"collector": {MinAge: 150, Drop: 0.00, Window: 14, Band: 0.08, Near: 0.20, Recent: 60},
 }
+
+// seededMarker marks an active rule that is a code default rather than one the
+// admin approved: newer defaults replace it on startup.
+var seededMarker = json.RawMessage(`{"seeded":true}`)
 
 var (
 	rulesMu    sync.RWMutex
@@ -108,13 +124,20 @@ func LoadFloorRules(ctx context.Context, pool *pgxpool.Pool) error {
 		if err := json.Unmarshal(s.Rule, &r); err != nil {
 			return fmt.Errorf("rule %d: %w", s.ID, err)
 		}
+		var marks struct {
+			Seeded bool `json:"seeded"`
+		}
+		_ = json.Unmarshal(s.Metrics, &marks)
+		if def, ok := defaultFloorRules[s.Kind]; ok && marks.Seeded && r != def {
+			continue // an outdated default: replaced below
+		}
 		setRule(s.Kind, r)
 		have[s.Kind] = true
 	}
 	for kind, r := range defaultFloorRules {
 		if !have[kind] {
 			raw, _ := json.Marshal(r)
-			if err := db.SetActiveRule(ctx, pool, kind, raw); err != nil {
+			if err := db.SetActiveRule(ctx, pool, kind, raw, seededMarker); err != nil {
 				return err
 			}
 			setRule(kind, r)
@@ -190,50 +213,72 @@ func btSeries(points []db.PricePoint, released time.Time) (offset int, s []float
 
 // btOutcome is one product's result under a rule.
 type btOutcome struct {
+	judged  bool // the product is old enough to judge this rule on
 	fired   bool
-	premium float64 // price paid over the true low
+	premium float64 // price paid over the low (lowest seen within the horizon)
 	false_  bool    // price later fell btFalseFloor further
 }
 
+// replay walks a product's history day by day, using only data up to each
+// day, and reports when the rule would first have fired. Young products are
+// only judged on rules they're old enough for: their low may still be ahead.
 func replay(p btProduct, r FloorRule) btOutcome {
+	if p.offset+len(p.s) < r.MinAge+btJudgeAfter {
+		return btOutcome{}
+	}
 	rel := p.s[0]
-	low := p.s[0]
+	low, lowAt := p.s[0], 0
 	hi, lo := p.rollHi[r.Window], p.rollLo[r.Window]
 	for i, price := range p.s {
-		low = math.Min(low, price)
+		if price < low {
+			low, lowAt = price, i
+		}
 		if i+p.offset < r.MinAge || i < r.Window {
 			continue
 		}
-		if 1-price/rel >= r.Drop && hi[i]/lo[i]-1 <= r.Band && price/low-1 <= r.Near {
-			return btOutcome{fired: true, premium: price/p.sufMin[0] - 1, false_: p.sufMin[i] < price*(1-btFalseFloor)}
+		if 1-price/rel >= r.Drop && hi[i]/lo[i]-1 <= r.Band && price/low-1 <= r.Near &&
+			(r.Recent <= 0 || i-lowAt <= r.Recent) {
+			return btOutcome{judged: true, fired: true, premium: price/p.sufMin[0] - 1, false_: p.sufMin[i] < price*(1-btFalseFloor)}
 		}
 	}
-	return btOutcome{}
+	return btOutcome{judged: true}
 }
 
 // BTMetrics summarizes a rule over some products.
 type BTMetrics struct {
-	Products  int     `json:"products"`
+	Products  int     `json:"products"`  // products it could be judged on
 	Coverage  float64 `json:"coverage"`  // share it fired on
-	Median    float64 `json:"median"`    // median premium over the true low
-	Mean      float64 `json:"mean"`      // mean premium over the true low
-	FalseRate float64 `json:"falseRate"` // share of firings that weren't the bottom
+	Hit5      float64 `json:"hit5"`      // share of firings within 5% of the low
+	Hit10     float64 `json:"hit10"`     // share of firings within 10% of the low
+	Median    float64 `json:"median"`    // median premium over the low
+	Mean      float64 `json:"mean"`      // mean premium over the low
+	FalseRate float64 `json:"falseRate"` // share of firings the price later fell 10%+ below
 }
 
 func metricsOf(outs []btOutcome) BTMetrics {
-	m := BTMetrics{Products: len(outs)}
 	var prem []float64
-	falses := 0
+	falses, judged, hit5, hit10 := 0, 0, 0, 0
 	for _, o := range outs {
+		if !o.judged {
+			continue
+		}
+		judged++
 		if o.fired {
 			prem = append(prem, o.premium)
 			if o.false_ {
 				falses++
 			}
+			if o.premium <= btHit {
+				hit5++
+			}
+			if o.premium <= 2*btHit {
+				hit10++
+			}
 		}
 	}
-	if len(outs) > 0 {
-		m.Coverage = float64(len(prem)) / float64(len(outs))
+	m := BTMetrics{Products: judged}
+	if judged > 0 {
+		m.Coverage = float64(len(prem)) / float64(judged)
 	}
 	if len(prem) > 0 {
 		sort.Float64s(prem)
@@ -248,17 +293,19 @@ func metricsOf(outs []btOutcome) BTMetrics {
 		}
 		m.Mean = sum / float64(len(prem))
 		m.FalseRate = float64(falses) / float64(len(prem))
+		m.Hit5 = float64(hit5) / float64(len(prem))
+		m.Hit10 = float64(hit10) / float64(len(prem))
 	}
 	return m
 }
 
-// score: lower is better. Premium paid, plus costs for false floors and for
-// products the rule never fires on.
+// score: lower is better. The goal is alerts that land within 5% of the
+// bottom; the average premium breaks ties between rules that hit as often.
 func (m BTMetrics) score() float64 {
 	if m.Coverage == 0 {
 		return math.Inf(1)
 	}
-	return m.Mean + 0.10*m.FalseRate + 0.30*(1-m.Coverage)
+	return -m.Hit5 + 0.30*m.Mean
 }
 
 func evaluateRule(products []btProduct, r FloorRule) []btOutcome {
@@ -341,7 +388,7 @@ func RunBacktest(ctx context.Context, pool *pgxpool.Pool) (*BacktestSummary, err
 	if err != nil {
 		return nil, err
 	}
-	horizonCutoff := time.Now().UTC().AddDate(0, 0, -btMinHistory)
+	horizonCutoff := time.Now().UTC().AddDate(0, 0, -btMinHistory) // newer sets can't be judged yet
 	byKind := map[string][]SearchResult{}
 	var ids []int
 	for _, p := range trackedProducts(c) {

@@ -94,6 +94,8 @@
   const kindName = (k: string) => (k === 'collector' ? 'Collector packs & boxes' : 'Regular packs & boxes');
   const pct0 = (f: number) => `${Math.round(f * 100)}%`;
   const resultRows = (m: BTMetrics) => [
+    ['Alerts within 5% of the eventual low', pct0(m.hit5 ?? 0)],
+    ['Alerts within 10% of the eventual low', pct0(m.hit10 ?? 0)],
     ['Bought above the eventual low (median)', pct0(m.median)],
     ['Bought above the eventual low (average)', pct0(m.mean)],
     ['Fired on', `${pct0(m.coverage)} of products`],
@@ -342,11 +344,13 @@
       <li><strong>◆ Possible floor</strong>, regular packs and boxes: {describeRule(th.floorRules.regular)}.</li>
       <li><strong>◆ Possible floor</strong>, Collector packs and boxes: {describeRule(th.floorRules.collector)}.
         Collector prices often don't drop much after release, so this rule doesn't require a drop.</li>
-      <li>Both rules are backtested on real price histories from 2019–2025, each tested on release years it
-        wasn't tuned on. Regular: the real low came a median ~6 months after release, and the signal bought ~10% above
-        it (median), against ~17% for waiting 3 months. Collector: ~16% above the low against ~22% for waiting 3 months.
-        It's a hint, not a guarantee: about half the time the price dipped another 10%+ later. Watched products that hit
+      <li>Both rules are backtested on real price histories (sets 2019–2026), each tested on release years it
+        wasn't tuned on, and tuned for alerts that land within 5% of the eventual low. Regular: ~31% of alerts land
+        within 5% of the low and ~50% within 10% (median ~10% above it); waiting a fixed 3 months lands within 5% only ~6%
+        of the time for boxes. Collector: ~26% within 5%. It's a strong hint, not a guarantee. Watched products that hit
         a floor raise an alert.</li>
+      <li><strong>▼ New low</strong> (watched products): the week's median price broke at least 2% below its previous low,
+        once a product has 2+ months of history. One cheap sale can't trigger it.</li>
       <li>The rules are re-tested every quarter on the latest price history; a clearly better rule is proposed here
         for you to apply.
         {#if data?.lastBacktest}Last run: {new Date(data.lastBacktest).toLocaleDateString()}.{:else}Not run yet.{/if}

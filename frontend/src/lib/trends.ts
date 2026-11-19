@@ -11,6 +11,9 @@ export interface Trend {
   releasePrice: number;
   dropFromRelease: number;
   band: number | null;
+  /** The 7-day median price broke below its previous low (prevLow). */
+  newLow?: boolean;
+  prevLow?: number;
   signal: Signal;
   spark: number[];
   sparkStart: string;
@@ -19,6 +22,8 @@ export interface Trend {
 }
 
 export interface Watch { mtgstocksId: number; dropAlert: number | null }
+
+export type AlertReason = 'floor' | 'drop' | 'new_low';
 
 export interface TrendRow {
   mtgstocksId: number;
@@ -31,12 +36,16 @@ export interface TrendRow {
   packsPerBox?: number;
   trend: Trend | null;
   watch: Watch | null;
-  alerts: ('floor' | 'drop')[];
+  alerts: AlertReason[];
   /** Packs of this set and kind in the collection (loose packs for a box row). */
   stock?: number;
 }
 
-export interface FloorRule { minAge: number; drop: number; window: number; band: number; near: number }
+export interface FloorRule {
+  minAge: number; drop: number; window: number; band: number; near: number;
+  /** If > 0, the low must have happened within this many days. */
+  recent?: number;
+}
 
 export interface Thresholds {
   newSetDays: number;
@@ -54,10 +63,15 @@ export function describeRule(r: FloorRule): string {
     ...(r.drop > 0 ? [`at least ${pctOf(r.drop)} below its release price`] : []),
     `moving within a ${pctOf(r.band)} range for the last ${r.window} days`,
     `within ${pctOf(r.near)} of its lowest price since release`,
+    ...(r.recent ? [`with that low reached in the last ${r.recent} days`] : []),
   ].join(', ');
 }
 
-export interface BTMetrics { products: number; coverage: number; median: number; mean: number; falseRate: number }
+export interface BTMetrics {
+  products: number; coverage: number; median: number; mean: number; falseRate: number;
+  /** Shares of alerts within 5% / 10% of the eventual low. */
+  hit5?: number; hit10?: number;
+}
 
 export interface RuleProposal {
   id: number;
@@ -131,18 +145,20 @@ export function filterRows(rows: TrendRow[], kind: KindFilter, show: ShowFilter)
 }
 
 /** Explains an alert in plain words. */
-export function alertText(r: TrendRow, reason: 'floor' | 'drop'): string {
+export function alertText(r: TrendRow, reason: AlertReason): string {
   const t = r.trend!;
   if (reason === 'floor') return `possible floor at ${money(t.current)}, ${pct(-t.dropFromRelease)} since release`;
+  if (reason === 'new_low') return `new low at ${money(t.current)}, below its previous low of ${money(t.prevLow)}`;
   return `${pct(-t.dropFromRelease)} since release, past your ${pct(-(r.watch?.dropAlert ?? 0))} alert`;
 }
 
 /** Why a watched product needs attention right now (mirrors the API's rule). */
-export function alertsFor(t: Trend | null, w: Watch | null): ('floor' | 'drop')[] {
+export function alertsFor(t: Trend | null, w: Watch | null): AlertReason[] {
   if (!t || !w) return [];
   return [
     ...(t.signal === 'floor' ? ['floor' as const] : []),
     ...(w.dropAlert != null && t.dropFromRelease >= w.dropAlert ? ['drop' as const] : []),
+    ...(t.newLow ? ['new_low' as const] : []),
   ];
 }
 

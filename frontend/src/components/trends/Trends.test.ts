@@ -328,7 +328,7 @@ describe('Trends page', () => {
   });
 
   describe('floor rule proposals', () => {
-    const metrics = (median: number) => ({ products: 61, coverage: 0.79, median, mean: median + 0.04, falseRate: 0.5 });
+    const metrics = (median: number) => ({ products: 61, coverage: 0.79, median, mean: median + 0.04, falseRate: 0.5, hit5: median < 0.12 ? 0.3 : 0.16, hit10: 0.5 });
     const proposal = {
       id: 7, kind: 'collector', createdAt: '2027-02-01T00:00:00Z',
       current: { minAge: 150, drop: 0, window: 14, band: 0.08, near: 0.2 },
@@ -352,6 +352,10 @@ describe('Trends page', () => {
         .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent?.trim()))
         .find(cells => cells[0] === 'Bought above the eventual low (median)');
       expect(medianRow).toEqual(['Bought above the eventual low (median)', '16%', '11%']);
+      const hitRow = Array.from(container.querySelectorAll('.proposal__table tr'))
+        .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent?.trim()))
+        .find(cells => cells[0] === 'Alerts within 5% of the eventual low');
+      expect(hitRow).toEqual(['Alerts within 5% of the eventual low', '16%', '30%']);
       expect(text).toContain('Tested on 61 products');
 
       await act(() => fireEvent.click(button(container, 'Apply')));

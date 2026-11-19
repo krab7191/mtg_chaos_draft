@@ -87,4 +87,15 @@ describe('trends helpers', () => {
       .toBe('released at least 150 days ago, at least 10% below its release price, moving within a 12% range for the last 14 days, within 10% of its lowest price since release');
     expect(describeRule({ minAge: 150, drop: 0, window: 14, band: 0.08, near: 0.2 })).not.toContain('below its release price');
   });
+
+  it('describes the recent-low requirement', () => {
+    expect(describeRule({ minAge: 180, drop: 0.2, window: 14, band: 0.2, near: 0.05, recent: 60 }))
+      .toContain('within 5% of its lowest price since release, with that low reached in the last 60 days');
+  });
+
+  it('raises and explains a new-low alert', () => {
+    const t = trend({ newLow: true, prevLow: 112.5, current: 108 });
+    expect(alertsFor(t, { mtgstocksId: 1, dropAlert: null })).toEqual(['new_low']);
+    expect(alertText(row({ trend: t }), 'new_low')).toBe('new low at $108.00, below its previous low of $112.50');
+  });
 });

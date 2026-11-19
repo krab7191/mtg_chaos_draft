@@ -19,7 +19,7 @@ func TestFloorRuleLifecycle(t *testing.T) {
 	}
 	ruleA, ruleB := json.RawMessage(`{"minAge":150}`), json.RawMessage(`{"minAge":120}`)
 
-	if err := db.SetActiveRule(ctx, pool, "regular", ruleA); err != nil {
+	if err := db.SetActiveRule(ctx, pool, "regular", ruleA, nil); err != nil {
 		t.Fatal(err)
 	}
 	// A second proposal for the same kind replaces the first.

@@ -44,7 +44,8 @@ func RulesByStatus(ctx context.Context, pool *pgxpool.Pool, status string) ([]St
 }
 
 // SetActiveRule makes rule the active one for kind, retiring the previous.
-func SetActiveRule(ctx context.Context, pool *pgxpool.Pool, kind string, rule json.RawMessage) error {
+// metrics may mark how it got there, e.g. {"seeded":true} for a default.
+func SetActiveRule(ctx context.Context, pool *pgxpool.Pool, kind string, rule, metrics json.RawMessage) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func SetActiveRule(ctx context.Context, pool *pgxpool.Pool, kind string, rule js
 	if _, err := tx.Exec(ctx, `UPDATE floor_rules SET status = 'retired', decided_at = NOW() WHERE kind = $1 AND status = 'active'`, kind); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO floor_rules (kind, rule, status, decided_at) VALUES ($1, $2, 'active', NOW())`, kind, rule); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO floor_rules (kind, rule, status, metrics, decided_at) VALUES ($1, $2, 'active', $3, NOW())`, kind, rule, metrics); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
