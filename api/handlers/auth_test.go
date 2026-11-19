@@ -172,9 +172,12 @@ func TestAuthCallback_SignsInByRole(t *testing.T) {
 		{"admin@example.com", "admin", "/admin/collection"},
 		{"viewer@example.com", "viewer", "/admin/collection"},
 		{"player@example.com", "user", "/select"},
+		// Case doesn't matter: configured and Google-reported emails can differ.
+		{"Viewer@Example.com", "viewer", "/admin/collection"},
+		{"ADMIN@example.com", "admin", "/admin/collection"},
 	}
 	for _, tc := range cases {
-		t.Run(tc.wantRole, func(t *testing.T) {
+		t.Run(tc.email, func(t *testing.T) {
 			f := newFakeGoogle(t)
 			f.userInfoBody = fmt.Sprintf(`{"id":"g-%s","email":%q,"name":"N","picture":""}`, tc.wantRole, tc.email)
 			h := newAuthTestHandler(t, f)

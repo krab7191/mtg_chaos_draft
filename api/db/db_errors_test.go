@@ -72,6 +72,12 @@ func TestDB_DatabaseDown(t *testing.T) {
 		"ListWatches":           func() error { return errOnly(db.ListWatches(ctx, pool)) },
 		"WatchMany":             func() error { return db.WatchMany(ctx, pool, []int{1}) },
 		"SetNotified":           func() error { return db.SetNotified(ctx, pool, 1, nil) },
+		"RulesByStatus":         func() error { return errOnly(db.RulesByStatus(ctx, pool, "active")) },
+		"SetActiveRule":         func() error { return db.SetActiveRule(ctx, pool, "regular", []byte(`{}`)) },
+		"ProposeRule":           func() error { return errOnly(db.ProposeRule(ctx, pool, "regular", []byte(`{}`), nil)) },
+		"DecideProposal":        func() error { return errOnly(db.DecideProposal(ctx, pool, 1, true)) },
+		"RecordBacktest":        func() error { return db.RecordBacktest(ctx, pool, []byte(`{}`)) },
+		"LastBacktest":          func() error { _, _, err := db.LastBacktest(ctx, pool); return err },
 		"UnwatchMany":           func() error { return db.UnwatchMany(ctx, pool, []int{1}) },
 	}
 	for name, call := range cases {

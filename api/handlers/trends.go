@@ -142,17 +142,37 @@ const (
 	trendWindow = 30   // days the trend is measured over
 	trendMove   = 0.05 // ±5% over the window counts as falling/rising
 
-	// A possible floor. Tuned by backtesting on 163 real pack and box price
-	// histories (sets 2019–mid 2025), choosing on pre-2023 sets and checking
-	// on 2023+ sets: when it fires it buys ~9% (median) above the eventual
-	// low, against ~17% for "wait 3 months". Age mattered most: lows come a
-	// median ~177 days after release.
-	floorMinAge = 150  // days since release
-	floorDrop   = 0.10 // at least 10% below the release price
-	floorWindow = 14   // days the band is measured over
-	floorBand   = 0.12 // highest/lowest in the window within 12%
-	floorNear   = 0.10 // and within 10% of the low since release
 )
+
+// FloorRule says when a product counts as a possible floor: old enough,
+// down from release, then within a narrow band for a while, near its low.
+type FloorRule struct {
+	MinAge int     `json:"minAge"` // days since release
+	Drop   float64 `json:"drop"`   // at least this far below the release price
+	Window int     `json:"window"` // days the band is measured over
+	Band   float64 `json:"band"`   // highest/lowest in the window within this
+	Near   float64 `json:"near"`   // and within this of the low since release
+}
+
+// floorRules are tuned by backtesting on real price histories (sets 2019 to
+// mid 2025), with leave-one-release-year-out cross-validation:
+//   - regular packs and boxes (102): fires on ~79%, buying ~10% (median)
+//     above the eventual low, against ~17% for "wait 3 months";
+//   - Collector packs and boxes (61) get their own rule: their prices often
+//     don't drop much, so no minimum drop and a wider "near the low"; fires
+//     on ~79% at ~16% above the low, against ~22% for "wait 3 months".
+var floorRules = map[string]FloorRule{
+	"regular":   {MinAge: 150, Drop: 0.10, Window: 14, Band: 0.12, Near: 0.10},
+	"collector": {MinAge: 150, Drop: 0.00, Window: 14, Band: 0.08, Near: 0.20},
+}
+
+// ruleKind is which floor rule applies to a product type.
+func ruleKind(productType string) string {
+	if strings.Contains(strings.ToLower(productType), "collector") {
+		return "collector"
+	}
+	return "regular"
+}
 
 // Signal is where a product is in its price cycle.
 type Signal string
@@ -177,8 +197,8 @@ type Trend struct {
 	// how far below it the price is now (negative when above).
 	ReleasePrice    float64 `json:"releasePrice"`
 	DropFromRelease float64 `json:"dropFromRelease"`
-	// Band is the spread between the highest and lowest price over the last
-	// floorWindow days, as a fraction of the lowest; nil without the history.
+	// Band is the spread between the highest and lowest price over the
+	// rule's window, as a fraction of the lowest; nil without the history.
 	Band        *float64   `json:"band"`
 	Signal      Signal     `json:"signal"`
 	Spark       []float64  `json:"spark"` // weekly prices since release, for a sparkline
@@ -198,7 +218,7 @@ func priceOn(points []db.PricePoint, day time.Time) (float64, bool) {
 
 // summarize computes a product's trend from its daily prices (oldest first)
 // as of today. Prices before release (preorders) are ignored for the low.
-func summarize(points []db.PricePoint, released *time.Time, today time.Time) *Trend {
+func summarize(points []db.PricePoint, released *time.Time, today time.Time, rule FloorRule) *Trend {
 	if len(points) == 0 {
 		return nil
 	}
@@ -228,8 +248,8 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time) *Tr
 	t.ReleasePrice = since[0].Price
 	t.DropFromRelease = 1 - t.Current/t.ReleasePrice
 
-	// Band over the last floorWindow days, if history covers the window.
-	windowStart := last.Day.AddDate(0, 0, -floorWindow)
+	// Band over the rule's window, if history covers it.
+	windowStart := last.Day.AddDate(0, 0, -rule.Window)
 	if !points[0].Day.After(windowStart) {
 		lo, hi := math.Inf(1), math.Inf(-1)
 		for i := len(points) - 1; i >= 0 && !points[i].Day.Before(windowStart); i-- {
@@ -250,17 +270,17 @@ func summarize(points []db.PricePoint, released *time.Time, today time.Time) *Tr
 		t.Spark = append(t.Spark, last.Price)
 	}
 
-	t.Signal = signalFor(t, released, today)
+	t.Signal = signalFor(t, released, today, rule)
 	return t
 }
 
-func signalFor(t *Trend, released *time.Time, today time.Time) Signal {
+func signalFor(t *Trend, released *time.Time, today time.Time, rule FloorRule) Signal {
 	switch {
 	case released != nil && released.After(today):
 		return SignalPreorder
 	case released != nil && today.Sub(*released) < newSetDays*24*time.Hour:
 		return SignalNew
-	case isFloor(t, released, today):
+	case isFloor(t, released, today, rule):
 		return SignalFloor
 	case t.Change30 != nil && *t.Change30 <= -trendMove:
 		return SignalFalling
@@ -271,11 +291,11 @@ func signalFor(t *Trend, released *time.Time, today time.Time) Signal {
 	}
 }
 
-// isFloor: old enough, down from release, then flat for floorWindow days
+// isFloor: old enough, down from release, then flat for the rule's window
 // near the low since release.
-func isFloor(t *Trend, released *time.Time, today time.Time) bool {
-	oldEnough := released != nil && today.Sub(*released) >= floorMinAge*24*time.Hour
-	return oldEnough && t.DropFromRelease >= floorDrop && t.Band != nil && *t.Band <= floorBand && t.AboveLow <= floorNear
+func isFloor(t *Trend, released *time.Time, today time.Time, rule FloorRule) bool {
+	oldEnough := released != nil && today.Sub(*released) >= time.Duration(rule.MinAge)*24*time.Hour
+	return oldEnough && t.DropFromRelease >= rule.Drop && t.Band != nil && *t.Band <= rule.Band && t.AboveLow <= rule.Near
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -365,14 +385,10 @@ type trendsResponse struct {
 	Backfilled    int  `json:"backfilled"`
 	Tracked       int  `json:"tracked"`
 	Thresholds    struct {
-		NewSetDays  int     `json:"newSetDays"`
-		TrendWindow int     `json:"trendWindow"`
-		TrendMove   float64 `json:"trendMove"`
-		FloorMinAge int     `json:"floorMinAge"`
-		FloorDrop   float64 `json:"floorDrop"`
-		FloorWindow int     `json:"floorWindow"`
-		FloorBand   float64 `json:"floorBand"`
-		FloorNear   float64 `json:"floorNear"`
+		NewSetDays  int                  `json:"newSetDays"`
+		TrendWindow int                  `json:"trendWindow"`
+		TrendMove   float64              `json:"trendMove"`
+		FloorRules  map[string]FloorRule `json:"floorRules"`
 	} `json:"thresholds"`
 }
 
@@ -433,13 +449,14 @@ func (h *TrendsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	th := &resp.Thresholds
 	th.NewSetDays, th.TrendWindow, th.TrendMove = newSetDays, trendWindow, trendMove
-	th.FloorMinAge, th.FloorDrop, th.FloorWindow, th.FloorBand, th.FloorNear = floorMinAge, floorDrop, floorWindow, floorBand, floorNear
+	th.FloorRules = floorRules
 	for _, p := range picked {
 		var released *time.Time
 		if rel, err := time.Parse("2006-01-02", p.ReleasedAt); err == nil {
 			released = &rel
 		}
-		row := trendRow{SearchResult: p, Trend: summarize(history[p.MTGStocksID], released, today), Stock: stock.of(p)}
+		trend := summarize(history[p.MTGStocksID], released, today, floorRules[ruleKind(p.ProductType)])
+		row := trendRow{SearchResult: p, Trend: trend, Stock: stock.of(p)}
 		if wt, ok := watches[p.MTGStocksID]; ok {
 			row.Watch = &wt
 		}

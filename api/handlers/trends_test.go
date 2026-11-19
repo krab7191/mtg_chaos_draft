@@ -71,7 +71,7 @@ func loadRealHistory(t *testing.T, file string) []db.PricePoint {
 func TestSummarize_RealWildsOfEldraineSetBooster(t *testing.T) {
 	points := loadRealHistory(t, "history_5382_woe_set_booster.json.gz")
 	released := day("2023-09-08")
-	tr := summarize(points, &released, day("2026-11-17"))
+	tr := summarize(points, &released, day("2026-11-17"), floorRules["regular"])
 
 	// Real history: bottomed at $4.58 two weeks after release (2023-09-22 UTC), now ~$16.70.
 	if tr.Low != 4.58 || !tr.LowDay.Equal(day("2023-09-22")) {
@@ -95,7 +95,7 @@ func TestSummarize_RealWildsOfEldraineSetBooster(t *testing.T) {
 func TestSummarize_RealRealityFracturePlayBooster(t *testing.T) {
 	points := loadRealHistory(t, "history_12545_rfa_play_booster.json.gz")
 	released := day("2026-10-02")
-	tr := summarize(points, &released, day("2026-11-17"))
+	tr := summarize(points, &released, day("2026-11-17"), floorRules["regular"])
 	if tr.Signal != SignalNew && tr.Signal != SignalFalling && tr.Signal != SignalFloor {
 		t.Errorf("a six-week-old set at its low: got %s", tr.Signal)
 	}
@@ -132,7 +132,7 @@ func TestSignals(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			start := tc.today.AddDate(0, 0, -len(tc.prices)).Format("2006-01-02")
-			tr := summarize(series(start, tc.prices...), tc.rel, tc.today)
+			tr := summarize(series(start, tc.prices...), tc.rel, tc.today, floorRules["regular"])
 			if tr.Signal != tc.want {
 				t.Errorf("want %s, got %s (drop %.2f, band %v, above low %.2f, change30 %v)",
 					tc.want, tr.Signal, tr.DropFromRelease, deref(tr.Band), tr.AboveLow, deref(tr.Change30))
@@ -151,17 +151,17 @@ func deref(f *float64) float64 {
 }
 
 func TestSummarize_Edges(t *testing.T) {
-	if summarize(nil, nil, day("2026-01-01")) != nil {
+	if summarize(nil, nil, day("2026-01-01"), floorRules["regular"]) != nil {
 		t.Error("no history should give no trend")
 	}
 	// Short history: no 30-day change or band yet.
-	tr := summarize(series("2025-12-25", 5, 5.1), nil, day("2026-01-01"))
+	tr := summarize(series("2025-12-25", 5, 5.1), nil, day("2026-01-01"), floorRules["regular"])
 	if tr.Change30 != nil || tr.Band != nil {
 		t.Errorf("short history: change %v band %v", tr.Change30, tr.Band)
 	}
 	// History that starts after release still finds a low and release price.
 	rel := day("2020-01-01")
-	tr = summarize(series("2025-06-01", 7, 6, 8), &rel, day("2026-01-01"))
+	tr = summarize(series("2025-06-01", 7, 6, 8), &rel, day("2026-01-01"), floorRules["regular"])
 	if tr.Low != 6 || tr.ReleasePrice != 7 {
 		t.Errorf("late history: low %v release %v", tr.Low, tr.ReleasePrice)
 	}
@@ -371,8 +371,8 @@ func TestTrendsList(t *testing.T) {
 	if watched == nil || watched.Trend == nil || watched.Watch == nil || !strings.Contains(strings.Join(watched.Alerts, ","), AlertDrop) {
 		t.Fatalf("watched row: %+v", watched)
 	}
-	if resp.Thresholds.FloorDrop != floorDrop {
-		t.Error("thresholds should be reported")
+	if resp.Thresholds.FloorRules["collector"] != floorRules["collector"] || resp.Thresholds.FloorRules["regular"] != floorRules["regular"] {
+		t.Error("both floor rules should be reported")
 	}
 
 	if watched.Stock != 3 {
@@ -507,5 +507,23 @@ func TestPackKindAndStock(t *testing.T) {
 		if got := idx.of(tc.p); got != tc.want {
 			t.Errorf("%s %s: want %d, got %d", tc.p.SetName, tc.p.ProductType, tc.want, got)
 		}
+	}
+}
+
+func TestFloorRulesDifferForCollectorProducts(t *testing.T) {
+	if ruleKind("Collector Booster Box") != "collector" || ruleKind("Collector Booster") != "collector" || ruleKind("Play Booster Box") != "regular" {
+		t.Fatal("rule kinds")
+	}
+	// Released 200 days ago, slipped only ~5% from release, then steady near
+	// its low for weeks: typical for a Collector box.
+	today := day("2026-01-01")
+	rel := today.AddDate(0, 0, -200)
+	prices := append(repeat(100, 30), repeat(95, 170)...)
+	pts := series(rel.Format("2006-01-02"), prices...)
+	if s := summarize(pts, &rel, today, floorRules["collector"]).Signal; s != SignalFloor {
+		t.Errorf("collector rule: want floor, got %s", s)
+	}
+	if s := summarize(pts, &rel, today, floorRules["regular"]).Signal; s == SignalFloor {
+		t.Errorf("regular rule needs a 10%% drop: got %s", s)
 	}
 }

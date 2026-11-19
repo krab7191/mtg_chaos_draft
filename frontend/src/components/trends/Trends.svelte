@@ -6,7 +6,7 @@
   import { send } from '../../lib/send';
   import { toast } from '../../lib/toast.svelte';
   import {
-    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote,
+    SIGNALS, filterRows, isBox, perPack, money, pct, age, alertText, alertsFor, watchFeedback, stockNote, describeRule,
     type TrendRow, type TrendsResponse, type PricePoint, type KindFilter, type ShowFilter,
   } from '../../lib/trends';
 
@@ -209,7 +209,10 @@
               {money(t?.current ?? r.marketPrice)}
               {#if isBox(r)}<span class="sub">{money(perPack(r))} / pack · {r.packsPerBox} packs</span>{/if}
             </td>
-            <td class="num">{t ? pct(-t.dropFromRelease) : '—'}</td>
+            <!-- Preorders have no release price yet: their change is only since listing. -->
+            <td class="num" title={t?.signal === 'preorder' ? 'Not released yet' : undefined}>
+              {t && t.signal !== 'preorder' ? pct(-t.dropFromRelease) : '—'}
+            </td>
             <td class="num">
               {t ? money(t.low) : '—'}
               {#if t}<span class="sub">{t.aboveLow < 0.005 ? 'at the low' : `${pct(t.aboveLow)} above`}</span>{/if}
@@ -273,13 +276,14 @@
   <details class="explain">
     <summary>How the signals work</summary>
     <ul>
-      <li><strong>◆ Possible floor</strong>: released at least {th.floorMinAge} days ago, at least
-        {Math.round(th.floorDrop * 100)}% below its release price, moving within a {Math.round(th.floorBand * 100)}% range
-        for the last {th.floorWindow} days, and within {Math.round(th.floorNear * 100)}% of its lowest price since release.
-        Watched products that hit this raise an alert.</li>
-      <li>Backtested on 163 real pack and box price histories from 2019–2025: the real low came a median of
-        ~6 months after release. When this signal fired it bought ~9% above that low (median), against ~17% for simply
-        waiting 3 months. It's a hint, not a guarantee: about a third of the time the price dipped another 10%+ later.</li>
+      <li><strong>◆ Possible floor</strong>, regular packs and boxes: {describeRule(th.floorRules.regular)}.</li>
+      <li><strong>◆ Possible floor</strong>, Collector packs and boxes: {describeRule(th.floorRules.collector)}.
+        Collector prices often don't drop much after release, so this rule doesn't require a drop.</li>
+      <li>Both rules are backtested on real price histories from 2019–2025, each tested on release years it
+        wasn't tuned on. Regular: the real low came a median ~6 months after release, and the signal bought ~10% above
+        it (median), against ~17% for waiting 3 months. Collector: ~16% above the low against ~22% for waiting 3 months.
+        It's a hint, not a guarantee: about half the time the price dipped another 10%+ later. Watched products that hit
+        a floor raise an alert.</li>
       <li><strong>↓ Falling / ↑ Rising</strong>: moved more than {Math.round(th.trendMove * 100)}% over {th.trendWindow} days.</li>
       <li><strong>★ New</strong>: released under {th.newSetDays} days ago, when prices still carry release hype.</li>
       <li>Prices are TCGplayer market prices via MTGStocks. A box's per-pack price assumes its standard pack count.</li>

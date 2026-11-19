@@ -45,7 +45,7 @@ func TestAddPackWithPurchase_RecordsPurchase(t *testing.T) {
 		t.Fatalf("want 2 purchases, got %d", len(list))
 	}
 	// Newest date first; an empty date means today.
-	if list[0].PurchasedOn != time.Now().Format(time.DateOnly) {
+	if list[0].PurchasedOn != dbToday(t, pool) {
 		t.Errorf("first listed purchase: %+v", list[0])
 	}
 	if list[0].CurrentPrice == nil || *list[0].CurrentPrice != 7.5 {

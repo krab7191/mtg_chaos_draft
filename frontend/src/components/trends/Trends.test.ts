@@ -15,7 +15,10 @@ const row = (id: number, over: Partial<TrendRow> = {}): TrendRow => ({
   mtgstocksId: id, name: 'Play Booster Display', setName: `Set ${id}`, setCode: 'S', releasedAt: '2026-01-01',
   productType: 'Play Booster Box', marketPrice: 118, packsPerBox: 36, trend: trend(), watch: null, alerts: [], ...over,
 });
-const thresholds = { newSetDays: 45, trendWindow: 30, trendMove: 0.05, floorMinAge: 150, floorDrop: 0.1, floorWindow: 14, floorBand: 0.12, floorNear: 0.1 };
+const thresholds = { newSetDays: 45, trendWindow: 30, trendMove: 0.05, floorRules: {
+  regular: { minAge: 150, drop: 0.1, window: 14, band: 0.12, near: 0.1 },
+  collector: { minAge: 150, drop: 0, window: 14, band: 0.08, near: 0.2 },
+} };
 const response = (products: TrendRow[], over: Partial<TrendsResponse> = {}): TrendsResponse =>
   ({ products, notifications: false, backfilled: 10, tracked: 10, thresholds, ...over });
 
@@ -152,7 +155,9 @@ describe('Trends page', () => {
     await waitFor(() => expect(container.querySelector('table')).not.toBeNull());
     expect(container.querySelector('.watch')).toBeNull();
     expect(container.querySelector('.history')?.textContent).toBe('History 3/10');
-    expect(container.querySelector('.explain')?.textContent?.replace(/\s+/g, ' ')).toContain('released at least 150 days ago, at least 10% below its release price');
+    const explain = container.querySelector('.explain')?.textContent?.replace(/\s+/g, ' ') ?? '';
+    expect(explain).toContain('regular packs and boxes: released at least 150 days ago, at least 10% below its release price, moving within a 12% range for the last 14 days');
+    expect(explain).toContain('Collector packs and boxes: released at least 150 days ago, moving within a 8% range for the last 14 days, within 20% of its lowest price');
   });
 
   it('says so when nothing matches, and survives a failed load', async () => {
@@ -292,5 +297,14 @@ describe('Trends page', () => {
     const { container } = await mount([alerting(1, 0), alerting(2, 6), alerting(3, 24)]);
     const items = Array.from(container.querySelectorAll('.alerts li')).map(li => li.querySelector('.stock-note')?.textContent ?? null);
     expect(items).toEqual(['none in stock', '6 in stock', null]);
+  });
+
+  it("shows no since-release change for preorders", async () => {
+    const { container } = await mount([
+      row(1, { trend: trend({ signal: 'preorder', dropFromRelease: 0.13 }) }),
+      row(2, { trend: trend({ dropFromRelease: 0.13 }) }),
+    ]);
+    const sinceRelease = Array.from(container.querySelectorAll('tbody tr')).map(r => r.querySelectorAll('td')[2].textContent?.trim());
+    expect(sinceRelease).toEqual(['—', '−13%']);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perPack, money, pct, age, filterRows, alertText, alertsFor, watchFeedback, stockNote, isBox, type TrendRow, type Trend } from './trends';
+import { perPack, money, pct, age, filterRows, alertText, alertsFor, watchFeedback, stockNote, describeRule, isBox, type TrendRow, type Trend } from './trends';
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 120, low: 100, lowDay: '2026-03-01', aboveLow: 0.2, change30: -0.02, releasePrice: 150,
@@ -80,5 +80,11 @@ describe('trends helpers', () => {
     expect(stockNote(row({ stock: undefined }))).toBe('none in stock');
     expect(stockNote(row({ stock: 6 }))).toBe('6 in stock');
     expect(stockNote(row({ stock: 10 }))).toBeNull();
+  });
+
+  it('describes a floor rule, leaving out a zero drop', () => {
+    expect(describeRule({ minAge: 150, drop: 0.1, window: 14, band: 0.12, near: 0.1 }))
+      .toBe('released at least 150 days ago, at least 10% below its release price, moving within a 12% range for the last 14 days, within 10% of its lowest price since release');
+    expect(describeRule({ minAge: 150, drop: 0, window: 14, band: 0.08, near: 0.2 })).not.toContain('below its release price');
   });
 });

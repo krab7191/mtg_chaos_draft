@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"mtg-chaos-draft/db"
@@ -96,8 +97,9 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Promote to admin if email matches ADMIN_EMAIL
-	if user.Email == h.adminEmail && user.Role != "admin" {
+	// Promote to admin if email matches ADMIN_EMAIL. Emails compare without
+	// case: Google may report "friend@gmail.com" for a configured "Friend@Gmail.com".
+	if strings.EqualFold(strings.TrimSpace(user.Email), strings.TrimSpace(h.adminEmail)) && user.Role != "admin" {
 		if err := db.SetUserRole(r.Context(), h.pool, user.ID, "admin"); err == nil {
 			user.Role = "admin"
 		}
@@ -105,7 +107,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	// Promote to viewer if email is in VIEWER_EMAILS (and not already admin)
 	if user.Role != "admin" {
 		for _, email := range h.viewerEmails {
-			if user.Email == email && user.Role != "viewer" {
+			if strings.EqualFold(strings.TrimSpace(user.Email), strings.TrimSpace(email)) && user.Role != "viewer" {
 				if err := db.SetUserRole(r.Context(), h.pool, user.ID, "viewer"); err == nil {
 					user.Role = "viewer"
 				}

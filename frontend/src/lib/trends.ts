@@ -36,15 +36,25 @@ export interface TrendRow {
   stock?: number;
 }
 
+export interface FloorRule { minAge: number; drop: number; window: number; band: number; near: number }
+
 export interface Thresholds {
   newSetDays: number;
   trendWindow: number;
   trendMove: number;
-  floorMinAge: number;
-  floorDrop: number;
-  floorWindow: number;
-  floorBand: number;
-  floorNear: number;
+  /** "regular" and "collector" floor rules. */
+  floorRules: Record<string, FloorRule>;
+}
+
+/** One floor rule in words. */
+export function describeRule(r: FloorRule): string {
+  const pctOf = (f: number) => `${Math.round(f * 100)}%`;
+  return [
+    `released at least ${r.minAge} days ago`,
+    ...(r.drop > 0 ? [`at least ${pctOf(r.drop)} below its release price`] : []),
+    `moving within a ${pctOf(r.band)} range for the last ${r.window} days`,
+    `within ${pctOf(r.near)} of its lowest price since release`,
+  ].join(', ');
 }
 
 export interface TrendsResponse {

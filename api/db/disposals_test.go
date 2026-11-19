@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"mtg-chaos-draft/db"
 	"mtg-chaos-draft/testhelper"
@@ -42,7 +41,7 @@ func TestApproveDraft_RecordsDisposals(t *testing.T) {
 	if d := byPack[epilogue.ID]; d.Quantity != 3 || d.Proceeds != 21 {
 		t.Errorf("epilogue: want 3 packs for $21, got %+v", d)
 	}
-	if d := byPack[normal.ID]; d.DisposedOn != time.Now().Format(time.DateOnly) || d.SetName != "Normal" {
+	if d := byPack[normal.ID]; d.DisposedOn != dbToday(t, pool) || d.SetName != "Normal" {
 		t.Errorf("details: %+v", d)
 	}
 

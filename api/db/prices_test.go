@@ -7,6 +7,8 @@ import (
 
 	"mtg-chaos-draft/db"
 	"mtg-chaos-draft/testhelper"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func day(s string) time.Time {
@@ -138,4 +140,15 @@ func TestSetNotified(t *testing.T) {
 	if w, _ := db.ListWatches(ctx, pool); len(w[1].Notified) != 0 {
 		t.Errorf("cleared: %v", w[1].Notified)
 	}
+}
+
+// dbToday is the database's CURRENT_DATE (UTC on the server), which is what
+// rows without an explicit date get; local time can already be a day off.
+func dbToday(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	var d string
+	if err := pool.QueryRow(context.Background(), `SELECT CURRENT_DATE::text`).Scan(&d); err != nil {
+		t.Fatal(err)
+	}
+	return d
 }
