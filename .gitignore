@@ -50,3 +50,6 @@ frontend/coverage
 
 # Vitest reporter output
 frontend/.vitest/
+
+# Dependencies and tool caches, anywhere in the repo
+node_modules/
