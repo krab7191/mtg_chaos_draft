@@ -118,7 +118,15 @@ jobs:
             MAJOR=$(echo $LATEST | sed 's/v//' | cut -d. -f1)
             MINOR=$(echo $LATEST | sed 's/v//' | cut -d. -f2)
             PATCH=$(echo $LATEST | sed 's/v//' | cut -d. -f3)
-            echo "VERSION=v${MAJOR}.${MINOR}.$((PATCH + 1))" >> $GITHUB_ENV
+            # Conventional commits since the last release: any feat(...) means a
+            # minor bump (new features), otherwise a patch bump (fixes, chores).
+            RANGE="HEAD"
+            if [ "$LATEST" != "v0.0.0" ]; then RANGE="${LATEST}..HEAD"; fi
+            if git log "$RANGE" --format=%s | grep -qE '^feat(\(|!|:)'; then
+              echo "VERSION=v${MAJOR}.$((MINOR + 1)).0" >> $GITHUB_ENV
+            else
+              echo "VERSION=v${MAJOR}.${MINOR}.$((PATCH + 1))" >> $GITHUB_ENV
+            fi
             echo "MANUALLY_TAGGED=false" >> $GITHUB_ENV
           fi
 
