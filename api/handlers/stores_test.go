@@ -67,7 +67,11 @@ func TestPackIndex_MatchesRealTitles(t *testing.T) {
 }
 
 // Tests never reach real stores: individual tests point a store at a fake.
-func init() { shopifyStores, cardKingdomURL, evEnabled = nil, "", false }
+func init() {
+	shopifyStores, cardKingdomURL, evEnabled = nil, "", false
+	// The stores tests list offers under count as read.
+	activeStoresOverride = []string{"S", "Fake Store", "Card Kingdom", "CardTrader", "Collector Store"}
+}
 
 // fakeShopify serves a collection: page 1 is full (250 products) so a second
 // page is fetched. status, if set, answers every request instead.
@@ -520,5 +524,55 @@ func TestOffersWithMarket_SuspiciouslyCheap(t *testing.T) {
 	}
 	if byURL["it"].Suspicious || !byURL["it"].IsDeal {
 		t.Errorf("Italian 70%% under: %+v", byURL["it"])
+	}
+}
+
+// A store no longer read (e.g. removed after it blocked the server) leaves no
+// listings: hidden at once, deleted on the next refresh. Old listings from any
+// store are hidden too. (Two stale Galactic Toys listings topped Best Deals.)
+func TestStaleAndRemovedStoresAreHidden(t *testing.T) {
+	ctx := trendsDB(t)
+	pool := testhelper.Pool(t)
+	price := 10.0
+	products := []SearchResult{{MTGStocksID: 1, SetName: "Old", ProductType: "Booster Pack", ReleasedAt: "2010-01-01", MarketPrice: &price}}
+	offers := []db.Offer{
+		{Store: "Galactic Toys", URL: "gt", MTGStocksID: 1, Title: "Old Booster Pack", Price: 4.5, Available: true},
+		{Store: "S", URL: "old", MTGStocksID: 1, Title: "Old Booster Pack", Price: 5, Available: true, SeenAt: time.Now().Add(-72 * time.Hour)},
+		{Store: "S", URL: "fresh", MTGStocksID: 1, Title: "Old Booster Pack", Price: 6, Available: true, SeenAt: time.Now()},
+	}
+	got := offersWithMarket(offers, products)
+	if len(got) != 1 || got[0].URL != "fresh" {
+		t.Errorf("want only the fresh listing from a store still read, got %+v", got)
+	}
+	_ = db.ReplaceStoreOffers(ctx, pool, "Galactic Toys", offers[:1])
+	_ = db.ReplaceStoreOffers(ctx, pool, "S", offers[2:])
+	withMockClient(200, fakeSetsJSON, func() { RefreshStoreOffers(ctx, pool) })
+	left, _ := db.ListStoreOffers(ctx, pool)
+	for _, o := range left {
+		if o.Store == "Galactic Toys" {
+			t.Errorf("a removed store's listing survived the refresh: %+v", o)
+		}
+	}
+	if len(left) != 1 {
+		t.Errorf("left: %+v", left)
+	}
+	if err := db.DeleteOffersExcept(ctx, closedPool(t), nil); err == nil {
+		t.Error("db down: want an error")
+	}
+}
+
+func TestActiveStores(t *testing.T) {
+	orig := activeStoresOverride
+	activeStoresOverride = nil
+	t.Cleanup(func() { activeStoresOverride = orig })
+	origCK, origCT, origShop := cardKingdomURL, cardTraderToken, shopifyStores
+	t.Cleanup(func() { cardKingdomURL, cardTraderToken, shopifyStores = origCK, origCT, origShop })
+	cardKingdomURL, cardTraderToken, shopifyStores = "x", "tok", []shopifyStore{{Name: "Shop"}}
+	if got := strings.Join(activeStores(), ","); got != "Shop,Card Kingdom,CardTrader" {
+		t.Errorf("active: %s", got)
+	}
+	cardKingdomURL, cardTraderToken, shopifyStores = "", "", nil
+	if got := activeStores(); len(got) != 0 {
+		t.Errorf("none: %v", got)
 	}
 }

@@ -91,3 +91,9 @@ func ProductLinks(ctx context.Context, pool *pgxpool.Pool) (map[int]string, erro
 	}
 	return out, rows.Err()
 }
+
+// DeleteOffersExcept removes the listings of stores no longer read.
+func DeleteOffersExcept(ctx context.Context, pool *pgxpool.Pool, stores []string) error {
+	_, err := pool.Exec(ctx, `DELETE FROM store_offers WHERE NOT (store = ANY($1))`, stores)
+	return err
+}

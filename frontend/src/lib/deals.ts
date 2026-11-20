@@ -173,7 +173,10 @@ export function cardmarketSlug(setName: string, productType: string): string {
 
 /** Stores the app can't read (no feed, or they block automated access):
  *  a one-click search each, opened by hand. */
-export function searchLinks(setName: string, productType: string, tcgUrl?: string): { store: string; url: string }[] {
+/** A store to look at by hand; note: a caveat worth knowing before buying (shown as a tooltip and tag). */
+export interface SearchLink { store: string; url: string; note?: string }
+
+export function searchLinks(setName: string, productType: string, tcgUrl?: string): SearchLink[] {
   const q = encodeURIComponent(searchQuery(setName, productType));
   return [
     // The pack's own page when known; a search otherwise (it also lists prerelease kits and such).
@@ -186,14 +189,15 @@ export function searchLinks(setName: string, productType: string, tcgUrl?: strin
     // Their site search ignores the query; their boosters page filters by set.
     { store: "Dave & Adam's", url: `https://www.dacardworld.com/gaming/booster-boxes-from-the-magic-the-gathering-tcg?set=${encodeURIComponent(daveAndAdamsSet(setName))}` },
     // European (prices in euros); their search mixes in other games, so open their Magic section.
-    { store: 'Magic Omens (EU, all MTG)', url: 'https://magicomens.com/collections/mtg' },
+    { store: 'Magic Omens (EU, all MTG)', url: 'https://magicomens.com/collections/mtg', note: 'Ships from Europe: only worth it for a bigger order' },
+    { store: 'Galactic Toys', url: `https://galactictoys.com/search?q=${q}`, note: 'Shipping is $8+ per order: only worth it for several packs' },
     { store: 'Collector Store', url: `https://www.collectorstore.com/search?q=${q}` },
     // A sealed page per set: "Dragon's Maze" → /mtg/dragons-maze/sealed/.
     { store: 'Star City Games', url: `https://starcitygames.com/mtg/${slug(setName)}/sealed/` },
     // Their packs section; no language filter, so foreign packs show too.
     { store: 'ABU Games', url: `https://abugames.com/magic-the-gathering/packs?search=${q}` },
     { store: 'CoolStuffInc', url: `https://www.coolstuffinc.com/main_search.php?pa=searchOnName&page=1&resultsPerPage=25&q=${q}` },
-    { store: 'Hareruya', url: `https://www.hareruyamtg.com/en/products/search?product=${q}` },
-    { store: 'Cardmarket (EU)', url: `https://www.cardmarket.com/en/Magic/Products/Boosters/${cardmarketSlug(setName, productType)}` },
+    { store: 'Hareruya', url: `https://www.hareruyamtg.com/en/products/search?product=${q}`, note: 'Ships from Japan: only worth it for a bigger order' },
+    { store: 'Cardmarket (EU)', url: `https://www.cardmarket.com/en/Magic/Products/Boosters/${cardmarketSlug(setName, productType)}`, note: 'Ships from Europe: only worth it for a bigger order' },
   ];
 }

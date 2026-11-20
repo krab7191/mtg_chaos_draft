@@ -58,6 +58,9 @@ describe('StoreDeals', () => {
     expect(container.querySelector('tbody td.name')?.textContent).toContain('Set 1 Draft Booster Pack');
     expect(container.querySelector('tbody td.name')?.textContent).toContain("priced as MTGStocks' Set 1 Booster Pack · 2000");
     expect(Array.from(container.querySelectorAll('.elsewhere a')).map(a => a.textContent)).toContain('Card Kingdom');
+    const gt = Array.from(container.querySelectorAll('.elsewhere a')).find(a => a.textContent === 'Galactic Toys')!;
+    expect(gt.getAttribute('title')).toContain('only worth it for several packs');
+    expect(gt.parentElement?.querySelector('.link-note')?.textContent).toBe('multi-pack orders');
 
     await act(() => fireEvent.click(button(container, 'In stock')));
     expect(names(container)).toEqual(['Set 1']); // Set 2 is above market: hidden by default

@@ -160,7 +160,7 @@
                     <summary>Search</summary>
                     <ul>
                       {#each searchLinks(o.setName, o.productType, o.tcgUrl) as l (l.store)}
-                        <li><a href={l.url} target="_blank" rel="noopener noreferrer">{l.store}</a></li>
+                        <li><a href={l.url} target="_blank" rel="noopener noreferrer" title={l.note}>{l.store}</a>{#if l.note}<span class="link-note" title={l.note}>multi-pack orders</span>{/if}</li>
                       {/each}
                     </ul>
                   </details>
@@ -226,4 +226,5 @@
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
+  .link-note { margin-left: 0.35rem; font-size: 0.68rem; color: var(--tone-high); cursor: help; white-space: nowrap; }
 </style>

@@ -37,6 +37,15 @@ describe('deals', () => {
     expect(links.find(l => l.store === 'eBay')!.url).toContain('LH_BIN=1');
   });
 
+  it('notes stores whose shipping only pays off for several packs', () => {
+    const links = searchLinks('Prophecy', 'Booster Pack');
+    const gt = links.find(l => l.store === 'Galactic Toys')!;
+    expect(gt.url).toBe('https://galactictoys.com/search?q=Prophecy%20Booster%20Pack');
+    expect(gt.note).toContain('only worth it for several packs');
+    expect(links.find(l => l.store === 'Hareruya')!.note).toContain('Japan');
+    expect(links.find(l => l.store === 'Card Kingdom')!.note).toBeUndefined();
+  });
+
   it("links TCGplayer's product page when known", () => {
     const tcg = (u?: string) => searchLinks("Dragon's Maze", 'Booster Pack', u).find(l => l.store === 'TCGplayer')!.url;
     expect(tcg('https://www.tcgplayer.com/product/67752/magic-dragons-maze-dragons-maze-booster-pack'))

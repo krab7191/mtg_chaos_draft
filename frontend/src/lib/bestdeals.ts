@@ -48,13 +48,17 @@ export interface Ranked extends Candidate {
   score: number;
 }
 
+/** Shipping per order for a store without a setting: cautious, so an unknown
+ *  store never wins on free shipping it doesn't have ($8+ is common for small shops). */
+export const UNKNOWN_SHIPPING = 8;
+
 /** Scores candidates that pass the filters, best first. */
 export function rank(candidates: Candidate[], filters: OfferFilters, ship: ShippingSettings): Ranked[] {
   // Reuse the store-listing filters (language, max price); "above market" is
   // about listings, not picks, so it doesn't apply here.
   const asOffers = candidates.map(c => ({ ...c, discount: 1, available: true }) as unknown as StoreOffer);
   const keep = new Set(applyFilters(asOffers, { ...filters, showOver: true }));
-  const perPack = (store: string) => (ship.perOrder[store] ?? 0) / Math.max(1, ship.packsPerOrder);
+  const perPack = (store: string) => (ship.perOrder[store] ?? UNKNOWN_SHIPPING) / Math.max(1, ship.packsPerOrder);
   return candidates
     .filter((_, i) => keep.has(asOffers[i]))
     .map(c => {

@@ -63,6 +63,31 @@ const dealDiscount = 0.15
 // for checking instead of called a deal.
 const suspiciousDiscount = 0.6
 
+// maxOfferAge: listings not refreshed for this long aren't shown (a store
+// that keeps failing, or one no longer read, mustn't leave old prices up).
+const maxOfferAge = 48 * time.Hour
+
+// activeStoresOverride replaces activeStores in tests.
+var activeStoresOverride []string
+
+// activeStores are the stores the app currently reads.
+func activeStores() []string {
+	if activeStoresOverride != nil {
+		return activeStoresOverride
+	}
+	var out []string
+	for _, s := range shopifyStores {
+		out = append(out, s.Name)
+	}
+	if cardKingdomURL != "" {
+		out = append(out, cardKingdomName)
+	}
+	if cardTraderToken != "" {
+		out = append(out, cardTraderName)
+	}
+	return out
+}
+
 // maxOverMarket: listings priced above this many times the market price
 // aren't shown (wrong matches, joke prices).
 const maxOverMarket = 2.0
@@ -448,6 +473,10 @@ func RefreshMarketplaces(ctx context.Context, pool *pgxpool.Pool) {
 }
 
 func refreshStores(ctx context.Context, pool *pgxpool.Pool, shopify, marketplaces bool) {
+	// Stores no longer read leave no listings behind.
+	if err := db.DeleteOffersExcept(ctx, pool, activeStores()); err != nil {
+		log.Printf("store listings: clearing old stores: %v", err)
+	}
 	c, err := getCatalog()
 	if err != nil {
 		log.Printf("store listings: no catalog: %v", err)
@@ -516,7 +545,12 @@ type Deal struct {
 
 // offersWithMarket joins listings with market prices, best discount first.
 func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
-	today := time.Now().UTC().Format(time.DateOnly)
+	now := time.Now().UTC()
+	today := now.Format(time.DateOnly)
+	active := map[string]bool{}
+	for _, s := range activeStores() {
+		active[s] = true
+	}
 	idx := newPackIndex(products)
 	byID := map[int]SearchResult{}
 	for _, p := range products {
@@ -524,6 +558,10 @@ func offersWithMarket(offers []db.Offer, products []SearchResult) []Deal {
 	}
 	out := []Deal{}
 	for _, o := range offers {
+		// Only stores still read, and only listings refreshed recently.
+		if !active[o.Store] || (!o.SeenAt.IsZero() && now.Sub(o.SeenAt) > maxOfferAge) {
+			continue
+		}
 		p, ok := byID[o.MTGStocksID]
 		// No market price, or only asking prices (no recent sales): there's
 		// nothing real to compare with, so the listing isn't shown.

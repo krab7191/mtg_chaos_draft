@@ -23,6 +23,11 @@ describe('best deals ranking', () => {
     expect(rank([ct, ck], NO_FILTERS, { ...ship, perOrder: { CardTrader: 0 } }).map(r => r.setName)).toEqual(['A', 'B']);
   });
 
+  it('a store without a shipping setting is charged a cautious $8 per order, not $0', () => {
+    const [r] = rank([cand({ store: 'Some Shop', price: 4.5 })], NO_FILTERS, ship);
+    expect(r.delivered).toBeCloseTo(4.5 + 8 / 3);
+  });
+
   it('keeps 3 different sets, and an excluded language is replaced by the next pack', () => {
     const all = [
       cand({ mtgstocksId: 1, setName: 'A', contents: 30, language: 'fr' }),
