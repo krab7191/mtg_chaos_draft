@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Spinner from '../Spinner.svelte';
   import { onMount } from 'svelte';
   import { getJSON } from '../../lib/api';
   import { send } from '../../lib/send';
@@ -9,13 +10,13 @@
     type OffersResponse, type OfferView, type StoreOffer,
   } from '../../lib/deals';
   import { filters, setShowOver } from '../../lib/filters.svelte';
+  import { watched, seedWatched, markWatched } from '../../lib/watches.svelte';
 
   let { canEdit = false }: { canEdit?: boolean } = $props();
 
   let data = $state<OffersResponse | null>(null);
   let loading = $state(true);
   let view = $state<OfferView>('deals');
-  let watched = $state(new Set<number>());
 
   // Language and max price come from the shared filter bar above the page.
 
@@ -23,7 +24,7 @@
     const res = await getJSON<OffersResponse>('/api/store-offers', "Couldn't load store listings");
     if (res) {
       data = res;
-      watched = new Set(res.watched);
+      seedWatched(res.watched);
       // Nothing under market today: show what's in stock instead of an empty table.
       if (!res.offers.some(o => o.isDeal)) view = 'instock';
     }
@@ -46,9 +47,7 @@
   async function setWatch(o: StoreOffer, watch: boolean) {
     const ok = await send(`/api/trends/${o.mtgstocksId}/watch`, 'PUT', { watch, dropAlert: null }, "Couldn't update the watch");
     if (!ok) return;
-    const next = new Set(watched);
-    if (watch) next.add(o.mtgstocksId); else next.delete(o.mtgstocksId);
-    watched = next;
+    markWatched(o.mtgstocksId, watch);
     if (watch) toast.show(`Watching ${o.setName} ${packName(o)}: you'll get an alert when a store lists it ${pct(-(data?.dealDiscount ?? 0.15))} or more under market`, 'success');
   }
 </script>
@@ -65,7 +64,7 @@
   {/if}
 
   {#if loading}
-    <p class="note">Loading…</p>
+    <Spinner label="Loading store listings…" />
   {:else if !data}
     <p class="note">Store listings aren't available right now.</p>
   {:else if data.offers.length === 0}

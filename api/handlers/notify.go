@@ -132,7 +132,11 @@ func currentAlerts(ctx context.Context, pool *pgxpool.Pool, ids []int) ([]watche
 	if err != nil {
 		return nil, err
 	}
-	deals := bestDeals(offers, c.products)
+	langs, err := alertLanguages(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	deals := bestDeals(inLanguages(offers, langs), c.products) // only languages the admin wants
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	out := make([]watchedAlert, 0, len(picked))
 	for _, p := range picked {

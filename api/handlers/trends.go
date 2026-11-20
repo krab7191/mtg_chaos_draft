@@ -661,7 +661,11 @@ func (h *TrendsHandler) rows(ctx context.Context, c *catalog, products []SearchR
 	if err != nil {
 		return nil, err
 	}
-	deals := bestDeals(offers, c.products)
+	langs, err := alertLanguages(ctx, h.pool)
+	if err != nil {
+		return nil, err
+	}
+	deals := bestDeals(inLanguages(offers, langs), c.products) // deal alerts follow the admin's languages
 	// A box's contents are its packs: the matching pack's EV × packs per box.
 	packOf := boxPacks(c, products)
 	evIDs := append([]int(nil), ids...)

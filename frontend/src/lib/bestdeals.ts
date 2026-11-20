@@ -65,6 +65,36 @@ export function rank(candidates: Candidate[], filters: OfferFilters, ship: Shipp
     .sort((a, b) => b.score - a.score);
 }
 
+/** A live CardTrader listing (from /api/best-deals/live). */
+export interface LiveOffer { mtgstocksId: number; store: string; url: string; title: string; language: string; price: number }
+
+/** Stores whose listings are checked live (the rest are links or market prices). */
+export const LIVE_STORES = ['CardTrader', 'Card Kingdom'];
+
+/** Swaps the live stores' candidates of the checked packs for their live listings. */
+export function withLive(candidates: Candidate[], checked: number[], live: LiveOffer[]): Candidate[] {
+  const done = new Set(checked);
+  const base = new Map<number, Candidate>();
+  for (const c of candidates) if (!base.has(c.mtgstocksId)) base.set(c.mtgstocksId, c);
+  const kept = candidates.filter(c => !(LIVE_STORES.includes(c.store) && done.has(c.mtgstocksId)));
+  const fresh = live.flatMap(o => {
+    const b = base.get(o.mtgstocksId);
+    return b ? [{ ...b, store: o.store, url: o.url, title: o.title, language: o.language || 'en', price: o.price }] : [];
+  });
+  return [...kept, ...fresh];
+}
+
+/** Packs among the best `n`, with a live store's listing, not checked live
+ *  recently (fresh says whether a pack's last check still counts). */
+export function toCheck(ranked: Ranked[], fresh: (id: number) => boolean, n = 10): number[] {
+  const ids: number[] = [];
+  for (const r of topPicks(ranked, n)) {
+    const live = ranked.some(x => x.mtgstocksId === r.mtgstocksId && LIVE_STORES.includes(x.store));
+    if (live && !fresh(r.mtgstocksId)) ids.push(r.mtgstocksId);
+  }
+  return ids;
+}
+
 /** The best `n` from different sets. */
 export function topPicks(ranked: Ranked[], n = 3): Ranked[] {
   const sets = new Set<string>();

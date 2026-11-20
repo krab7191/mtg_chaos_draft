@@ -614,3 +614,63 @@ func (h *TrendsHandler) StoreOffers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }
+
+// ── Alert languages ───────────────────────────────────────────
+
+// The admin's language filter, kept on the server so phone deal alerts follow
+// it (filters otherwise live in the browser). Unset or null = every language.
+const alertLanguagesKey = "alertLanguages"
+
+func alertLanguages(ctx context.Context, pool *pgxpool.Pool) (map[string]bool, error) {
+	var langs []string
+	ok, err := db.GetSetting(ctx, pool, alertLanguagesKey, &langs)
+	if err != nil || !ok || langs == nil {
+		return nil, err
+	}
+	m := map[string]bool{}
+	for _, l := range langs {
+		m[l] = true
+	}
+	return m, nil
+}
+
+// inLanguages keeps offers in the given languages (all when langs is nil).
+func inLanguages(offers []db.Offer, langs map[string]bool) []db.Offer {
+	if langs == nil {
+		return offers
+	}
+	out := make([]db.Offer, 0, len(offers))
+	for _, o := range offers {
+		if langs[cmp.Or(o.Language, "en")] {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// AlertLanguages reads (GET) or sets (PUT {"languages": [...] | null}) the
+// languages deal alerts cover.
+func (h *TrendsHandler) AlertLanguages(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPut {
+		var body struct {
+			Languages []string `json:"languages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Languages) > 20 {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := db.SetSetting(r.Context(), h.pool, alertLanguagesKey, body.Languages); err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	var langs []string
+	if _, err := db.GetSetting(r.Context(), h.pool, alertLanguagesKey, &langs); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"languages": langs})
+}

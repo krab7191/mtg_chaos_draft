@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"mtg-chaos-draft/db"
@@ -124,6 +129,92 @@ func (h *TrendsHandler) BestDeals(w http.ResponseWriter, r *http.Request) {
 		AsOf       string                        `json:"asOf"`
 		Timing     map[string]map[Signal]float64 `json:"timing"`
 	}{out, shippingDefaults, today.Format(time.DateOnly), timingFactors}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// Card Kingdom's whole sealed list is one request: re-read at most every
+// ctLiveCache for live checks.
+var (
+	ckLiveMu    sync.Mutex
+	ckLiveAt    time.Time
+	ckLiveOffer []db.Offer
+)
+
+// liveCardKingdom returns Card Kingdom's current listings for the given packs.
+func liveCardKingdom(ctx context.Context, idx *packIndex, ids []int) ([]db.Offer, error) {
+	if cardKingdomURL == "" {
+		return []db.Offer{}, nil
+	}
+	ckLiveMu.Lock()
+	defer ckLiveMu.Unlock()
+	if ckLiveOffer == nil || ctLiveClock().Sub(ckLiveAt) >= ctLiveCache {
+		offers, _, err := fetchCardKingdom(ctx, idx)
+		if err != nil {
+			return nil, err
+		}
+		now := ctLiveClock().UTC()
+		for i := range offers {
+			offers[i].SeenAt = now
+		}
+		ckLiveOffer, ckLiveAt = offers, now
+	}
+	want := map[int]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	out := []db.Offer{}
+	for _, o := range ckLiveOffer {
+		if want[o.MTGStocksID] {
+			out = append(out, o)
+		}
+	}
+	return out, nil
+}
+
+// BestDealsLive re-checks CardTrader and Card Kingdom live for the packs a page is showing
+// (GET /api/best-deals/live?ids=1,2,3; at most ctLiveMax) and returns their
+// current listings, with the usual rules applied. Nothing is saved.
+func (h *TrendsHandler) BestDealsLive(w http.ResponseWriter, r *http.Request) {
+	var ids []int
+	for _, f := range strings.Split(r.URL.Query().Get("ids"), ",") {
+		if id, err := strconv.Atoi(strings.TrimSpace(f)); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		http.Error(w, "ids required", http.StatusBadRequest)
+		return
+	}
+	c, err := getCatalog()
+	if err != nil {
+		http.Error(w, "couldn't reach MTGStocks — try again shortly", http.StatusBadGateway)
+		return
+	}
+	idx := newPackIndex(c.products)
+	fresh, err := liveCardTrader(r.Context(), h.pool, idx, ids)
+	if err != nil {
+		log.Printf("best deals: live CardTrader check: %v", err)
+		http.Error(w, "couldn't reach CardTrader right now", http.StatusBadGateway)
+		return
+	}
+	ck, err := liveCardKingdom(r.Context(), idx, ids)
+	if err != nil {
+		log.Printf("best deals: live Card Kingdom check: %v", err)
+		http.Error(w, "couldn't reach Card Kingdom right now", http.StatusBadGateway)
+		return
+	}
+	fresh = append(fresh, ck...)
+	deals := []Deal{}
+	for _, d := range offersWithMarket(fresh, c.products) {
+		if d.Available {
+			deals = append(deals, d)
+		}
+	}
+	resp := struct {
+		Offers    []Deal    `json:"offers"`
+		CheckedAt time.Time `json:"checkedAt"`
+	}{deals, time.Now().UTC()}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }

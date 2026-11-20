@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"mtg-chaos-draft/db"
@@ -215,37 +216,106 @@ func fetchCardTrader(ctx context.Context, pool *pgxpool.Pool, c *catalog, idx *p
 		if err := ct.get(ctx, fmt.Sprintf("/marketplace/products?blueprint_id=%d", b.BlueprintID), &byBlueprint); err != nil {
 			return nil, 0, err
 		}
-		cheapest := map[string]ctListing{}
-		for _, l := range byBlueprint[fmt.Sprint(b.BlueprintID)] {
-			if l.Quantity <= 0 || l.OnVacation || l.PriceCents <= 0 || l.PriceCurrency != "USD" || !l.User.CTZero {
-				continue
-			}
-			lang := ctLanguage(l.PropertiesHash.Language)
-			if cur, ok := cheapest[lang]; !ok || l.PriceCents < cur.PriceCents {
-				cheapest[lang] = l
-			}
-		}
-		langs := make([]string, 0, len(cheapest))
-		for lang := range cheapest {
-			langs = append(langs, lang)
-		}
-		sort.Strings(langs)
-		for _, lang := range langs {
-			l := cheapest[lang]
-			name := languageNames[lang]
-			if name == "" {
-				name = lang
-			}
-			out = append(out, db.Offer{
-				Store:       cardTraderName,
-				URL:         fmt.Sprintf("https://www.cardtrader.com/en/cards/%d#%s", b.BlueprintID, lang),
-				MTGStocksID: b.MTGStocksID,
-				Title:       fmt.Sprintf("%s · %s · ships from %s via Zero · incl. ~10%% fee", b.Name, name, l.User.CountryCode),
-				Price:       math.Round(float64(l.PriceCents)*(1+cardTraderFee)) / 100,
-				Available:   true,
-				Language:    lang,
-			})
-		}
+		out = append(out, ctOffers(b, byBlueprint[fmt.Sprint(b.BlueprintID)])...)
 	}
 	return out, len(bps), nil
+}
+
+// ctOffers turns one booster's listings into offers: the cheapest CardTrader
+// Zero listing per language, fee included.
+func ctOffers(b db.CTBlueprint, listings []ctListing) []db.Offer {
+	cheapest := map[string]ctListing{}
+	for _, l := range listings {
+		if l.Quantity <= 0 || l.OnVacation || l.PriceCents <= 0 || l.PriceCurrency != "USD" || !l.User.CTZero {
+			continue
+		}
+		lang := ctLanguage(l.PropertiesHash.Language)
+		if cur, ok := cheapest[lang]; !ok || l.PriceCents < cur.PriceCents {
+			cheapest[lang] = l
+		}
+	}
+	langs := make([]string, 0, len(cheapest))
+	for lang := range cheapest {
+		langs = append(langs, lang)
+	}
+	sort.Strings(langs)
+	out := make([]db.Offer, 0, len(langs))
+	for _, lang := range langs {
+		l := cheapest[lang]
+		name := languageNames[lang]
+		if name == "" {
+			name = lang
+		}
+		out = append(out, db.Offer{
+			Store:       cardTraderName,
+			URL:         fmt.Sprintf("https://www.cardtrader.com/en/cards/%d#%s", b.BlueprintID, lang),
+			MTGStocksID: b.MTGStocksID,
+			Title:       fmt.Sprintf("%s · %s · ships from %s via Zero · incl. ~10%% fee", b.Name, name, l.User.CountryCode),
+			Price:       math.Round(float64(l.PriceCents)*(1+cardTraderFee)) / 100,
+			Available:   true,
+			Language:    lang,
+			SeenAt:      time.Now().UTC(),
+		})
+	}
+	return out
+}
+
+// Live checks for the few packs a page is about to recommend: listings sell
+// within minutes, so the 2-hourly read isn't fresh enough for a "buy this".
+// Read-only (nothing is saved), cached briefly so reloads don't hammer
+// CardTrader, one check at a time at the API's pace.
+const (
+	ctLiveMax   = 10              // packs per check
+	ctLiveCache = 5 * time.Minute // a pack's listings are reused this long
+)
+
+var (
+	ctLiveMu    sync.Mutex
+	ctLiveSeen  = map[int]ctLiveEntry{} // by blueprint
+	ctLiveClock = time.Now
+)
+
+type ctLiveEntry struct {
+	at     time.Time
+	offers []db.Offer
+}
+
+// liveCardTrader returns fresh CardTrader offers for the given packs (by
+// MTGStocks id, at most ctLiveMax).
+func liveCardTrader(ctx context.Context, pool *pgxpool.Pool, idx *packIndex, ids []int) ([]db.Offer, error) {
+	if cardTraderToken == "" {
+		return []db.Offer{}, nil
+	}
+	want := map[int]bool{}
+	for _, id := range ids[:min(len(ids), ctLiveMax)] {
+		want[id] = true
+	}
+	bps, err := db.CardTraderBlueprints(ctx, pool)
+	if err != nil {
+		return nil, err
+	}
+	ctLiveMu.Lock()
+	defer ctLiveMu.Unlock()
+	ct := &ctClient{}
+	out := []db.Offer{}
+	for _, b := range bps {
+		if !want[b.MTGStocksID] {
+			continue
+		}
+		if p, ok := idx.match(b.Name); !ok || p.MTGStocksID != b.MTGStocksID {
+			continue
+		}
+		if e, ok := ctLiveSeen[b.BlueprintID]; ok && ctLiveClock().Sub(e.at) < ctLiveCache {
+			out = append(out, e.offers...)
+			continue
+		}
+		var byBlueprint map[string][]ctListing
+		if err := ct.get(ctx, fmt.Sprintf("/marketplace/products?blueprint_id=%d", b.BlueprintID), &byBlueprint); err != nil {
+			return nil, err
+		}
+		offers := ctOffers(b, byBlueprint[fmt.Sprint(b.BlueprintID)])
+		ctLiveSeen[b.BlueprintID] = ctLiveEntry{at: ctLiveClock(), offers: offers}
+		out = append(out, offers...)
+	}
+	return out, nil
 }

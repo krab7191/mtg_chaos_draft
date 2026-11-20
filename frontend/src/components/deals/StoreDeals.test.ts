@@ -4,8 +4,9 @@ import StoreDeals from './StoreDeals.svelte';
 import { toast } from '../../lib/toast.svelte';
 import type { OffersResponse, StoreOffer } from '../../lib/deals';
 import { clearFilters, setLanguage, setMaxPrice } from '../../lib/filters.svelte';
+import { watched } from '../../lib/watches.svelte';
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); clearFilters(); localStorage.clear(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); clearFilters(); localStorage.clear(); watched.clear(); });
 
 const offer = (id: number, over: Partial<StoreOffer> = {}): StoreOffer => ({
   store: 'Collector Store', url: `https://x/${id}`, mtgstocksId: id, title: `Magic the Gathering: Set ${id} Draft Booster Pack`, price: 40, available: true,

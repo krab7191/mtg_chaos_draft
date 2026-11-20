@@ -1,9 +1,30 @@
 <script lang="ts">
   // One filter bar for every prices page; settings are shared and remembered.
+  // For the admin, the languages are also saved on the server so phone deal
+  // alerts follow them (the server's choice is loaded on each page).
+  import { onMount } from 'svelte';
   import { LANGUAGES } from '../lib/deals';
-  import { filters, ALL_LANGUAGES, setLanguage, setMaxPrice, clearFilters, languageShown } from '../lib/filters.svelte';
+  import {
+    filters, ALL_LANGUAGES, setLanguage, setLanguages, setMaxPrice, clearFilters, languageShown, onLanguagesChange,
+  } from '../lib/filters.svelte';
+
+  let { canEdit = false }: { canEdit?: boolean } = $props();
 
   const active = $derived(filters.languages != null || filters.maxPrice != null);
+
+  onMount(() => {
+    if (!canEdit) return;
+    fetch('/api/alert-languages')
+      .then(r => (r.ok ? r.json() : null))
+      .then((body: { languages: string[] | null } | null) => { if (body) setLanguages(body.languages, false); })
+      .catch(() => { /* keep this browser's choice */ });
+    onLanguagesChange(langs => {
+      fetch('/api/alert-languages', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ languages: langs }),
+      }).catch(() => { /* alerts keep the last saved languages */ });
+    });
+    return () => onLanguagesChange(null);
+  });
 </script>
 
 <div class="bar" role="group" aria-label="Filters for all price pages">
@@ -22,6 +43,9 @@
       onchange={e => { setMaxPrice(parseFloat(e.currentTarget.value)); e.currentTarget.value = filters.maxPrice == null ? '' : String(filters.maxPrice); }} />
   </label>
   {#if active}<button type="button" class="clear" onclick={clearFilters}>Clear</button>{/if}
+  <span class="hint">
+    Languages: store listings and Best Deals{canEdit ? ', and phone deal alerts' : ''}. Max price: every list.
+  </span>
 </div>
 
 <style>
@@ -36,5 +60,6 @@
   label { display: inline-flex; gap: 0.25rem; align-items: center; cursor: pointer; color: var(--color-text); }
   label.off { color: var(--color-text-muted); text-decoration: line-through; }
   .max input { width: 4.5rem; font: inherit; }
+  .hint { flex-basis: 100%; font-size: 0.72rem; }
   .clear { background: none; border: none; color: var(--color-accent); font: inherit; cursor: pointer; padding: 0; }
 </style>

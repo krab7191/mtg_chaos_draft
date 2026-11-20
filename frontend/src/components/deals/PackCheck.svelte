@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Spinner from '../Spinner.svelte';
   // "Check a pack": search any single pack and see what its contents are
   // worth (pull rates x card prices), by slot and by card, against its price.
   import { getJSON } from '../../lib/api';
@@ -63,7 +64,7 @@
   </div>
 
   {#if loading}
-    <p class="note">Working it out…</p>
+    <Spinner label="Working it out…" />
   {:else if result}
     {@const r = result}
     <div class="summary" class:premium={r.premium}>

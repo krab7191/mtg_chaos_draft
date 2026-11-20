@@ -72,6 +72,8 @@ func TestDB_DatabaseDown(t *testing.T) {
 			return db.RecordEV(ctx, pool, map[time.Time]map[int]float64{time.Now(): {1: 1}})
 		},
 		"EVDays":               func() error { return errOnly(db.EVDays(ctx, pool)) },
+		"GetSetting":           func() error { var v []string; return errOnly(db.GetSetting(ctx, pool, "k", &v)) },
+		"SetSetting":           func() error { return db.SetSetting(ctx, pool, "k", []string{"en"}) },
 		"LatestEV":             func() error { return errOnly(db.LatestEV(ctx, pool, []int{1}, 14)) },
 		"GetWeightSettings":    func() error { return errOnly(db.GetWeightSettings(ctx, pool)) },
 		"UpdateWeightSettings": func() error { return errOnly(db.UpdateWeightSettings(ctx, pool, &db.WeightSettings{})) },

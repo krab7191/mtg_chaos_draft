@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Spinner from '../Spinner.svelte';
   import { onMount, tick } from 'svelte';
   import Sparkline from './Sparkline.svelte';
   import PriceChart from './PriceChart.svelte';
@@ -270,7 +271,7 @@
 
 <!-- ── Table ──────────────────────────────────────────────── -->
 {#if loading && !data}
-  <p class="note">Loading…</p>
+  <Spinner label="Loading price trends…" />
 {:else if rows.length === 0}
   <p class="note">Nothing matches these filters.</p>
 {:else}
@@ -382,7 +383,7 @@
                       title="{r.setName} {kindLabel(r)}: daily market price"
                     />
                   {:else}
-                    <p class="note">Loading history…</p>
+                    <Spinner label="Loading history…" />
                   {/if}
                 </div>
               </td>

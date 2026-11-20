@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rank, topPicks, reasons, type Candidate } from './bestdeals';
+import { rank, topPicks, reasons, withLive, toCheck, type Candidate } from './bestdeals';
 import { NO_FILTERS } from './deals';
 
 const cand = (over: Partial<Candidate> = {}): Candidate => ({
@@ -50,5 +50,25 @@ describe('best deals ranking', () => {
     expect(reasons(rank([cand({ signal: 'floor' })], NO_FILTERS, ship)[0])).toContain('◆ Possible floor: near its low');
     expect(reasons(rank([cand({ signal: 'falling', timing: 1.045 })], NO_FILTERS, ship)[0]).some(w => w.includes('+5%'))).toBe(true);
     expect(reasons(rank([cand({ signal: '', market: 10 })], NO_FILTERS, ship)[0])).toHaveLength(1); // at market, no signal: just the value
+  });
+});
+
+describe('live CardTrader prices', () => {
+  it('swaps the checked packs\' CardTrader candidates for live ones', () => {
+    const all = [cand({ mtgstocksId: 1, store: 'TCGplayer', price: 12 }), cand({ mtgstocksId: 1, store: 'CardTrader', price: 6 }),
+      cand({ mtgstocksId: 2, store: 'CardTrader', price: 7, setName: 'B' })];
+    const out = withLive(all, [1], [{ mtgstocksId: 1, store: 'CardTrader', url: 'n', title: 'new', language: '', price: 8.19 },
+      { mtgstocksId: 99, store: 'CardTrader', url: 'x', title: 'unknown pack', language: 'en', price: 1 }]);
+    expect(out.map(c => [c.mtgstocksId, c.store, c.price, c.language])).toEqual([
+      [1, 'TCGplayer', 12, 'en'], [2, 'CardTrader', 7, 'en'], [1, 'CardTrader', 8.19, 'en'],
+    ]);
+  });
+
+  it('checks the CardTrader packs among the best, once', () => {
+    const ranked = rank([cand({ mtgstocksId: 1, store: 'CardTrader' }), cand({ mtgstocksId: 2, setName: 'B', store: 'TCGplayer' }),
+      cand({ mtgstocksId: 3, setName: 'C', store: 'CardTrader', contents: 5 })], NO_FILTERS, ship);
+    // Packs 1 and 3 have CardTrader listings; 2 only TCGplayer (nothing to check live).
+    expect(toCheck(ranked, () => false)).toEqual([1, 3]);
+    expect(toCheck(ranked, id => id === 1)).toEqual([3]); // 1 checked recently
   });
 });

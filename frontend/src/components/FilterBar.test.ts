@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, fireEvent, act } from '../tests/svelte';
+import { render, fireEvent, act, waitFor } from '../tests/svelte';
 import FilterBar from './FilterBar.svelte';
 import { filters, clearFilters, FILTERS_KEY, setShowOver, withinMax, ALL_LANGUAGES } from '../lib/filters.svelte';
 
-afterEach(() => { clearFilters(); localStorage.clear(); vi.restoreAllMocks(); });
+afterEach(() => { clearFilters(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const box = (c: HTMLElement, label: string) =>
   Array.from(c.querySelectorAll('label')).find(l => l.textContent?.trim().startsWith(label))!.querySelector('input')!;
@@ -53,5 +53,39 @@ describe('FilterBar', () => {
     expect(filters.languages).toBeNull(); // unreadable: defaults
     setShowOver(true);
     expect(filters.showOver).toBe(true);
+  });
+});
+
+describe('FilterBar for the admin', () => {
+  it('loads the languages saved for phone alerts, and saves changes', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit): Promise<unknown> =>
+      init?.method === 'PUT' ? { ok: true, status: 204 } : { ok: true, status: 200, json: async (): Promise<unknown> => ({ languages: ['en', 'ja'] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const { container, unmount } = render(FilterBar, { props: { canEdit: true } });
+    await waitFor(() => expect(filters.languages).toEqual(['en', 'ja']));
+    expect(container.textContent).toContain('and phone deal alerts');
+    await act(() => fireEvent.click(box(container, 'German')));
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/alert-languages', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ languages: ['en', 'ja', 'de'] }),
+    }));
+    await act(() => fireEvent.click(container.querySelector('.clear')!));
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/alert-languages', expect.objectContaining({ body: JSON.stringify({ languages: null }) }));
+    unmount();
+  });
+
+  it('viewers keep their own choice and save nothing', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = render(FilterBar, {});
+    await act(() => fireEvent.click(box(container, 'German')));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('phone deal alerts');
+  });
+
+  it('copes with the server being unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('down'); }));
+    const { container } = render(FilterBar, { props: { canEdit: true } });
+    await act(() => fireEvent.click(box(container, 'German')));
+    expect(filters.languages).not.toContain('de');
   });
 });

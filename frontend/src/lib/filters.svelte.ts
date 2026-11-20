@@ -26,12 +26,22 @@ function save() {
   try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch { /* private mode: not remembered */ }
 }
 
+/** Called after the languages change (the admin's bar saves them for phone alerts). */
+let onLanguages: ((langs: string[] | null) => void) | null = null;
+export function onLanguagesChange(fn: ((langs: string[] | null) => void) | null) { onLanguages = fn; }
+
 /** Shows or hides one language; all ticked again means "no language filter". */
 export function setLanguage(lang: string, on: boolean) {
   const current = filters.languages ?? ALL_LANGUAGES;
   const next = on ? [...new Set([...current, lang])] : current.filter(l => l !== lang);
-  filters.languages = next.length >= ALL_LANGUAGES.length ? null : ALL_LANGUAGES.filter(l => next.includes(l));
+  setLanguages(next.length >= ALL_LANGUAGES.length ? null : ALL_LANGUAGES.filter(l => next.includes(l)));
+}
+
+/** Sets the language filter outright (null = every language). */
+export function setLanguages(langs: string[] | null, notify = true) {
+  filters.languages = langs;
   save();
+  if (notify) onLanguages?.(langs);
 }
 
 export function setMaxPrice(v: number | null) {
@@ -45,8 +55,10 @@ export function setShowOver(on: boolean) {
 }
 
 export function clearFilters() {
+  const hadLanguages = filters.languages != null;
   Object.assign(filters, NO_FILTERS);
   save();
+  if (hadLanguages) onLanguages?.(null);
 }
 
 export const languageShown = (lang: string) => filters.languages == null || filters.languages.includes(lang);

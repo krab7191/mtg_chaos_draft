@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Spinner from '../Spinner.svelte';
   import { onMount, tick } from 'svelte';
   import { getJSON } from '../../lib/api';
   import { send } from '../../lib/send';
@@ -6,6 +7,7 @@
   import { money, pct, age, alertText, evText, contentsTone, type TrendRow, type PricePoint } from '../../lib/trends';
   import { searchLinks } from '../../lib/deals';
   import { withinMax } from '../../lib/filters.svelte';
+  import { watched, seedWatched, markWatched } from '../../lib/watches.svelte';
   import Sparkline from '../trends/Sparkline.svelte';
   import PriceChart from '../trends/PriceChart.svelte';
 
@@ -29,7 +31,10 @@
     loading = true;
     const q = before ? `?before=${encodeURIComponent(before)}` : '';
     const res = await getJSON<CheapestResponse>(`/api/cheapest/trends${q}`, "Couldn't load the cheapest packs");
-    if (res) data = res;
+    if (res) {
+      data = res;
+      seedWatched(res.products.filter(r => r.watch).map(r => r.mtgstocksId));
+    }
     loading = false;
   }
   onMount(load);
@@ -58,6 +63,7 @@
     const ok = await send(`/api/trends/${r.mtgstocksId}/watch`, 'PUT', { watch, dropAlert: null }, "Couldn't update the watch");
     if (!ok) return;
     r.watch = watch ? { mtgstocksId: r.mtgstocksId, dropAlert: null } : null;
+    markWatched(r.mtgstocksId, watch);
     if (watch) {
       const pctUnder = Math.round((data?.dipBelowUsual ?? 0.15) * 100);
       toast.show(`Watching ${r.setName} ${r.productType}: you'll get an alert when it's ${pctUnder}%+ under its usual price or a store lists it well under market`, 'success');
@@ -88,7 +94,7 @@
   </form>
 
   {#if loading && !data}
-    <p class="note">Loading…</p>
+    <Spinner label="Loading the cheapest packs…" />
   {:else if !data}
     <p class="note">The cheapest packs aren't available right now.</p>
   {:else if data.products.length === 0}
@@ -136,10 +142,10 @@
               {#if canEdit}
                 <td>
                   <label class="watch">
-                    <input type="checkbox" checked={r.watch != null} onchange={async e => {
+                    <input type="checkbox" checked={watched.has(r.mtgstocksId)} onchange={async e => {
                       const box = e.currentTarget;
                       await setWatch(r, box.checked);
-                      box.checked = r.watch != null;
+                      box.checked = watched.has(r.mtgstocksId);
                     }} />
                     <span class="sr-only">Watch {r.setName} {r.productType}</span>
                   </label>
@@ -169,7 +175,7 @@
                         title="{r.setName} {r.productType}: daily market price"
                       />
                     {:else}
-                      <p class="note">Loading history…</p>
+                      <Spinner label="Loading history…" />
                     {/if}
                   </div>
                 </td>

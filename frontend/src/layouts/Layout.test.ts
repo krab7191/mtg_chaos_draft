@@ -62,6 +62,12 @@ describe('Layout', () => {
     expect(wide).toMatch(/class="main main--wide/);
   });
 
+  it('every page has a back-to-top button (hidden until you scroll)', async () => {
+    const container = await createContainer();
+    const html = await container.renderToString(Layout, { props: { title: 'T' } });
+    expect(html).toMatch(/<button[^>]*id="to-top"[^>]*aria-label="Back to top"[^>]*hidden/);
+  });
+
   it('price pages can show the shared filter bar', async () => {
     const container = await createContainer();
     const plain = await container.renderToString(Layout, { props: { title: 'T' } });

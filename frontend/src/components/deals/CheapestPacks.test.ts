@@ -2,10 +2,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor } from '../../tests/svelte';
 import CheapestPacks from './CheapestPacks.svelte';
 import { clearFilters, setMaxPrice } from '../../lib/filters.svelte';
+import { watched } from '../../lib/watches.svelte';
 import { toast } from '../../lib/toast.svelte';
 import type { Trend, TrendRow } from '../../lib/trends';
 
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); watched.clear(); });
 
 const trend = (over: Partial<Trend> = {}): Trend => ({
   current: 4, low: 3, lowDay: '2015-01-01', aboveLow: 0.3, change30: -0.05, releasePrice: 4, dropFromRelease: 0,

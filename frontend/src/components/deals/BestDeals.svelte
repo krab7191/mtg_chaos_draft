@@ -4,7 +4,8 @@
   import { money } from '../../lib/trends';
   import { languageLabel } from '../../lib/deals';
   import { filters } from '../../lib/filters.svelte';
-  import { rank, topPicks, reasons, type BestDealsResponse, type ShippingSettings } from '../../lib/bestdeals';
+  import { rank, topPicks, reasons, withLive, toCheck, type BestDealsResponse, type ShippingSettings, type LiveOffer } from '../../lib/bestdeals';
+  import Spinner from '../Spinner.svelte';
 
   let data = $state<BestDealsResponse | null>(null);
   let loading = $state(true);
@@ -16,6 +17,45 @@
   $effect(() => {
     if (!data) return;
     try { localStorage.setItem(SHIP_KEY, JSON.stringify(ship)); } catch { /* private mode: not remembered */ }
+  });
+
+  // Store listings sell within minutes: the CardTrader and Card Kingdom
+  // prices of the packs in the top 10 are checked live (read-only) — on load,
+  // whenever filters or shipping bring unchecked packs in (e.g. switching to
+  // English only), and again once a check is 10 minutes old while the page
+  // stays open. After a failure it waits 2 minutes before trying again.
+  const FRESH_MS = 10 * 60_000;
+  const RETRY_MS = 2 * 60_000;
+  let live = $state<'idle' | 'checking' | 'done' | 'failed'>('idle');
+  const checkedAt = new Map<number, number>();
+  let failedAt = 0;
+  let now = $state(Date.now());
+  onMount(() => {
+    const timer = setInterval(() => (now = Date.now()), 60_000);
+    return () => clearInterval(timer);
+  });
+
+  async function checkLive(ids: number[]) {
+    live = 'checking';
+    try {
+      const res = await fetch(`/api/best-deals/live?ids=${ids.join(',')}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const body = (await res.json()) as { offers: LiveOffer[] };
+      const at = Date.now();
+      ids.forEach(id => checkedAt.set(id, at));
+      if (data) data = { ...data, candidates: withLive(data.candidates, ids, body.offers ?? []) };
+      live = 'done';
+    } catch {
+      failedAt = Date.now();
+      live = 'failed'; // the page says prices are from the last read
+    }
+  }
+
+  $effect(() => {
+    if (!data || live === 'checking') return;
+    if (live === 'failed' && now - failedAt < RETRY_MS) return;
+    const ids = toCheck(ranked, id => now - (checkedAt.get(id) ?? -Infinity) < FRESH_MS);
+    if (ids.length > 0) checkLive(ids);
   });
 
   onMount(async () => {
@@ -36,13 +76,20 @@
 
 <section class="best">
   {#if loading}
-    <p class="note">Loading…</p>
+    <Spinner label="Loading the best deals…" />
   {:else if !data}
     <p class="note">Best deals aren't available right now.</p>
   {:else if picks.length === 0}
     <p class="note">Nothing to rank yet: pack contents values and store listings load after the server's daily run.</p>
   {:else}
-    <ol class="picks">
+    {#if live === 'checking'}
+      <Spinner label="Checking store prices live…" />
+    {:else if live === 'done'}
+      <p class="note live">CardTrader and Card Kingdom prices checked live (rechecked every 10 minutes while this page is open).</p>
+    {:else if live === 'failed'}
+      <p class="note live">Couldn't reach the stores just now: prices are from the last read (up to 2 hours old). Trying again shortly.</p>
+    {/if}
+    <ol class="picks" class:stale={live === 'checking'}>
       {#each picks as p, i (p.mtgstocksId + p.store + p.url)}
         <li class="pick">
           <div class="pick__rank">{i + 1}</div>
@@ -105,6 +152,8 @@
 <style>
   .note { font-size: 0.85rem; color: var(--color-text-muted); }
   .muted { color: var(--color-text-muted); font-size: 0.85rem; }
+  .picks.stale { opacity: 0.5; }
+  .live { margin: 0 0 0.6rem; }
   .picks { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: 0.8rem; }
   .pick { display: flex; gap: 0.9rem; padding: 0.8rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
   .pick__rank { font-size: 1.6rem; font-weight: 700; color: var(--tone-great); min-width: 1.6rem; }

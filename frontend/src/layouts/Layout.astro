@@ -86,10 +86,12 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
     )}
 
     <main class:list={["main", { "main--wide": wide }]}>
-      {filterBar && <FilterBar client:load />}
+      {filterBar && <FilterBar client:load canEdit={user?.role === 'admin'} />}
       <slot />
     </main>
 
+    <!-- Long pages: a way back up, shown once you've scrolled down. -->
+    <button type="button" id="to-top" class="to-top" aria-label="Back to top" title="Back to top" hidden>↑</button>
     <Toast client:load />
   </body>
 </html>
@@ -288,9 +290,44 @@ const version = import.meta.env.PUBLIC_APP_VERSION;
 
     &--wide { max-width: 1200px; }
   }
+
+  /* ── Back to top ─────────────────────────────────────────── */
+  .to-top {
+    /* Bottom-left: toasts use the bottom-right. Lifted above a page's fixed
+       bottom bar like the toasts are (--toast-offset, e.g. the pick page). */
+    position: fixed;
+    left: 1rem;
+    bottom: calc(1rem + max(var(--toast-offset, 0px), env(safe-area-inset-bottom)));
+    z-index: 150; /* under the menu and its overlay */
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+
+    &:hover, &:focus-visible { border-color: var(--color-accent); color: var(--color-accent); }
+    &[hidden] { display: none; }
+  }
 </style>
 
 <script>
+  // ── Back to top ───────────────────────────────────────────────
+  const toTop = document.getElementById('to-top');
+  if (toTop) {
+    const update = () => { toTop.hidden = window.scrollY < 600; };
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+    toTop.addEventListener('click', () => {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    });
+  }
+
   // ── Nav ───────────────────────────────────────────────────────
   const toggle  = document.getElementById('nav-toggle') as HTMLButtonElement;
   const menu    = document.getElementById('nav-menu') as HTMLElement;
