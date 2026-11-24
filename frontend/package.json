@@ -23,7 +23,7 @@
     "svelte-sonner": "^1.2.3"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/jest-dom": "^8.0.0",
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.1.0",
